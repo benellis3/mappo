@@ -82,6 +82,8 @@ RUN mkdir /pool && echo "export PATH=$PATH:'/pool/pool'" >> ~/.bashrc
 
 RUN pip3 install cloudpickle
 
+RUN pip3 install tensorboard
+
 EXPOSE 8888
 
 
