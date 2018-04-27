@@ -28,7 +28,7 @@ RUN pip3 install --upgrade pip
 RUN pip3 install numpy scipy pyyaml matplotlib
 RUN pip3 install imageio
 RUN pip3 install tensorboard-logger
-RUN pip3 install ruamel.base
+RUN pip3 install ruamel.base ryd
 
 RUN mkdir /install
 WORKDIR /install
