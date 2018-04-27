@@ -5,9 +5,10 @@ SCHEME_CACHE  = {} # global scheme registry
 
 class Scheme():
 
-    def __init__(self, scheme_list):
+    def __init__(self, scheme_list, agent_flatten=True):
         self.scheme_list = scheme_list
-        self = self.agent_flatten()  # NEW!
+        if agent_flatten:
+            self = self.agent_flatten()  # NEW!
         self.t_id_depth = self._get_t_id_depth(scheme_list)
         pass
 
@@ -81,7 +82,7 @@ class Scheme():
             else:
                 flat_scheme_list.append(_scheme)
 
-        return Scheme(flat_scheme_list)
+        return Scheme(flat_scheme_list, agent_flatten=False)
 
     def get_output_sizes(self, transition_scheme):
         """

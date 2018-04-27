@@ -54,7 +54,7 @@ class VDNMultiagentController():
         self.schemes = {}
         for _agent_id in range(self.n_agents):
             self.schemes["agent_input__agent{}".format(_agent_id)] = self.agent_scheme_fn(_agent_id).agent_flatten()
-        self.schemes["lambda_network"] = self.lambda_network_scheme
+        self.schemes["lambda_network"] = self.mixer_scheme
         # create joint scheme from the agents schemes and lambda_network_scheme
         self.joint_scheme_dict = _join_dicts(self.schemes)
 
