@@ -1,0 +1,12 @@
+env: pred_prey
+env_args:
+  agent_obs:
+    - 1
+    - 1
+  episode_limit: 20
+  nagent_capture_enabled: False
+  n_prey: 1
+  prey_movement: "escape"
+  predator_prey_shape:
+    - 3
+    - 3

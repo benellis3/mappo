@@ -1,0 +1,21 @@
+action_selector: "epsilon_greedy"
+agent_model: "RNN"
+agent_output_type: "qvalues"
+batch_size: 64
+batch_size_run: 64
+buffer_size: 128
+defaults: default iql predator_prey
+env_args:
+  n_agents: 3
+  predator_prey_shape:
+    - 3
+    - 3
+  prey_movement: "escape"
+  nagent_capture_enabled: True
+iql_epsilon_start: 0.5
+iql_epsilon_finish: 0.05
+iql_epsilon_time_length: 40000
+iql_epsilon_decay_mode: "exp"
+target_critic_update_interval: 661500
+test_nepisode: 50
+use_replay_buffer: True

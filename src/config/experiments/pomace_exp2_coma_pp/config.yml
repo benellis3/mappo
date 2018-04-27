@@ -1,0 +1,13 @@
+batch_size: 2
+defaults: default coma pomace predator_prey
+env_args:
+  n_agents: 3
+  predator_prey_shape:
+    - 3
+    - 3
+  prey_movement: "escape"
+  nagent_capture_enabled: True
+pomace_noise_network: pomace_noise_exp1_nn1
+pomace_multiagent_network: pomace_nn_exp1
+pomace_exp_variant: 1
+
