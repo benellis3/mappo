@@ -9,8 +9,10 @@ Includes implementations of algorithms:
 ## Installation instructions
 
 Build the Dockerfile using 
-> cd docker
-> ./build.sh
+```
+cd docker
+./build.sh
+```
 
 Set up StarCraft II. Download this specific version here:
 (SC2.3.16.1)[http://blzdistsc2-a.akamaihd.net/Linux/SC2.3.16.1.zip]
@@ -31,19 +33,27 @@ maps folder (which you will have to create first).
 
 Run one of the EXPERIMENTs from the folder `src/config/experiments`
 on a specific GPU using some special PARAMETERS:
-> cd pymarl/src
-> ../run <GPU> python3 main.py --exp_name=<EXPERIMENT> with <PARAMETERS>
+```
+cd pymarl/src
+../run <GPU> python3 main.py --exp_name=<EXPERIMENT> with <PARAMETERS>
+```
 
 Keep an eye on your docker containers, they will be named
 `<USER>_pymarl_GPU_<GPU>_<RANDOM>`:
-> docker ps
+```
+docker ps
+```
 
 If you do not want them anymore, kill a container named `NAME` with
-> docker kill <NAME>
-> docker rm <NAME>
+```
+docker kill <NAME>
+docker rm <NAME>
+```
 
 If you want to get rid of *all* your containers, execute 
-> pymarl/kill.sh
+```
+pymarl/kill.sh
+```
 
 ## Run SC2 baselines
 
