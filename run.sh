@@ -12,14 +12,13 @@ else
   cmd=docker
 fi
 
-NV_GPU="$GPU" ${cmd} run --rm \
+NV_GPU="$GPU" ${cmd} run --rm -i -d \
     --name $name \
-    --security-opt="apparmor=unconfined" --cap-add=SYS_PTRACE \
+    --cap-add=SYS_PTRACE \
     --net host \
     --user $(id -u) \
-    -v `pwd`:/deepmarl \
+    -v `pwd`:/pymarl \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
-    -v `pwd`/mongodb:/data/db \
     -e DISPLAY=unix$DISPLAY \
-    -t deepmarl/pytorch \
+    -t pymarl \
     ${@:2}
