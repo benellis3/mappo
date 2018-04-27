@@ -644,6 +644,7 @@ class NStepRunner():
                                                           info={"T":self.T},
                                                           test_mode=test_mode)
 
+            # TODO: adapt for multiple simultaneous output types!
             self.episode_buffer.set_col(bs=ids_envs_not_terminated,
                                         col=self.multiagent_controller.action_selector.output_type,
                                         t=self.t_episode,

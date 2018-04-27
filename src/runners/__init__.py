@@ -11,3 +11,6 @@ REGISTRY["pomace"] = poMACERunner
 
 from .iql_runner import IQLRunner
 REGISTRY["iql"] = IQLRunner
+
+from .vdn_runner import VDNRunner
+REGISTRY["vdn"] = VDNRunner

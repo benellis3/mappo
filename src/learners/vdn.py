@@ -52,8 +52,7 @@ class VDNLearner():
     def __init__(self, multiagent_controller, logging_struct=None, args=None):
         self.args = args
         self.multiagent_controller = multiagent_controller
-        self.agents = multiagent_controller.agents # for now, do not use any other multiagent controller functionality!!
-        self.n_agents = len(self.agents)
+        self.n_agents = self.multiagent_controller.n_agents
         self.n_actions = self.multiagent_controller.n_actions
         self.T_q = 0
         self.target_update_interval=args.target_update_interval
@@ -75,12 +74,8 @@ class VDNLearner():
 
     def create_models(self, transition_scheme):
 
-        self.agent_parameters = []
-        for agent in self.agents:
-            self.agent_parameters.extend(agent.get_parameters())
-            if self.args.share_agent_params:
-                break
-        self.agent_optimiser =  RMSprop(self.agent_parameters, lr=self.args.lr_q)
+        self.network_parameters = self.multiagent_controller.get_parameters()
+        self.network_optimiser =  RMSprop(self.network_parameters, lr=self.args.lr_q)
 
         # calculate a grand joint scheme
         self.joint_scheme_dict = self.multiagent_controller.joint_scheme_dict
@@ -115,9 +110,9 @@ class VDNLearner():
                                                                            tformat=data_inputs_tformat,
                                                                            test_mode=True, # irrelevant, as no action selection
                                                                            target_mode=True, # use target network
-                                                                           mix=True, # calculate q_tot
+                                                                           actions="greedy",
                                                                            )
-        vvalues, _ = target_mac_output["q_tot_values"].detach()
+        q_tot = target_mac_output["q_tot"].detach()
 
         # calculate q_tot targets
         td_targets, \
@@ -125,7 +120,7 @@ class VDNLearner():
                                                     bs_ids=None,
                                                     td_lambda=self.args.td_lambda,
                                                     gamma=self.args.gamma,
-                                                    value_function_values=vvalues,
+                                                    value_function_values=q_tot,
                                                     n_agents=1, # have only 1, "central" agent
                                                     to_variable=True,
                                                     to_cuda=self.args.use_cuda)
@@ -146,7 +141,7 @@ class VDNLearner():
                                                                     tformat=data_inputs_tformat,
                                                                     test_mode=True, # irrelevant, as no action selection!
                                                                     target_mode=False,
-                                                                    actions=actions, # setting the actions actually means:
+                                                                    actions=Variable(actions, requires_grad=False), # setting the actions actually means:
                                                                                      # do not select them again!
                                                                     )
 
@@ -154,10 +149,10 @@ class VDNLearner():
         VDN_loss = VDN_loss.mean()
 
         # carry out optimization for agents
-        self.agent_optimiser.zero_grad()
+        self.network_optimiser.zero_grad()
         VDN_loss.backward()
-        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
-        self.agent_optimiser.step() #DEBUG
+        policy_grad_norm = th.nn.utils.clip_grad_norm(self.network_parameters, 50)
+        self.network_optimiser.step() #DEBUG
 
         # increase episode counter
         self.T_q += len(batch_history) * batch_history._n_t
@@ -169,7 +164,7 @@ class VDNLearner():
 
         self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy())
         self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean())
-        self._add_stat("target_q_tot_mean", target_mac_output["q_tot_values"].data.cpu().numpy().mean())
+        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean())
 
         # self._add_stat("critic_loss", critic_loss.data.cpu().numpy())
         # self._add_stat("critic_mean", critic_mean)
@@ -224,7 +219,8 @@ class VDNLearner():
         Logging is triggered in run.py
         """
         stats = self.get_stats()
-        logging_dict =  dict(q_loss = _seq_mean(stats["q_loss"]),
+        logging_dict =  dict(q_loss = _seq_mean(stats["q_tot_loss"]),
+                             target_q_tot_mean=_seq_mean(stats["target_q_tot_mean"]),
                              target_q_mean = _seq_mean(stats["target_q_mean"]),
                              T_q=self.T_q
                             )

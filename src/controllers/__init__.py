@@ -10,3 +10,6 @@ REGISTRY["coma_recursive_ac"] = COMAAgentController
 REGISTRY["independent_mac"] = IndependentMultiagentController
 REGISTRY["coma_mac"] = COMAMultiAgentController
 REGISTRY["pomace_mac"] = poMACEMultiagentController
+
+from .vdn_agents import VDNMultiagentController
+REGISTRY["vdn_mac"] = VDNMultiagentController

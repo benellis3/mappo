@@ -61,7 +61,7 @@ class VDNRunner(NStepRunner):
                                    #      shape=(1,),
                                    #      dtype=np.bool,
                                    #      missing=False),
-                                   dict(name="vdl_epsilons",
+                                   dict(name="vdn_epsilons",
                                         scope="episode",
                                         shape=(1,),
                                         dtype=np.float32,
@@ -84,7 +84,7 @@ class VDNRunner(NStepRunner):
 
         # set up epsilon greedy action selector with proper access function to epsilons
         def _get_epsilons():
-            ret = self.episode_buffer.get_col(col="vdl_epsilons",
+            ret = self.episode_buffer.get_col(col="vdn_epsilons",
                                               scope="episode")
             return ret
         self.multiagent_controller.action_selector._get_epsilons = _get_epsilons
@@ -104,14 +104,14 @@ class VDNRunner(NStepRunner):
         if not self.test_mode:
             ttype = th.cuda.FloatTensor if self.episode_buffer.is_cuda else th.FloatTensor
             # calculate IQL_epsilon_schedule
-            if not hasattr(self, "vdl_epsilon_decay_schedule"):
-                 self.vdl_epsilon_decay_schedule = FlatThenDecaySchedule(start=self.args.vdl_epsilon_start,
-                                                                         finish=self.args.vdl_epsilon_finish,
-                                                                         time_length=self.args.vdl_epsilon_time_length,
-                                                                         decay=self.args.vdl_epsilon_decay_mode)
+            if not hasattr(self, "vdn_epsilon_decay_schedule"):
+                 self.vdn_epsilon_decay_schedule = FlatThenDecaySchedule(start=self.args.vdn_epsilon_start,
+                                                                         finish=self.args.vdn_epsilon_finish,
+                                                                         time_length=self.args.vdn_epsilon_time_length,
+                                                                         decay=self.args.vdn_epsilon_decay_mode)
 
-            epsilons = ttype(self.batch_size, 1).fill_(self.vdl_epsilon_decay_schedule.eval(self.T))
-            self.episode_buffer.set_col(col="vdl_epsilons",
+            epsilons = ttype(self.batch_size, 1).fill_(self.vdn_epsilon_decay_schedule.eval(self.T))
+            self.episode_buffer.set_col(col="vdn_epsilons",
                                         scope="episode",
                                         data=epsilons)
         pass
@@ -119,7 +119,7 @@ class VDNRunner(NStepRunner):
     def log(self, log_directly=True):
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
-            log_str += ", VDL_epsilon={:g}".format(self.vdl_epsilon_decay_schedule.eval(self.T))
+            log_str += ", VDN_epsilon={:g}".format(self.vdn_epsilon_decay_schedule.eval(self.T))
             self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
         else:
             self.logging_struct.py_logger.info("TEST RUNNER INFO: {}".format(log_str))

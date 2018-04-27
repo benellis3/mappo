@@ -1,8 +1,9 @@
 REGISTRY = {}
 
-from .basic import DQN, RNN
+from .basic import DQN, RNN, FCEncoder
 REGISTRY["DQN"] = DQN
 REGISTRY["RNN"] = RNN
+REGISTRY["fc_encoder"] = FCEncoder
 
 from .coma import COMANonRecursiveAgent, COMARecursiveAgent
 REGISTRY["coma_recursive"] = COMARecursiveAgent
@@ -19,6 +20,11 @@ REGISTRY["pomace_nn_exp1"] = poMACEExp1Network
 
 from .pomace.exp2 import poMACEExp2Network
 REGISTRY["pomace_nn_exp2"] = poMACEExp2Network
+
+from .vdn import VDNMixingNetwork, VDNMixer
+REGISTRY["vdn_mixing_network"] = VDNMixingNetwork
+REGISTRY["vdn_mixer"] = VDNMixer
+
 
 
 

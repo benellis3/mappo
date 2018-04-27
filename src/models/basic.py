@@ -190,3 +190,36 @@ class RNN(nn.Module):
                th.cat(h_list[1:], t_dim), \
                loss, \
                tformat
+
+class FCEncoder(nn.Module):
+    def __init__(self, input_shapes, output_shapes=None, layer_args=None, args=None):
+        super(FCEncoder, self).__init__()
+        self.args = args
+
+        # Set up input regions automatically if required (if sensible)
+        self.input_shapes = {}
+        assert set(input_shapes.keys()) == {"main"}, \
+            "set of input_shapes does not coincide with model structure!"
+        self.input_shapes.update(input_shapes)
+
+        # Set up layer_args automatically if required
+        self.output_shapes = {}
+        self.output_shapes["fc1"] = 64
+        if output_shapes is not None:
+            self.output_shapes.update(output_shapes)
+
+        # Set up layer_args automatically if required
+        self.layer_args = {}
+        self.layer_args["fc1"] = {"in":input_shapes["main"], "out":output_shapes["main"]}
+        if layer_args is not None:
+            self.layer_args.update(layer_args)
+
+        #Set up network layers
+        self.fc1 = nn.Linear(self.input_shapes["main"], self.output_shapes["main"])
+        pass
+
+    def forward(self, inputs, tformat):
+
+        x, n_seq, tformat = _to_batch(inputs["main"], tformat)
+        x = F.relu(self.fc1(x))
+        return _from_batch(x, n_seq, tformat), tformat

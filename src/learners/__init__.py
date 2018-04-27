@@ -8,3 +8,6 @@ REGISTRY["coma"] = COMALearner
 REGISTRY["iac_v"] = IACvLearner
 REGISTRY["iac_q"] = IACqLearner
 REGISTRY["iql"] = IQLLearner
+
+from .vdn import VDNLearner
+REGISTRY["vdn"] = VDNLearner
