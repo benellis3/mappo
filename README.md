@@ -1,7 +1,10 @@
 # Fast MVC-style deep MARL framework
 
-Work in progress implementation of Counterfactual Multi-Agent Policy Gradients
-(should be stable now)
+Includes implementations of algorithms:
+- COMA
+- IQL
+- VDN (soon)
+- QMIX (soon)
 
 ## Installation instructions
 
