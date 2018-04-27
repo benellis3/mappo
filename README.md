@@ -35,7 +35,7 @@ Run one of the EXPERIMENTs from the folder `src/config/experiments`
 on a specific GPU using some special PARAMETERS:
 ```
 cd pymarl/src
-../run <GPU> python3 main.py --exp_name=<EXPERIMENT> with <PARAMETERS>
+../run.sh <GPU> python3 main.py --exp_name=<EXPERIMENT> with <PARAMETERS>
 ```
 
 Keep an eye on your docker containers, they will be named
