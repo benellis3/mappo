@@ -14,3 +14,6 @@ REGISTRY["iql"] = IQLRunner
 
 from .vdn_runner import VDNRunner
 REGISTRY["vdn"] = VDNRunner
+
+from .qmix_runner import QMIXRunner
+REGISTRY["qmix"] = QMIXRunner

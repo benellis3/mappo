@@ -11,3 +11,6 @@ REGISTRY["iql"] = IQLLearner
 
 from .vdn import VDNLearner
 REGISTRY["vdn"] = VDNLearner
+
+from .qmix import QMIXLearner
+REGISTRY["qmix"] = QMIXLearner

@@ -13,3 +13,6 @@ REGISTRY["pomace_mac"] = poMACEMultiagentController
 
 from .vdn_agents import VDNMultiagentController
 REGISTRY["vdn_mac"] = VDNMultiagentController
+
+from .qmix_agents import QMIXMultiagentController
+REGISTRY["qmix_mac"] = QMIXMultiagentController

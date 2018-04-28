@@ -25,6 +25,11 @@ from .vdn import VDNMixingNetwork, VDNMixer
 REGISTRY["vdn_mixing_network"] = VDNMixingNetwork
 REGISTRY["vdn_mixer"] = VDNMixer
 
+from .qmix import QMIXMixingNetwork, QMIXMixer
+REGISTRY["qmix_mixing_network"] = QMIXMixingNetwork
+REGISTRY["qmix_mixer"] = VDNMixer
+
+
 
 
 

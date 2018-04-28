@@ -13,10 +13,10 @@ from models import REGISTRY as m_REGISTRY
 
 from debug.debug import IS_PYCHARM_DEBUG
 
-class VDNLoss(nn.Module):
+class QMIXLoss(nn.Module):
 
     def __init__(self):
-        super(VDNLoss, self).__init__()
+        super(QMIXLoss, self).__init__()
     def forward(self, q_tot_values, target, tformat):
         """
         calculate sum_i ||r_{t+1} + max_a Q^i(s_{t+1}, a) - Q^i(s_{t}, a_{t})||_2^2
@@ -47,7 +47,7 @@ class VDNLoss(nn.Module):
         output_tformat = "s" # scalar
         return ret, output_tformat
 
-class VDNLearner():
+class QMIXLearner():
 
     def __init__(self, multiagent_controller, logging_struct=None, args=None):
         self.args = args
@@ -68,7 +68,7 @@ class VDNLearner():
         :return:
         """
         if self.args.td_lambda != 0:
-            self.logging_struct.py_logger.warning("For original VDN, td_lambda should be 0!")
+            self.logging_struct.py_logger.warning("For original QMIX, td_lambda should be 0!")
         pass
 
 
@@ -129,7 +129,7 @@ class VDNLearner():
         actions, actions_tformat = batch_history.get_col(col="actions",
                                                          agent_ids=list(range(self.n_agents)))
 
-        vdl_loss_fn = partial(VDNLoss(),
+        vdl_loss_fn = partial(QMIXLoss(),
                               target=Variable(td_targets, requires_grad=False),)
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(len(batch_history))
@@ -145,12 +145,12 @@ class VDNLearner():
                                                                                      # do not select them again!
                                                                     )
 
-        VDN_loss = mac_output["losses"]
-        VDN_loss = VDN_loss.mean()
+        QMIX_loss = mac_output["losses"]
+        QMIX_loss = QMIX_loss.mean()
 
         # carry out optimization for agents
         self.network_optimiser.zero_grad()
-        VDN_loss.backward()
+        QMIX_loss.backward()
 
         policy_grad_norm = th.nn.utils.clip_grad_norm(self.network_parameters, 50)
         self.network_optimiser.step()
@@ -159,7 +159,7 @@ class VDNLearner():
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy())
+        self._add_stat("q_tot_loss", QMIX_loss.data.cpu().numpy())
         self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean())
         self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean())
 

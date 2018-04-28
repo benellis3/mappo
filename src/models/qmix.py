@@ -1,3 +1,4 @@
+from functools import partial
 from math import sqrt
 import torch as th
 from torch.autograd import Variable
@@ -7,6 +8,56 @@ import torch.nn.functional as F
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _pick_keys
 from models import REGISTRY as m_REGISTRY
 from models.basic import RNN as RecursiveAgent, DQN as NonRecursiveAgent
+
+class HyperLinear():
+    """
+    Linear network layers that allows for two additional complications:
+        - parameters admit to be connected via a hyper-network like structure
+        - network weights are transformed according to some rule before application
+    """
+
+    def __init__(self, in_size, out_size, use_hypernetwork=True):
+        self.use_hypernetwork = use_hypernetwork
+
+        if not self.use_hypernetwork:
+            self.w = nn.Linear(in_size, out_size)
+        self.b = nn.Parameter(out_size)
+
+        # initialize layers
+        stdv = 1. / sqrt(in_size)
+        if not self.use_hypernetwork:
+            self.w.weight.data.uniform_(-stdv, stdv)
+        self.b.data.uniform_(-stdv, stdv)
+
+        pass
+
+    def forward(self, inputs, weights, weight_mod="abs", hypernet=None, **kwargs):
+        """
+        we assume inputs are of shape [a*bs*t]*v
+        """
+        assert inputs.dim() == 2, "we require inputs to be of shape [a*bs*t]*v"
+
+        if self.use_hypernetwork:
+            assert weights is not None, "if using hyper-network, need to supply the weights!"
+            w = weights
+        else:
+            w = self.w.weights
+
+        weight_mod_fn = None
+        if weight_mod in ["abs"]:
+            weight_mod_fn = th.abs
+        elif weight_mod in ["pow"]:
+            exponent = kwargs.get("exponent", 2)
+            weight_mod_fn = partial(th.pow, exponent=exponent)
+        elif callable(weight_mod):
+            weight_mod_fn = weight_mod
+
+        if weight_mod_fn is not None:
+            w = weight_mod_fn(w)
+
+        x = th.bmm(inputs, w) + self.b
+        return x
+
 
 class QMIXMixer(nn.Module):
 
@@ -19,11 +70,47 @@ class QMIXMixer(nn.Module):
         self.n_agents = n_agents # not needed in this precise context
 
         # Set up input regions automatically if required (if sensible)
-        self.input_shapes = {}
-        assert set(input_shapes.keys()) == set(),\
+        expected_input_shapes =  {"chosen_qvalues"}
+        if self.args.qmix_use_state:
+            expected_input_shapes.update("states")
+        assert set(input_shapes.keys()) == expected_input_shapes,\
             "set of input_shapes does not coincide with model structure!"
+        self.input_shapes = {}
         self.input_shapes.update(input_shapes)
 
+        # Set up layer_args automatically if required
+        self.layer_args = {}
+        self.layer_args["hyper_fc1"] = {"in":self.input_shapes["chosen_qvalues"], "out":self.args.qmix_mixer_hidden_layer_size}
+        self.layer_args["hyper_fc2"] = {"in":self.layer_args["hyper_fc1"]["out"], "out":1}
+        if layer_args is not None:
+            self.layer_args.update(layer_args)
+
+        # Set up output_shapes automatically if required
+        self.output_shapes = {}
+        self.output_shapes["output_layer"] = self.n_actions # will return a*bs*t*n_actions
+        if output_shapes is not None:
+            self.output_shapes.update(output_shapes)
+
+
+        if self.args.qmix_use_state:
+            self.hyper_network_1 = nn.Linear(self.input_shapes["states"],
+                                             self.layer_args["hyper_fc1"]["in"]*self.layer_args["hyper_fc1"]["out"])
+            self.hyper_network_2 = nn.Linear(self.input_shapes["states"],
+                                             self.layer_args["hyper_fc2"]["in"]*self.layer_args["hyper_fc2"]["out"])
+
+            self.hyper_fc1 = HyperLinear(self.layer_args["hyper_fc1"]["in"],
+                                         self.layer_args["hyper_fc1"]["out"],
+                                         use_hypernetwork=True)
+            self.hyper_fc2 = HyperLinear(self.layer_args["hyper_fc2"]["in"],
+                                         self.layer_args["hyper_fc1"]["out"],
+                                         use_hypernetwork=True)
+        else:
+            self.hyper_fc1 = HyperLinear(self.layer_args["hyper_fc1"]["in"],
+                                         self.layer_args["hyper_fc1"]["out"],
+                                         use_hypernetwork=False)
+            self.hyper_fc2 = HyperLinear(self.layer_args["hyper_fc2"]["in"],
+                                         self.layer_args["hyper_fc1"]["out"],
+                                         use_hypernetwork=False)
         pass
 
     def init_hidden(self):
@@ -36,10 +123,15 @@ class QMIXMixer(nn.Module):
     def forward(self, chosen_qvalues, states, tformat, baseline = True): # DEBUG!!
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
-        if states is not None:
-            assert False, "state mixing in QMIX is not yet implemented"
+        if self.qmix_use_state is not None:
+            assert states is not None, "states cannot be None if qmix is to use state"
 
-        return chosen_qvalues.sum(dim=_vdim(tformat), keepdim=True)
+            w1 = self.hyper_fc1(states)
+            w2 = self.hyper_fc2(states)
+            x = F.elu(self.hyper_fc1(chosen_qvalues, weights=w1))
+            x = self.hyper_fc2(x, weights=w2)
+
+        return x
 
     pass
 

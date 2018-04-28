@@ -8,9 +8,9 @@ class Scheme():
     def __init__(self, scheme_list, agent_flatten=True):
         self.scheme_list = scheme_list
         if agent_flatten:
-            self = self.agent_flatten()  # NEW!
-        self.t_id_depth = self._get_t_id_depth(scheme_list)
-        pass
+            self.agent_flatten()  # NEW!
+        self.t_id_depth = self._get_t_id_depth(self.scheme_list)
+        return
 
     def _get_t_id_depth(self, scheme_list):
         # calculates required minimum sequence depth when t_id is set (based on shift transforms)
@@ -82,6 +82,7 @@ class Scheme():
             else:
                 flat_scheme_list.append(_scheme)
 
+        self.scheme_list = flat_scheme_list
         return Scheme(flat_scheme_list, agent_flatten=False)
 
     def get_output_sizes(self, transition_scheme):

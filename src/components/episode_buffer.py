@@ -407,7 +407,10 @@ class BatchEpisodeBuffer():
                     continue
                 scope = scheme_item.get("scope", "transition")
 
-                t_slice = None if t_id is None else slice(max(0, t_id-scheme.t_id_depth), t_id+1)
+                try:
+                    t_slice = None if t_id is None else slice(max(0, t_id-scheme.t_id_depth), t_id+1)
+                except Exception as e:
+                    pass
                 _data, _data_format = self.get_col(col=scheme_item["name"],
                                                    scope=scope,
                                                    t=t_slice,
