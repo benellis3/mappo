@@ -151,39 +151,18 @@ class VDNLearner():
         # carry out optimization for agents
         self.network_optimiser.zero_grad()
         VDN_loss.backward()
+
         policy_grad_norm = th.nn.utils.clip_grad_norm(self.network_parameters, 50)
-        self.network_optimiser.step() #DEBUG
+        self.network_optimiser.step()
 
         # increase episode counter
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        #target_critic_mean = output_target_critic["qvalue"].mean().data.cpu().numpy()
-        #critic_mean = output_critic["qvalue"].mean().data.cpu().numpy()
-        #advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
-
         self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy())
         self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean())
         self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean())
 
-        # self._add_stat("critic_loss", critic_loss.data.cpu().numpy())
-        # self._add_stat("critic_mean", critic_mean)
-        # self._add_stat("advantage_mean", advantage_mean)
-        # self._add_stat("target_critic_mean", target_critic_mean)
-        # self._add_stat("critic_grad_norm", critic_grad_norm)
-        # self._add_stat("policy_grad_norm", policy_grad_norm)
-        # self._add_stat("policy_loss", COMA_loss.data.cpu().numpy())
-
-        #a = batch_history.to_pd()
-        #b = target_critic_td_targets
-
-        # DEBUGGING SECTION
-        # print(min(batch_history.seq_lens))
-        # for i, p in enumerate(batch_history.seq_lens):
-        #     if p < batch_history.data.shape[1]:
-        #         a = batch_history.to_pd()
-        #         b = target_critic_td_targets[:, i, :, :]
-        #         c = 5
         pass
 
     def update_target_nets(self):
@@ -218,6 +197,7 @@ class VDNLearner():
 
         Logging is triggered in run.py
         """
+
         stats = self.get_stats()
         logging_dict =  dict(q_loss = _seq_mean(stats["q_tot_loss"]),
                              target_q_tot_mean=_seq_mean(stats["target_q_tot_mean"]),

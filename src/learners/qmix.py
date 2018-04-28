@@ -1,168 +1,173 @@
 from copy import deepcopy
 from functools import partial
-from torch.autograd import Variable
-from models import central_critic
 import torch as th
 from torch import nn
-import torch.nn.functional as F
-from torch.optim import Adam
 from torch.autograd import Variable
+from torch.optim import RMSprop
 
-# from .scheme_logger import SchemeLogger
-from utils.blitzz.scheme import Scheme, SCHEME_CACHE
-from utils.blitzz.transforms import _build_input, _build_inputs, _stack_by_key, _split_batch, _bsdim, _vdim, _build_model_inputs, _tdim, _adim
-from utils.blitzz.debug import IS_PYCHARM_DEBUG
+from components.scheme import Scheme
+from components.transforms import _adim, _bsdim, _tdim, _vdim, \
+    _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
+    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
+from models import REGISTRY as m_REGISTRY
 
-class IQLLoss(nn.Module):
+from debug.debug import IS_PYCHARM_DEBUG
+
+class VDNLoss(nn.Module):
 
     def __init__(self):
-        super(IQLLoss, self).__init__()
-    def forward(self, input, target, tformat):
+        super(VDNLoss, self).__init__()
+    def forward(self, q_tot_values, target, tformat):
+        """
+        calculate sum_i ||r_{t+1} + max_a Q^i(s_{t+1}, a) - Q^i(s_{t}, a_{t})||_2^2
+        where i is agent_id
+
+        inputs: qvalues, actions and targets
+        """
+
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         nans = (target != target)
         target[nans] = 0.0
-        input[nans] = 0.0
+        q_tot_values[nans] = 0.0
 
         # calculate mean-square loss
-        ret = (input - target)**2
+        ret = (q_tot_values - target.detach())**2
 
-        # sum over whole sequences
-        ret = ret.sum(dim=_tdim(tformat), keepdim=True)
+        # average over whole sequences
+        ret = ret.mean(dim=_tdim(tformat), keepdim=True)
 
-        #sum over agents
-        ret = ret.sum(dim=_adim(tformat), keepdim=True)
+        # average over agents
+        ret = ret.mean(dim=_adim(tformat), keepdim=True)
 
         # average over batches
         ret = ret.mean(dim=_bsdim(tformat), keepdim=True)
 
-        output_tformat = "s"
+        output_tformat = "s" # scalar
         return ret, output_tformat
 
-class IQLLearner():
+class VDNLearner():
 
-    def __init__(self, multiagent_controller, args):
+    def __init__(self, multiagent_controller, logging_struct=None, args=None):
         self.args = args
         self.multiagent_controller = multiagent_controller
-        self.agents = multiagent_controller.agents # for now, do not use any other multiagent controller functionality!!
-        self.n_agents = len(self.agents)
+        self.n_agents = self.multiagent_controller.n_agents
         self.n_actions = self.multiagent_controller.n_actions
-        self.T = 0
-        self.target_critic_update_interval=args.target_critic_update_interval
+        self.T_q = 0
+        self.target_update_interval=args.target_update_interval
         self.stats = {}
-
+        self.logging_struct = logging_struct
         self.last_target_update_T = 0
+
+        self.args_sanity_check()
+        pass
+
+    def args_sanity_check(self):
+        """
+        :return:
+        """
+        if self.args.td_lambda != 0:
+            self.logging_struct.py_logger.warning("For original VDN, td_lambda should be 0!")
         pass
 
 
     def create_models(self, transition_scheme):
 
-        self.agent_parameters = []
-        for agent in self.agents:
-            self.agent_parameters.extend(agent.get_parameters())
-            if self.args.share_agent_params:
-                break
-        self.agent_optimiser = Adam(self.agent_parameters, lr=self.args.lr_agent)
+        self.network_parameters = self.multiagent_controller.get_parameters()
+        self.network_optimiser =  RMSprop(self.network_parameters, lr=self.args.lr_q)
 
         # calculate a grand joint scheme
-        self.joint_scheme = Scheme([])
-        self.joint_scheme.name = "IQL" # set name if want to add to cache
-        self.joint_scheme.join([_a.scheme(_i).agent_flatten() for _i, _a in enumerate(self.agents)])
-
+        self.joint_scheme_dict = self.multiagent_controller.joint_scheme_dict
         pass
 
-    def train(self, batch_history):
+    def train(self, batch_history, T_global=None):
         # ------------------------------------------------------------------------------
         # |  We follow the algorithmic description of COMA as supplied in Algorithm 1  |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)        |
         # ------------------------------------------------------------------------------
 
-        if IS_PYCHARM_DEBUG:
-            a = batch_history.to_pd() # DEBUG
-
-        if (self.T - self.last_target_update_T) / self.target_critic_update_interval > 1.0:
+        # Update target if necessary
+        if (self.T_q - self.last_target_update_T) / self.target_update_interval > 1.0:
             self.update_target_nets()
-            self.last_target_update_T = self.T
+            self.last_target_update_T = self.T_q
             print("updating target net!")
 
         # create one single batch_history view suitable for all
-        inputs, inputs_tformat = batch_history.view(scheme=self.joint_scheme,
-                                                    to_cuda=self.args.use_cuda,
-                                                    to_variable=True,
+        data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=self.joint_scheme_dict,
+                                                              to_cuda=self.args.use_cuda,
+                                                              to_variable=True,
+                                                              bs_ids=None,
+                                                              fill_zero=True)
+        # get target outputs for q_tot
+        hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
+            len(batch_history))
+
+        target_mac_output, \
+        target_mac_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
+                                                                           hidden_states=hidden_states,
+                                                                           loss_fn=None,
+                                                                           tformat=data_inputs_tformat,
+                                                                           test_mode=True, # irrelevant, as no action selection
+                                                                           target_mode=True, # use target network
+                                                                           actions="greedy",
+                                                                           )
+        q_tot = target_mac_output["q_tot"].detach()
+
+        # calculate q_tot targets
+        td_targets, \
+        td_targets_tformat = batch_history.get_stat("td_lambda_targets",
                                                     bs_ids=None,
-                                                    fill_zero=True)
+                                                    td_lambda=self.args.td_lambda,
+                                                    gamma=self.args.gamma,
+                                                    value_function_values=q_tot,
+                                                    n_agents=1, # have only 1, "central" agent
+                                                    to_variable=True,
+                                                    to_cuda=self.args.use_cuda)
 
+        # now calculate q_tot from non-target network according to the actions that were actually taken
+        actions, actions_tformat = batch_history.get_col(col="actions",
+                                                         agent_ids=list(range(self.n_agents)))
 
-        observations, observations_tformat = batch_history.get_col(bs=None,
-                                                         col="observations",
-                                                         agent_ids=list(range(0, self.n_agents)),
-                                                         stack=True)
-        # TODO: SHIFT observation to t+1: _tdim(observations_tformat)
-
-        # TODO: Handle NaNs
-        # observations[observations!=observations] = 0.0 # mask NaNs
-
-        # TODO: Get rewards
-        rewards, rewards_tformat = batch_history.get_col(bs=None,
-                                                         col="rewards"),
-
-        # TODO: Calculate targets!
-        targets = None
-
-        iql_loss_function = partial(IQLLoss(),
-                                       targets=Variable(targets))
+        vdl_loss_fn = partial(VDNLoss(),
+                              target=Variable(td_targets, requires_grad=False),)
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(len(batch_history))
 
-        agent_controller_output, \
-        agent_controller_output_tformat = self.multiagent_controller.get_outputs(inputs,
-                                                                                 hidden_states=hidden_states,
-                                                                                 loss_fn=iql_loss_function,
-                                                                                 log_softmax=False,
-                                                                                 softmax=False,
-                                                                                 tformat=inputs_tformat)
-        IQL_loss, IQL_loss_tformat = agent_controller_output["losses"]
-        IQL_loss = IQL_loss.mean()
+        mac_output, \
+        mac_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
+                                                                    hidden_states=hidden_states,
+                                                                    loss_fn=vdl_loss_fn,
+                                                                    tformat=data_inputs_tformat,
+                                                                    test_mode=True, # irrelevant, as no action selection!
+                                                                    target_mode=False,
+                                                                    actions=Variable(actions, requires_grad=False), # setting the actions actually means:
+                                                                                     # do not select them again!
+                                                                    )
+
+        VDN_loss = mac_output["losses"]
+        VDN_loss = VDN_loss.mean()
 
         # carry out optimization for agents
-        self.agent_optimiser.zero_grad()
-        IQL_loss.backward()
-        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
-        self.agent_optimiser.step() #DEBUG
+        self.network_optimiser.zero_grad()
+        VDN_loss.backward()
+
+        policy_grad_norm = th.nn.utils.clip_grad_norm(self.network_parameters, 50)
+        self.network_optimiser.step()
 
         # increase episode counter
-        self.T += len(batch_history) * batch_history._n_t
+        self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        #target_critic_mean = output_target_critic["qvalue"].mean().data.cpu().numpy()
-        #critic_mean = output_critic["qvalue"].mean().data.cpu().numpy()
-        #advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
+        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy())
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean())
+        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean())
 
-
-
-        self._add_stat("critic_loss", critic_loss.data.cpu().numpy())
-        self._add_stat("critic_mean", critic_mean)
-        self._add_stat("advantage_mean", advantage_mean)
-        self._add_stat("target_critic_mean", target_critic_mean)
-        self._add_stat("critic_grad_norm", critic_grad_norm)
-        self._add_stat("policy_grad_norm", policy_grad_norm)
-        self._add_stat("policy_loss", COMA_loss.data.cpu().numpy())
-
-        #a = batch_history.to_pd()
-        #b = target_critic_td_targets
-
-        # DEBUGGING SECTION
-        # print(min(batch_history.seq_lens))
-        # for i, p in enumerate(batch_history.seq_lens):
-        #     if p < batch_history.data.shape[1]:
-        #         a = batch_history.to_pd()
-        #         b = target_critic_td_targets[:, i, :, :]
-        #         c = 5
         pass
 
     def update_target_nets(self):
-        self.target_critic.load_state_dict(self.critic.state_dict())
+        self.multiagent_controller.update_target()
+        pass
 
     def _add_stat(self, name, value):
         if not hasattr(self, "_stats"):
@@ -171,7 +176,7 @@ class IQLLearner():
             self._stats[name] = []
             self._stats[name+"_T"] = []
         self._stats[name].append(value)
-        self._stats[name+"_T"].append(self.T)
+        self._stats[name+"_T"].append(self.T_q)
 
         if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
             self._stats[name].pop(0)
@@ -184,6 +189,28 @@ class IQLLearner():
             return self._stats
         else:
             return []
+
+    def log(self, log_directly = True):
+        """
+        Each learner has it's own logging routine, which logs directly to the python-wide logger if log_directly==True,
+        and returns a logging string otherwise
+
+        Logging is triggered in run.py
+        """
+
+        stats = self.get_stats()
+        logging_dict =  dict(q_loss = _seq_mean(stats["q_tot_loss"]),
+                             target_q_tot_mean=_seq_mean(stats["target_q_tot_mean"]),
+                             target_q_mean = _seq_mean(stats["target_q_mean"]),
+                             T_q=self.T_q
+                            )
+        logging_str = "T_q={:g}, ".format(logging_dict["T_q"])
+        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_q"]))
+
+        if log_directly:
+            self.logging_struct.py_logger.info("{} LEARNER INFO: {}".format(self.args.learner.upper(), logging_str))
+
+        return logging_str, logging_dict
 
     def _log(self):
         pass

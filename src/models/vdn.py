@@ -39,7 +39,8 @@ class VDNMixer(nn.Module):
         if states is not None:
             assert False, "state mixing in VDN is not yet implemented"
 
-        return chosen_qvalues.sum(dim=_vdim(tformat), keepdim=True)
+        return chosen_qvalues.sum(dim=_adim(tformat),
+                                  keepdim=True)
 
     pass
 

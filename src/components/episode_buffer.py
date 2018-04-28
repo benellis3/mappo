@@ -503,22 +503,23 @@ class BatchEpisodeBuffer():
         elif label in ["td_lambda_targets"]:
             gamma = kwargs.get("gamma")
             td_lambda = kwargs.get("td_lambda")
+            n_agents = kwargs.get("n_agents", self.n_agents)
             value_function_values = kwargs.get("value_function_values") # else may get weird variable sharing errors
-            # stats = self._get_stat_td_lambda_targets_batch(value_function_values,
-            #                                               gamma=gamma,
-            #                                               td_lambda=td_lambda)
+
             stats, tformat = self._td_lambda_targets(value_function_values,
-                                                           gamma=gamma,
-                                                           td_lambda=td_lambda)
+                                                     n_agents=n_agents,
+                                                     gamma=gamma,
+                                                     td_lambda=td_lambda)
             return stats, tformat
         else:
             assert False, "Unknown batch statistic: {}".format(label)
         pass
 
-    def _td_lambda_targets(self, value_function_values, gamma, td_lambda):
+    def _td_lambda_targets(self, value_function_values, n_agents, gamma, td_lambda):
         """
         uses efficient update rule for calculating consecutive G_t_n_lambda in reverse (see docs)
         """
+
 
         V_tensor = value_function_values
         if isinstance(V_tensor, Variable):
@@ -528,14 +529,14 @@ class BatchEpisodeBuffer():
         R_tensor, _ = self.get_col(col="reward")
         if isinstance(R_tensor, Variable):
             R_tensor = R_tensor.data
-        R_tensor = R_tensor.clone().unsqueeze(0).repeat(self.n_agents, 1, 1, 1)
+        R_tensor = R_tensor.clone().unsqueeze(0).repeat(n_agents, 1, 1, 1)
         h = self._n_t-1 # horizon (index)
 
         # create truncation tensor
         truncated, _ = self.get_col(col="truncated")
         truncated = truncated.clone() # clone this because we are de-NaNing in place
         truncated[truncated!=truncated] = 0.0 # need to mask NaNs
-        truncated_tensor = truncated.sum(dim=1, keepdim=True).unsqueeze(0).repeat(self.n_agents,1,1,1)
+        truncated_tensor = truncated.sum(dim=1, keepdim=True).unsqueeze(0).repeat(n_agents,1,1,1)
 
         seq_lens = self.seq_lens
 

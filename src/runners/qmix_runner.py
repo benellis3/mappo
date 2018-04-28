@@ -8,7 +8,7 @@ from runners import REGISTRY as r_REGISTRY
 
 NStepRunner = r_REGISTRY["nstep"]
 
-class COMARunner(NStepRunner):
+class QMIXRunner(NStepRunner):
 
     def _setup_data_scheme(self, data_scheme):
         self.data_scheme = Scheme([dict(name="observations",
@@ -57,6 +57,10 @@ class COMARunner(NStepRunner):
                                         shape=(1,),
                                         dtype=np.bool,
                                         missing=False),
+                                   # dict(name="q_tot",
+                                   #      shape=(1,),
+                                   #      dtype=np.bool,
+                                   #      missing=False),
                                    dict(name="qmix_epsilons",
                                         scope="episode",
                                         shape=(1,),
@@ -64,6 +68,34 @@ class COMARunner(NStepRunner):
                                         missing=float("nan"))
                                   ]).agent_flatten()
         pass
+
+    def __init__(self,
+                 multiagent_controller=None,
+                 args=None,
+                 logging_struct=None,
+                 data_scheme=None,
+                 **kwargs):
+
+        super().__init__(multiagent_controller,
+                         args,
+                         logging_struct,
+                         data_scheme,
+                         **kwargs)
+
+        # set up epsilon greedy action selector with proper access function to epsilons
+        def _get_epsilons():
+            ret = self.episode_buffer.get_col(col="qmix_epsilons",
+                                              scope="episode")
+            return ret
+        self.multiagent_controller.action_selector._get_epsilons = _get_epsilons
+        pass
+
+    def _add_episode_stats(self, T_global):
+        super()._add_episode_stats(T_global)
+        self._add_stat("qvalues_entropy",
+                       self.episode_buffer.get_stat("qvalues_entropy"),
+                       T_global=T_global)
+        return
 
     def reset(self):
         super().reset()
@@ -74,9 +106,9 @@ class COMARunner(NStepRunner):
             # calculate IQL_epsilon_schedule
             if not hasattr(self, "qmix_epsilon_decay_schedule"):
                  self.qmix_epsilon_decay_schedule = FlatThenDecaySchedule(start=self.args.qmix_epsilon_start,
-                                                                          finish=self.args.qmix_epsilon_finish,
-                                                                          time_length=self.args.qmix_epsilon_time_length,
-                                                                          decay=self.args.qmix_epsilon_decay_mode)
+                                                                         finish=self.args.qmix_epsilon_finish,
+                                                                         time_length=self.args.qmix_epsilon_time_length,
+                                                                         decay=self.args.qmix_epsilon_decay_mode)
 
             epsilons = ttype(self.batch_size, 1).fill_(self.qmix_epsilon_decay_schedule.eval(self.T))
             self.episode_buffer.set_col(col="qmix_epsilons",
