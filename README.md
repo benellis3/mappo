@@ -73,8 +73,8 @@ If MongoDB is not available, then Sacred will produce output files under
 
 ### Copyright and usage restrictions
 
-All code in this repo (except where explicitely denoted otherwise):
+This framework has been designed, and all core components have been implemented by:
 Copyright 2018, Christian Schroeder de Witt (WhiRL, Torr Vision Lab, University of Oxford)
 caschroeder@outlook.com
 
-PLEASE KEEP CONFIDENTIAL
+PLEASE KEEP CONFIDENTIAL - USE FOR EDUCATIONAL / ACADEMIC PURPOSES ONLY
