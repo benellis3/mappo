@@ -5,13 +5,14 @@ from torch import nn
 from torch.autograd import Variable
 from torch.optim import RMSprop
 
+from debug.debug import IS_PYCHARM_DEBUG
 from models.coma import COMACritic
 from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
 
-from debug.debug import IS_PYCHARM_DEBUG
+from .basic import BasicLearner
 
 class COMAPolicyLoss(nn.Module):
 
@@ -64,7 +65,7 @@ class COMACriticLoss(nn.Module):
         output_tformat = "s" # scalar
         return ret, output_tformat
 
-class COMALearner():
+class COMALearner(BasicLearner):
 
     def __init__(self, multiagent_controller, logging_struct=None, args=None):
         self.args = args
@@ -312,7 +313,7 @@ class COMALearner():
             self._stats[name+"_T"].pop(0)
 
         # log to sacred if enabled
-        if hasattr(self.logging_struct, "log_sacred_scalar_fn"):
+        if hasattr(self.logging_struct, "sacred_log_scalar_fn"):
             self.logging_struct.sacred_log_scalar_fn(_underscore_to_cap(name), value)
 
         # log to tensorboard if enabled

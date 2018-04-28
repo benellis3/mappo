@@ -708,8 +708,8 @@ class NStepRunner():
             self._stats[name+"_T"].pop(0)
 
         # log to sacred if enabled
-        if hasattr(self.logging_struct, "log_sacred_scalar_fn"):
-            self.logging_struct.sacred_log_scalar_fn(_underscore_to_cap(name), value)
+        if hasattr(self.logging_struct, "sacred_log_scalar_fn"):
+            self.logging_struct.sacred_log_scalar_fn(key=_underscore_to_cap(name), val=value)
 
         # log to tensorboard if enabled
         if hasattr(self.logging_struct, "log_tensorboard_scalar_fn"):

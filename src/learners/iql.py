@@ -9,8 +9,9 @@ from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
-
 from debug.debug import IS_PYCHARM_DEBUG
+
+from .basic import BasicLearner
 
 class IQLLoss(nn.Module):
 
@@ -48,7 +49,7 @@ class IQLLoss(nn.Module):
         output_tformat = "s" # scalar
         return ret, output_tformat
 
-class IQLLearner():
+class IQLLearner(BasicLearner):
 
     def __init__(self, multiagent_controller, logging_struct=None, args=None):
         self.args = args
@@ -163,8 +164,8 @@ class IQLLearner():
         #critic_mean = output_critic["qvalue"].mean().data.cpu().numpy()
         #advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
 
-        self._add_stat("q_loss", IQL_loss.data.cpu().numpy())
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean())
+        self._add_stat("q_loss", IQL_loss.data.cpu().numpy(), T_global=self.T_q)
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_global=self.T_q)
 
         # self._add_stat("critic_loss", critic_loss.data.cpu().numpy())
         # self._add_stat("critic_mean", critic_mean)
@@ -190,20 +191,6 @@ class IQLLearner():
         self.multiagent_controller.update_target()
         pass
 
-    def _add_stat(self, name, value):
-        if not hasattr(self, "_stats"):
-            self._stats = {}
-        if name not in self._stats:
-            self._stats[name] = []
-            self._stats[name+"_T"] = []
-        self._stats[name].append(value)
-        self._stats[name+"_T"].append(self.T_q)
-
-        if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
-            self._stats[name].pop(0)
-            self._stats[name+"_T"].pop(0)
-
-        return
 
     def get_stats(self):
         if hasattr(self, "_stats"):

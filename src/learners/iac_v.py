@@ -11,6 +11,8 @@ from components.scheme import Scheme
 from components.transforms import _bsdim, _vdim, _tdim, _adim, _generate_scheme_shapes, \
     _generate_input_shapes, _join_dicts, _build_model_inputs
 
+from .basic import BasicLearner
+
 class IACvPolicyLoss(nn.Module):
 
     def __init__(self):
@@ -61,7 +63,7 @@ class IACvCriticLoss(nn.Module):
         output_tformat = "s"
         return ret, output_tformat
 
-class IACvLearner():
+class IACvLearner(BasicLearner):
 
     def __init__(self, multiagent_controller, args):
         self.args = args

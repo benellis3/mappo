@@ -9,9 +9,10 @@ from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
+from debug.debug import IS_PYCHARM_DEBUG
 from models import REGISTRY as m_REGISTRY
 
-from debug.debug import IS_PYCHARM_DEBUG
+from .basic import BasicLearner
 
 class VDNLoss(nn.Module):
 
@@ -47,7 +48,7 @@ class VDNLoss(nn.Module):
         output_tformat = "s" # scalar
         return ret, output_tformat
 
-class VDNLearner():
+class VDNLearner(BasicLearner):
 
     def __init__(self, multiagent_controller, logging_struct=None, args=None):
         self.args = args
@@ -159,9 +160,9 @@ class VDNLearner():
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy())
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean())
-        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean())
+        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy(), T_global=self.T_q)
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_global=self.T_q)
+        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_global=self.T_q)
 
         pass
 
@@ -169,7 +170,7 @@ class VDNLearner():
         self.multiagent_controller.update_target()
         pass
 
-    def _add_stat(self, name, value):
+    def _add_stat(self, name, value, T_global):
         if not hasattr(self, "_stats"):
             self._stats = {}
         if name not in self._stats:
@@ -181,6 +182,14 @@ class VDNLearner():
         if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
             self._stats[name].pop(0)
             self._stats[name+"_T"].pop(0)
+
+        # log to sacred if enabled
+        if hasattr(self.logging_struct, "sacred_log_scalar_fn"):
+            self.logging_struct.sacred_log_scalar_fn(_underscore_to_cap(name), value)
+
+        # log to tensorboard if enabled
+        if hasattr(self.logging_struct, "log_tensorboard_scalar_fn"):
+            self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_global)
 
         return
 

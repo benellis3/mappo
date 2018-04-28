@@ -12,6 +12,8 @@ from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, \
     _build_model_inputs, _join_dicts
 
+from .basic import BasicLearner
+
 class IACqPolicyLoss(nn.Module):
 
     def __init__(self):
@@ -61,7 +63,7 @@ class IACqCriticLoss(nn.Module):
         output_tformat = "s"
         return ret, output_tformat
 
-class IACqLearner():
+class IACqLearner(BasicLearner):
 
     def __init__(self, multiagent_controller, args):
         self.args = args
@@ -297,21 +299,6 @@ class IACqLearner():
 
     def update_target_nets(self):
         self.target_critic.load_state_dict(self.critic.state_dict())
-
-    def _add_stat(self, name, value):
-        if not hasattr(self, "_stats"):
-            self._stats = {}
-        if name not in self._stats:
-            self._stats[name] = []
-            self._stats[name+"_T"] = []
-        self._stats[name].append(value)
-        self._stats[name+"_T"].append(self.T)
-
-        if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
-            self._stats[name].pop(0)
-            self._stats[name+"_T"].pop(0)
-
-        return
 
     def get_stats(self):
         if hasattr(self, "_stats"):
