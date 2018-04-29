@@ -8,4 +8,5 @@ pomace_use_epsilon_seed: True
 pomace_random_seed_max: 10000000000
 pomace_multiagent_network: pomace_noise_multiagent_nn1
 pomace_noise_network: pomace_noise_nn1
+pomace_noise_hidden_layer_size: 64
 runner: pomace

@@ -472,3 +472,47 @@ def _merge_dicts(a, b, path=None, overwrite=True):
         else:
             a[key] = b[key]
     return a
+
+def _unpack_random_seed(seeds, output_shape, gen_fn):
+    """
+    takes a random seed and generates and unpacks it into a tensor of random variables
+    """
+    # # generate epsilon of necessary
+    # if is_seed: #self.args.pomace_use_epsilon_seed:
+
+    assert len(output_shape) == 2, "output_shape must be of dim 2!"
+
+    if seeds.is_cuda: # inputs["pomace_epsilon_seeds"]
+        _initial_rng_state_all = th.cuda.get_rng_state_all()
+        # epsilon_variances.shape[_bsdim(tformat)],
+        #                                            self.args.pomace_epsilon_size
+        epsilons = th.cuda.FloatTensor(*output_shape)  # not sure if can do this directly on GPU using pytorch.dist...
+        for _bs in range(output_shape[0]):  #(epsilon_variances.shape[0]):
+            # inputs["pomace_epsilon_seeds"]
+            th.cuda.manual_seed_all(int(seeds.data[_bs, 0]))
+            #epsilons[_bs].normal_(mean=0.0, std=epsilon_variances.data[_bs, 0])
+            epsilons[_bs] = gen_fn(out=epsilons[_bs],
+                                   bs=_bs)
+        th.cuda.set_rng_state_all(_initial_rng_state_all)
+    else:
+        _initial_rng_state = th.get_rng_state()
+        epsilons = th.cuda.FloatTensor(*output_shape)
+        for _bs in range(output_shape[0]):  # could use pytorch dist
+            th.manual_seed(int(seeds.data[_bs, 0]))
+            epsilons[_bs] = gen_fn(out=epsilons[_bs],
+                                   bs=_bs)
+        th.set_rng_state(_initial_rng_state)
+    epsilons = Variable(epsilons, requires_grad=False)
+    return epsilons
+
+    # else:
+    #     epsilons = inputs["epsilon"] * epsilon_variances
+    #
+    # else:
+    # if inputs["pomace_epsilon_seeds"].is_cuda:
+    #     epsilons = Variable(th.cuda.FloatTensor(epsilon_variances.shape[_bsdim(tformat)],
+    #                                             self.args.pomace_epsilon_size).zero_(), requires_grad=False)
+    # else:
+    #     epsilons = Variable(th.FloatTensor(epsilon_variances.shape[_bsdim(tformat)],
+    #                                        self.args.pomace_epsilon_size).zero_(), requires_grad=False)
+    #     pass

@@ -12,12 +12,11 @@ class BasicLearner():
             self._stats[name] = []
             self._stats[name+"_T"] = []
         self._stats[name].append(value)
-        self._stats[name+"_T"].append(self.T_q)
+        self._stats[name+"_T"].append(T_global)
 
         if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
             self._stats[name].pop(0)
             self._stats[name+"_T"].pop(0)
-
 
         if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
             self._stats[name].pop(0)

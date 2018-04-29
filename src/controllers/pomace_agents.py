@@ -45,7 +45,10 @@ class poMACEMultiagentController():
                                                       scope="episode",
                                                       requires_grad=False,
                                                       switch=self.args.multiagent_controller in ["pomace_mac"]),
-                                                 dict(name="state")]).agent_flatten()
+                                                 dict(name="state"),
+                                                 dict(name="agent_id",
+                                                      select_agent_ids=list(range(self.n_agents)))
+                                                 ])
 
         self.agent_scheme_fn = lambda _agent_id: Scheme([dict(name="agent_id",
                                                        transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
@@ -60,7 +63,7 @@ class poMACEMultiagentController():
                                                                        ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
                                                            switch=self.args.obs_last_action),
                                                        dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id])
-                                                      ]).agent_flatten()
+                                                      ])
 
 
         # Set up schemes
@@ -76,13 +79,13 @@ class poMACEMultiagentController():
         for _agent_id in range(self.n_agents):
             self.input_columns["agent_input__agent{}".format(_agent_id)] = {}
             self.input_columns["agent_input__agent{}".format(_agent_id)]["main"] = \
-                Scheme([dict(name="agent_id", select_agent_ids=[_agent_id]),
-                        dict(name="agent_observation", select_agent_ids=[_agent_id]),
+                Scheme([dict(name="agent_observation", select_agent_ids=[_agent_id]),
                         dict(name="past_action",
                              select_agent_ids=[_agent_id],
-                             switch=self.args.obs_last_action)]).agent_flatten()
-            self.input_columns["agent_input__agent{}".format(_agent_id)]["secondary"] = \
-                Scheme([dict(name="agent_id", select_agent_ids=[_agent_id])]).agent_flatten()
+                             switch=self.args.obs_last_action),
+                        dict(name="agent_id", select_agent_ids=[_agent_id])])
+            # self.input_columns["agent_input__agent{}".format(_agent_id)]["agent_ids"] = \
+            #     Scheme([dict(name="agent_id", select_agent_ids=[_agent_id])])
 
         self.input_columns["lambda_network"] = {}
         self.input_columns["lambda_network"]["pomace_epsilon_variances"] = Scheme([dict(name="pomace_epsilon_variances",
@@ -94,6 +97,10 @@ class poMACEMultiagentController():
             self.input_columns["lambda_network"]["pomace_epsilons"] =      Scheme([dict(name="pomace_epsilons",
                                                                                         scope="episode")])
         self.input_columns["lambda_network"]["state"] = Scheme([dict(name="state")])
+        for _agent_id in range(self.n_agents):
+            self.input_columns["lambda_network"]["agent_ids__agent{}".format(_agent_id)] = \
+                Scheme([dict(name="agent_id",
+                             select_agent_ids=[_agent_id])])
 
         pass
 
