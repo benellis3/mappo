@@ -41,10 +41,7 @@ def run(_run, _config, _log, pymongo_client):
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     if tensorboard:
-        import os
-        from os.path import dirname, abspath
-        file_tb_path = os.path.join(dirname(dirname(abspath(__file__))), "tb_logs")
-        configure(os.path.join(file_tb_path, "{}").format(unique_token))
+        configure("results/tb_logs/{}".format(unique_token))
 
     # set up logging object to be passed on from now on
     logging_struct = SN(py_logger=_log,
