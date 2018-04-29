@@ -96,7 +96,7 @@ RUN pip3 install statsmodels pandas seaborn
 RUN mkdir /pool && echo "export PATH=$PATH:'/pool/pool'" >> ~/.bashrc
 # RUN cd /pool && git clone https://github.com/oxwhirl/pool.git pool-repo &&  ln -s pool-repo/pool && git submodule update --init --recursive
 
-RUN pip3 install cloudpickle
+RUN pip3 install cloudpickle ruamel.yaml
 
 EXPOSE 8888
 
