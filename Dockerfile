@@ -101,7 +101,7 @@ RUN pip3 install cloudpickle ruamel.yaml
 EXPOSE 8888
 
 
-WORKDIR /deepmarl
+WORKDIR /pymarl
 # RUN echo "mongod --fork --logpath /var/log/mongod.log" >> ~/.bashrc
 #CMD ["mongod", "--fork", "--logpath", "/var/log/mongod.log"]
 # EXPOSE 27017
