@@ -717,7 +717,7 @@ class NStepRunner():
             self.logging_struct.sacred_log_scalar_fn(key=_underscore_to_cap(name), val=value)
 
         # log to tensorboard if enabled
-        if hasattr(self.logging_struct, "log_tensorboard_scalar_fn"):
+        if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
             self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_global)
 
         return

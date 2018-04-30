@@ -19,36 +19,49 @@ ex = Experiment("deepmarl")
 ex.logger = logger
 ex.captured_out_filter = apply_backspaces_and_linefeeds
 
-# The central mongodb for our deepmarl experiments
-# You need to set up local port forwarding to ensure this local port maps to the server
-db_host = "localhost"
-db_port = 27027 # Use a different port from the default mongodb port to avoid a potential clash
-client = None
-mongodb_fail = False
-if True:
-    # First try to connect to the central server. If that doesn't work then just save locally
-    maxSevSelDelay = 100  # Assume 1ms maximum server selection delay
-    try:
-        # Check whether server is accessible
-        logger.info("Trying to connect to mongoDB '{}:{}'".format(db_host, db_port))
-        client = pymongo.MongoClient(db_host, db_port, serverSelectionTimeoutMS=maxSevSelDelay)
-        client.server_info()
-        # If this hasn't raised an exception, we can add the observer
-        ex.observers.append(MongoObserver.create(url=db_host, port=db_port, db_name='deepmarl'))
-        logger.info("Added MongoDB observer on {}.".format(db_host))
-    except pymongo.errors.ServerSelectionTimeoutError:
-        logger.warning("Couldn't connect to MongoDB.")
-        logger.info("Fallback to FileStorageObserver in ./results/sacred.")
-        mongodb_fail = True
-if mongodb_fail:
-    import os
-    from os.path import dirname, abspath
-    file_obs_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
-    logger.info("Using the FileStorageObserver in ./results/sacred")
-    ex.observers.append(FileStorageObserver.create(file_obs_path))
+mongo_client = None
+
+def setup_mongodb(conf_str):
+    # The central mongodb for our deepmarl experiments
+    # You need to set up local port forwarding to ensure this local port maps to the server
+    # if conf_str == "":
+    # db_host = "localhost"
+    # db_port = 27027 # Use a different port from the default mongodb port to avoid a potential clash
+
+    from config.mongodb import REGISTRY as mongo_REGISTRY
+    mongo_conf = mongo_REGISTRY[conf_str](None, None)
+    db_url = mongo_conf["db_url"]
+    db_name = mongo_conf["db_name"]
+
+    client = None
+    mongodb_fail = False
+    if True:
+        # First try to connect to the central server. If that doesn't work then just save locally
+        maxSevSelDelay = 10000  # Assume 1ms maximum server selection delay
+        try:
+            # Check whether server is accessible
+            logger.info("Trying to connect to mongoDB '{}'".format(db_url))
+            client = pymongo.MongoClient(db_url, ssl=True, serverSelectionTimeoutMS=maxSevSelDelay)
+            client.server_info()
+            # If this hasn't raised an exception, we can add the observer
+            ex.observers.append(MongoObserver.create(url=db_url, db_name=db_name, ssl=True)) # db_name=db_name,
+            logger.info("Added MongoDB observer on {}.".format(db_url))
+        except pymongo.errors.ServerSelectionTimeoutError:
+            logger.warning("Couldn't connect to MongoDB.")
+            logger.info("Fallback to FileStorageObserver in results/sacred.")
+            mongodb_fail = True
+    #if mongodb_fail:
+    if True:
+        import os
+        from os.path import dirname, abspath
+        file_obs_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
+        logger.info("Using the FileStorageObserver in results/sacred")
+        ex.observers.append(FileStorageObserver.create(file_obs_path))
+    return client
 
 @ex.main
 def my_main(_run, _config, _log, env_args):
+    global mongo_client
 
     # Setting the random seed throughout the modules
     np.random.seed(_config["seed"])
@@ -56,10 +69,10 @@ def my_main(_run, _config, _log, env_args):
     env_args['seed'] = _config["seed"]
 
     # run the framework
-    run(_run, _config, _log, client)
-
+    run(_run, _config, _log, mongo_client)
 
 if __name__ == '__main__':
+    global mongo_client
     from copy import deepcopy
     params = deepcopy(sys.argv)
 
@@ -110,6 +123,7 @@ if __name__ == '__main__':
     for _i in sorted(del_indices, reverse=True):
         del params[_i]
 
-    #_setup_mongodb(params)
+    #set up mongodb / file observer
+    mongo_client = setup_mongodb(config_dic["mongodb_profile"])
     ex.run_commandline(params)
 
