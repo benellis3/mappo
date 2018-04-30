@@ -3,8 +3,8 @@
 Includes implementations of algorithms:
 - COMA
 - IQL
-- VDN (soon)
-- QMIX (soon)
+- VDN (untested)
+- QMIX (untested)
 
 ## Installation instructions
 
