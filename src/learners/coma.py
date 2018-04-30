@@ -281,7 +281,9 @@ class COMALearner(BasicLearner):
         COMA_loss = COMA_loss.mean()
 
         if self.args.coma_use_entropy_regularizer:
-            COMA_loss += EntropyRegularisationLoss()(policies=agent_controller_output["policies"])
+            COMA_loss += self.args.coma_entropy_loss_regularization_factor * \
+                         EntropyRegularisationLoss()(policies=agent_controller_output["policies"],
+                                                     tformat="a*bs*t*v").sum()
 
         # carry out optimization for agents
         self.agent_optimiser.zero_grad()
