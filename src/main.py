@@ -51,7 +51,7 @@ def setup_mongodb(conf_str):
             logger.info("Fallback to FileStorageObserver in results/sacred.")
             mongodb_fail = True
     #if mongodb_fail:
-    if True:
+    if mongodb_fail:
         import os
         from os.path import dirname, abspath
         file_obs_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
