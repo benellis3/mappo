@@ -13,7 +13,7 @@ fi
 
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-${cmd} run --rm \
+${cmd} run -d --rm \
     --name $name \
     --security-opt="apparmor=unconfined" --cap-add=SYS_PTRACE \
     --net host \
