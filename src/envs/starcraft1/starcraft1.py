@@ -56,101 +56,101 @@ class SC1(MultiAgentEnv):
         if isinstance(args, dict):
             args = convert(args)
 
-    # Read arguments
-    self.n_agents = args.n_agents
-    self.n_enemies = args.n_enemies
-    self.map_name = args.map_name
-    self.episode_limit = args.episode_limit
-    self._move_amount = args.move_amount
-    self._step_mul = args.step_mul
-    self.difficulty = args.difficulty
-    self.state_last_action = args.state_last_action
+        # Read arguments
+        self.n_agents = args.n_agents
+        self.n_enemies = args.n_enemies
+        self.map_name = args.map_name
+        self.episode_limit = args.episode_limit
+        self._move_amount = args.move_amount
+        self._step_mul = args.step_mul
+        self.difficulty = args.difficulty
+        self.state_last_action = args.state_last_action
 
-    # Rewards args
-    self.reward_only_positive = args.reward_only_positive
-    self.reward_negative_scale = args.reward_negative_scale
-    self.reward_death_value = args.reward_death_value
-    self.reward_win = args.reward_win
-    self.reward_scale = args.reward_scale
-    self.reward_scale_rate = args.reward_scale_rate
+        # Rewards args
+        self.reward_only_positive = args.reward_only_positive
+        self.reward_negative_scale = args.reward_negative_scale
+        self.reward_death_value = args.reward_death_value
+        self.reward_win = args.reward_win
+        self.reward_scale = args.reward_scale
+        self.reward_scale_rate = args.reward_scale_rate
 
-    # Other
-    self.seed = args.seed
-    self.heuristic_function = args.heuristic_function
-    self.measure_fps = args.measure_fps
+        # Other
+        self.seed = args.seed
+        self.heuristic_function = args.heuristic_function
+        self.measure_fps = args.measure_fps
 
-    self.hostname = args.hostname
-    self.port = args.port
+        self.hostname = args.hostname
+        self.port = args.port
 
-    self.debug_inputs = False
-    self.debug_rewards = False
+        self.debug_inputs = False
+        self.debug_rewards = False
 
-    self.n_actions_no_attack = 6
-    self.n_actions = self.n_actions_no_attack + self.n_enemies
+        self.n_actions_no_attack = 6
+        self.n_actions = self.n_actions_no_attack + self.n_enemies
 
-    # TODO fill in correct values
-    if sys.platform == 'linux':
-        self.game_version = "1.4.0"
-        os.environ['SC1PATH'] = os.path.join(os.getcwd(), '..', '3rdparty', 'StarCraftI')
-        self.stalker_id = 1885
-        self.zealot_id = 1886
-    else:
-        self.game_version = "4.1.2"  # latest release, uses visualisations
-        self.stalker_id = 1922
-        self.zealot_id = 1923
+        # TODO fill in correct values
+        if sys.platform == 'linux':
+            self.game_version = "1.4.0"
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '..', '3rdparty', 'StarCraftI')
+            self.stalker_id = 1885
+            self.zealot_id = 1886
+        else:
+            self.game_version = "4.1.2"  # latest release, uses visualisations
+            self.stalker_id = 1922
+            self.zealot_id = 1923
 
-    if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-        self._agent_race = "P"  # Protoss
-        self._bot_race = "P"  # Protoss
+        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
+            self._agent_race = "P"  # Protoss
+            self._bot_race = "P"  # Protoss
 
-        self.unit_health_max_z = 160
-        self.unit_health_max_s = 150
+            self.unit_health_max_z = 160
+            self.unit_health_max_s = 150
 
-        self.max_reward = 2 * self.unit_health_max_s + 3 * self.unit_health_max_z + self.n_enemies * self.reward_death_value + self.reward_win
-    else:
-        self._agent_race = "T"  # Terran
-        self._bot_race = "T"  # Terran
-        self.unit_health_max = 45
+            self.max_reward = 2 * self.unit_health_max_s + 3 * self.unit_health_max_z + self.n_enemies * self.reward_death_value + self.reward_win
+        else:
+            self._agent_race = "T"  # Terran
+            self._bot_race = "T"  # Terran
+            self.unit_health_max = 45
 
-        self.max_reward = self.n_enemies * (self.unit_health_max + self.reward_death_value) + self.reward_win
+            self.max_reward = self.n_enemies * (self.unit_health_max + self.reward_death_value) + self.reward_win
 
-    # Launch the game
-    self._launch()
+        # Launch the game
+        self._launch()
 
-    self._game_info = self.controller.game_info()
-    self.map_x = self._game_info.start_raw.map_size.x
-    self.map_y = self._game_info.start_raw.map_size.y
-    self.map_play_area_min = self._game_info.start_raw.playable_area.p0
-    self.map_play_area_max = self._game_info.start_raw.playable_area.p1
-    self.max_distance_x = self.map_play_area_max.x - self.map_play_area_min.x
-    self.max_distance_y = self.map_play_area_max.y - self.map_play_area_min.y
+        self._game_info = self.controller.game_info() # CHANGE
+        self.map_x = self._game_info.start_raw.map_size.x
+        self.map_y = self._game_info.start_raw.map_size.y
+        self.map_play_area_min = self._game_info.start_raw.playable_area.p0
+        self.map_play_area_max = self._game_info.start_raw.playable_area.p1
+        self.max_distance_x = self.map_play_area_max.x - self.map_play_area_min.x
+        self.max_distance_y = self.map_play_area_max.y - self.map_play_area_min.y
 
-    self._episode_count = -1
-    self._total_steps = 0
+        self._episode_count = -1
+        self._total_steps = 0
 
-    self.battles_won = 0
-    self.battles_game = 0
-    self.timeouts = 0
-    self.force_restarts = 0
+        self.battles_won = 0
+        self.battles_game = 0
+        self.timeouts = 0
+        self.force_restarts = 0
 
-    # self.last_action = tc.zeros((self.n_agents, self.n_actions))
+        # self.last_action = tc.zeros((self.n_agents, self.n_actions))
 
-    # self.save_units()
+        # self.save_units()
 
     def _launch(self):
+        #CREATE SUBPROCESS - use pid
 
         self.controller = tc.Client()
         self.controller.connect(self.hostname, self.port)
         self._obs = self.cl.init()
-
 
         #self._run_config = run_configs.get()
         self._map = maps.get(self.map_name) # TODO: find out how to set the map in sc1
 
         # Setting up the interface
         #self.interface = sc_pb.InterfaceOptions(
-                raw = True, # raw, feature-level data
-                score = True)
+        #        raw = True, # raw, feature-level data
+        #        score = True)
 
         # TODO: could try to change config file (bwapi.ini), but calling launcher is probably better
         #self._sc2_procs = [self._run_config.start(game_version=self.game_version)]
@@ -163,8 +163,8 @@ class SC1(MultiAgentEnv):
         # TODO: need to call launcher, possibly with environment specifications (number of players, map, etc.)
         # TODO: find out how to set seed
         #create = sc_pb.RequestCreateGame(realtime = False,
-                random_seed = self.seed,
-                local_map=sc_pb.LocalMap(map_path=self._map.path, map_data=self._run_config.map_data(self._map.path)))
+        #        random_seed = self.seed,
+        #        local_map=sc_pb.LocalMap(map_path=self._map.path, map_data=self._run_config.map_data(self._map.path)))
         #create.player_setup.add(type=sc_pb.Participant)
         #create.player_setup.add(type=sc_pb.Computer, race=races[self._bot_race],
                                 difficulty=difficulties[self.difficulty])
@@ -183,6 +183,7 @@ class SC1(MultiAgentEnv):
 
     def reset(self):
         """Start a new episode."""
+        # EMPTY MAP: Reset should spawn units explicitely - don't use map files
 
         if self.debug_inputs or self.debug_rewards:
             print('------------>> RESET <<------------')

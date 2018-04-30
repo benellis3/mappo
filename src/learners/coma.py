@@ -11,6 +11,7 @@ from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
+from components.losses import EntropyRegularisationLoss
 
 from .basic import BasicLearner
 
@@ -278,6 +279,9 @@ class COMALearner(BasicLearner):
                                                                                  test_mode=False)
         COMA_loss = agent_controller_output["losses"]
         COMA_loss = COMA_loss.mean()
+
+        if self.args.coma_use_entropy_regularizer:
+            COMA_loss += EntropyRegularisationLoss()(policies=agent_controller_output["policies"])
 
         # carry out optimization for agents
         self.agent_optimiser.zero_grad()

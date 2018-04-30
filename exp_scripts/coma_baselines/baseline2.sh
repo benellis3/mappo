@@ -1,7 +1,7 @@
 #!/bin/bash
 # To be called from inside Docker container for now
 
-cd /deepmarl/src
+cd /pymarl/src
 export PYTHONPATH=$PYTHONPATH:/pymarl/src/
 
 N_REPEAT=$1

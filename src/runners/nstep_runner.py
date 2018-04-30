@@ -690,6 +690,7 @@ class NStepRunner():
 
         self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_global=T_global)
         self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_global=T_global)
+        self._add_stat("T_env", T_global, T_global=T_global)
         pass
 
     def _add_stat(self, name, value, T_global):
