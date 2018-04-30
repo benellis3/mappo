@@ -9,7 +9,7 @@ run_mode: sequential
 save_model: False
 share_agent_params: True
 tensorboard: True
-test_interval: 2000
+test_interval: 8000
 test_nepisode: 50
 t_max: 100000000
 

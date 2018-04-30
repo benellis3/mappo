@@ -609,7 +609,8 @@ class NStepRunner():
                                            bs_empty=[_i for _i in range(self.batch_size) if _i not in ids_envs_not_terminated])
 
                 # update episode time counter
-                self.T += len(ids_envs_not_terminated)
+                if not self.test_mode:
+                    self.T += len(ids_envs_not_terminated)
 
 
             # generate multiagent_controller inputs for policy forward pass
@@ -690,7 +691,8 @@ class NStepRunner():
 
         self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_global=T_global)
         self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_global=T_global)
-        self._add_stat("T_env", T_global, T_global=T_global)
+        if not self.test_mode:
+            self._add_stat("T_env", T_global, T_global=T_global)
         pass
 
     def _add_stat(self, name, value, T_global):

@@ -7,7 +7,7 @@ coma_epsilon_finish: 0.05
 coma_epsilon_time_length: 20000
 coma_epsilon_decay_mode: "exp"
 coma_exploration_mode: "softmax"
-coma_use_entropy_regularizer: False
+coma_use_entropy_regularizer: True
 gamma: 0.99
 learner: coma
 lr_agent: 5e-4
