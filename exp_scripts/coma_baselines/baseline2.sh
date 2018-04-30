@@ -12,4 +12,5 @@ for i in $(seq 1 $N_REPEAT); do
   GPU_ID=`shuf -i0-${N_UPPER} -n1`
   echo "Starting repeat number $i on GPU $GPU_ID"
   NV_GPU=${GPU_ID} ../.././docker.sh python3 /pymarl/src/main.py --exp_name=coma_baseline_5m with name=coma_baseline_5m__repeat${i}
+  sleep 10s
 done

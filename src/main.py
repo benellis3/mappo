@@ -72,7 +72,6 @@ def my_main(_run, _config, _log, env_args):
     run(_run, _config, _log, mongo_client)
 
 if __name__ == '__main__':
-    global mongo_client
     from copy import deepcopy
     params = deepcopy(sys.argv)
 
