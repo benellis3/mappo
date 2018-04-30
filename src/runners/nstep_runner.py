@@ -694,6 +694,8 @@ class NStepRunner():
         pass
 
     def _add_stat(self, name, value, T_global):
+        if isinstance(value, np.ndarray) and value.size == 1:
+            value = float(value)
 
         if not hasattr(self, "_stats"):
             self._stats = {}

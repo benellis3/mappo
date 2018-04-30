@@ -1,5 +1,6 @@
+import numpy as np
+
 from components.transforms import _underscore_to_cap
-import numpy
 
 
 class BasicLearner():
@@ -8,7 +9,7 @@ class BasicLearner():
     """
 
     def _add_stat(self, name, value, T_global):
-        if isinstance(value, numpy.ndarray) and value.size == 1:
+        if isinstance(value, np.ndarray) and value.size == 1:
             value = float(value)
 
         if not hasattr(self, "_stats"):
