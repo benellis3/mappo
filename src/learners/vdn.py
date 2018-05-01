@@ -160,9 +160,10 @@ class VDNLearner(BasicLearner):
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy(), T_env=self.T_q)
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=self.T_q)
-        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_env=self.T_q)
+        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy(), T_env=self.T_env)
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=self.T_env)
+        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_env=self.T_env)
+        self._add_stat("T_q", self.T_q, T_env=T_env)
 
         pass
 

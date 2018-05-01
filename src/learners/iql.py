@@ -160,31 +160,10 @@ class IQLLearner(BasicLearner):
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        #target_critic_mean = output_target_critic["qvalue"].mean().data.cpu().numpy()
-        #critic_mean = output_critic["qvalue"].mean().data.cpu().numpy()
-        #advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
+        self._add_stat("q_loss", IQL_loss.data.cpu().numpy(), T_env=T_env)
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
+        self._add_stat("T_q", self.T_q, T_env=T_env)
 
-        self._add_stat("q_loss", IQL_loss.data.cpu().numpy(), T_env=self.T_q)
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=self.T_q)
-
-        # self._add_stat("critic_loss", critic_loss.data.cpu().numpy())
-        # self._add_stat("critic_mean", critic_mean)
-        # self._add_stat("advantage_mean", advantage_mean)
-        # self._add_stat("target_critic_mean", target_critic_mean)
-        # self._add_stat("critic_grad_norm", critic_grad_norm)
-        # self._add_stat("policy_grad_norm", policy_grad_norm)
-        # self._add_stat("policy_loss", COMA_loss.data.cpu().numpy())
-
-        #a = batch_history.to_pd()
-        #b = target_critic_td_targets
-
-        # DEBUGGING SECTION
-        # print(min(batch_history.seq_lens))
-        # for i, p in enumerate(batch_history.seq_lens):
-        #     if p < batch_history.data.shape[1]:
-        #         a = batch_history.to_pd()
-        #         b = target_critic_td_targets[:, i, :, :]
-        #         c = 5
         pass
 
     def update_target_nets(self):
