@@ -79,9 +79,9 @@ class poMACERunner(NStepRunner):
                                   ]).agent_flatten()
         pass
 
-    def _add_episode_stats(self, T_global):
-        super()._add_episode_stats(T_global)
-        self._add_stat("policy_entropy", self.episode_buffer.get_stat("policy_entropy"), T_global=T_global)
+    def _add_episode_stats(self, T_env):
+        super()._add_episode_stats(T_env)
+        self._add_stat("policy_entropy", self.episode_buffer.get_stat("policy_entropy"), T_env=T_env)
         return
 
     def reset(self):

@@ -8,7 +8,7 @@ class BasicLearner():
     basis class for learners
     """
 
-    def _add_stat(self, name, value, T_global):
+    def _add_stat(self, name, value, T_env):
         if isinstance(value, np.ndarray) and value.size == 1:
             value = float(value)
 
@@ -16,9 +16,9 @@ class BasicLearner():
             self._stats = {}
         if name not in self._stats:
             self._stats[name] = []
-            self._stats[name+"_T"] = []
+            self._stats[name+"_T_env"] = []
         self._stats[name].append(value)
-        self._stats[name+"_T"].append(T_global)
+        self._stats[name+"_T_env"].append(T_env)
 
         if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
             self._stats[name].pop(0)
@@ -34,4 +34,4 @@ class BasicLearner():
 
         # log to tensorboard if enabled
         if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
-            self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_global)
+            self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)

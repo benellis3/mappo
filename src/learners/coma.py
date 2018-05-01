@@ -1,5 +1,6 @@
 from copy import deepcopy
 from functools import partial
+import numpy as np
 import torch as th
 from torch import nn
 from torch.autograd import Variable
@@ -175,7 +176,7 @@ class COMALearner(BasicLearner):
         """
         pass
 
-    def train(self, batch_history, T_global=None):
+    def train(self, batch_history, T_env=None):
         # -------------------------------------------------------------------------------
         # |  We follow the algorithmic description of COMA as supplied in Algorithm 1   |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)         |
@@ -213,6 +214,11 @@ class COMALearner(BasicLearner):
                                                                            inputs_tformat=data_inputs_tformat,
                                                                            to_variable=True)
 
+        critic_loss_arr = []
+        critic_mean_arr = []
+        target_critic_mean_arr = []
+        critic_grad_norm_arr = []
+
         def _optimize_critic(**kwargs):
             inputs_critic= kwargs["coma_model_inputs"]["critic"]
             inputs_target_critic=kwargs["coma_model_inputs"]["target_critic"]
@@ -246,13 +252,14 @@ class COMALearner(BasicLearner):
             critic_grad_norm = th.nn.utils.clip_grad_norm(self.critic_parameters, 50)
             self.critic_optimiser.step()
 
-            # Calculate critic statistics
+            # Calculate critic statistics and update
             target_critic_mean = output_target_critic["qvalue"].mean().data.cpu().numpy()
             critic_mean = output_critic["qvalue"].mean().data.cpu().numpy()
-            self._add_stat("critic_loss", critic_loss.data.cpu().numpy(), T_global=T_global)
-            self._add_stat("critic_mean", critic_mean, T_global=T_global)
-            self._add_stat("target_critic_mean", target_critic_mean, T_global=T_global)
-            self._add_stat("critic_grad_norm", critic_grad_norm, T_global=T_global)
+
+            critic_loss_arr.append(np.asscalar(critic_loss.data.cpu().numpy()))
+            critic_mean_arr.append(np.asscalar(critic_mean))
+            target_critic_mean_arr.append(np.asscalar(target_critic_mean))
+            critic_grad_norm_arr.append(critic_grad_norm)
 
             self.T_critic += len(batch_history) * batch_history._n_t
 
@@ -291,14 +298,20 @@ class COMALearner(BasicLearner):
         policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
         self.agent_optimiser.step()  # DEBUG
 
-        # Calculate policy statistics
-        advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
-        self._add_stat("advantage_mean", advantage_mean, T_global=T_global)
-        self._add_stat("policy_grad_norm", policy_grad_norm, T_global=T_global)
-        self._add_stat("policy_loss", COMA_loss.data.cpu().numpy(), T_global=T_global)
-
         # increase episode counter (the fastest one is always)
         self.T_policy += len(batch_history) * batch_history._n_t
+
+        # Calculate policy statistics
+        advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
+        self._add_stat("advantage_mean", advantage_mean, T_env=T_env)
+        self._add_stat("policy_grad_norm", policy_grad_norm, T_env=T_env)
+        self._add_stat("policy_loss", COMA_loss.data.cpu().numpy(), T_env=T_env)
+        self._add_stat("critic_loss", np.mean(critic_loss_arr), T_env=T_env)
+        self._add_stat("critic_mean", np.mean(critic_mean_arr), T_env=T_env)
+        self._add_stat("target_critic_mean", np.mean(target_critic_mean_arr), T_env=T_env)
+        self._add_stat("critic_grad_norm", np.mean(critic_grad_norm_arr), T_env=T_env)
+        self._add_stat("T_policy", self.T_policy, T_env=T_env)
+        self._add_stat("T_critic", self.T_critic, T_env=T_env)
 
         pass
 

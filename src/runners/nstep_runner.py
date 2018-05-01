@@ -55,7 +55,7 @@ class NStepRunner():
         self.n_subprocesses = self.args.n_subprocesses
         self.queue = None
         self.subprocesses = None
-        self.T = 0
+        self.T_env = 0
         self.max_t_episode = args.t_max
         self.batch_size = kwargs.get("batch_size", self.args.batch_size_run)
         self.transition_buffer_is_cuda = kwargs.get("transition_buffer_is_cuda", False) # only makes sense for subprocesses
@@ -570,7 +570,7 @@ class NStepRunner():
         ret = self._exch_msgs(msgs=selected_actions_msgs, ids=[_b for _b in ids])
         return ret
 
-    def run(self, test_mode, save_episode=False, T_global=None):
+    def run(self, test_mode):
         self.test_mode = test_mode
 
         # don't reset at initialization as don't have access to hidden state size then
@@ -610,7 +610,7 @@ class NStepRunner():
 
                 # update episode time counter
                 if not self.test_mode:
-                    self.T += len(ids_envs_not_terminated)
+                    self.T_env += len(ids_envs_not_terminated)
 
 
             # generate multiagent_controller inputs for policy forward pass
@@ -642,7 +642,7 @@ class NStepRunner():
                 self.multiagent_controller.select_actions(inputs=multiagent_controller_outputs,
                                                           avail_actions=avail_actions,
                                                           tformat=avail_actions_format,
-                                                          info={"T":self.T},
+                                                          info=dict(T_env=self.T_env),
                                                           test_mode=test_mode)
 
             # TODO: adapt for multiple simultaneous output types!
@@ -676,26 +676,26 @@ class NStepRunner():
             pass
 
         # calculate episode statistics
-        self._add_episode_stats(T_global=T_global)
+        self._add_episode_stats(T_env=self.T_env)
 
         return self.episode_buffer
 
-    def _add_episode_stats(self, T_global):
+    def _add_episode_stats(self, T_env):
 
         if self.env_stats_aggregator is not None:
             # receive episode stats from envs
             stats_msgs = ["STATS"]*self.batch_size
             env_stats = self._exch_msgs(msgs=stats_msgs, ids=range(self.batch_size))
             self.env_stats_aggregator.aggregate(stats=[env_stats[_id]["env_stats"] for _id in range(self.batch_size)],
-                                                add_stat_fn=partial(self._add_stat, T_global=T_global))
+                                                add_stat_fn=partial(self._add_stat, T_env=T_env))
 
-        self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_global=T_global)
-        self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_global=T_global)
+        self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env)
+        self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_env=T_env)
         if not self.test_mode:
-            self._add_stat("T_env", T_global, T_global=T_global)
+            self._add_stat("T_env", T_env, T_env=T_env)
         pass
 
-    def _add_stat(self, name, value, T_global):
+    def _add_stat(self, name, value, T_env):
         if isinstance(value, np.ndarray) and value.size == 1:
             value = float(value)
 
@@ -704,13 +704,13 @@ class NStepRunner():
 
         if name not in self._stats:
             self._stats[name] = []
-            self._stats[name+"_T"] = []
+            self._stats[name+"_T_env"] = []
         self._stats[name].append(value)
-        self._stats[name+"_T"].append(self.T)
+        self._stats[name+"_T_env"].append(self.T_env)
 
         if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
             self._stats[name].pop(0)
-            self._stats[name+"_T"].pop(0)
+            self._stats[name+"_T_env"].pop(0)
 
         # log to sacred if enabled
         if hasattr(self.logging_struct, "sacred_log_scalar_fn"):
@@ -718,7 +718,7 @@ class NStepRunner():
 
         # log to tensorboard if enabled
         if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
-            self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_global)
+            self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
 
         return
 
@@ -736,7 +736,7 @@ class NStepRunner():
             return "", {}
 
         logging_dict =  dict(
-                         T_global=self.T,
+                         T_env=self.T_env,
                          episode_length=_seq_mean(stats["episode_length"]),
                         )
 
@@ -752,7 +752,7 @@ class NStepRunner():
             logging_dict["episode_reward"] = _seq_mean(stats["episode_reward"])
 
         logging_str = ""
-        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_global"]))
+        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_env"]))
 
         if self.env_stats_aggregator is not None:
             # get logging str from env_stats aggregator

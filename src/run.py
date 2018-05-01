@@ -188,48 +188,46 @@ def run_sequential(args, _logging_struct, _run, unique_token):
 
     _logging_struct.py_logger.info("Beginning training for {} timesteps".format(args.t_max))
 
-    while T <= args.t_max:
+    while runner_obj.T_env <= args.t_max:
 
         # Run for a whole episode at a time
-        episode_rollout = runner_obj.run(T_global=T, test_mode=False)
-        T = runner_obj.T
+        episode_rollout = runner_obj.run(test_mode=False)
 
         episode_sample = None
         if args.use_replay_buffer:
             buffer.put(episode_rollout)
-            T = runner_obj.T
 
             if buffer.can_sample(args.batch_size):
                 episode_sample = buffer.sample(args.batch_size, seq_len=0)
         else:
             episode_sample = episode_rollout
 
-        learner_obj.train(episode_sample, T_global=T)
+        learner_obj.train(episode_sample, T_env=runner_obj.T_env)
 
         # Execute test runs once in a while
         n_test_runs = max(1, args.test_nepisode // runner_obj.batch_size)
-        if (T - last_test_T) / args.test_interval > 1.0:
+        if ( runner_obj.T_env - last_test_T) / args.test_interval > 1.0:
 
-            _logging_struct.py_logger.info("T_env: {}".format(T))
+            _logging_struct.py_logger.info("T_env: {}".format( runner_obj.T_env))
             runner_obj.log() # log runner statistics derived from training runs
 
-            last_test_T = T
+            last_test_T =  runner_obj.T_env
             for _ in range(n_test_runs):
-                runner_obj.run(T_global=T, test_mode=True)
+                runner_obj.run(test_mode=True)
 
             runner_obj.log()  # log runner statistics derived from test runs
             learner_obj.log()
 
         # save model once in a while
-        if args.save_model and T - model_save_time >= args.t_max // args.save_model_interval:
-            model_save_time = T
+        if args.save_model and runner_obj.T_env - model_save_time >= args.t_max // args.save_model_interval:
+            model_save_time = runner_obj.T_env
             _logging_struct.py_logger.info("Saving models")
 
             save_path = "results/models/{}".format(unique_token)
             os.makedirs(save_path, exist_ok=True)
 
             # learner obj will save all agent and further models used
-            learner_obj.save_models(path=save_path, token=unique_token, time=T)
+            learner_obj.save_models(path=save_path, token=unique_token, time=runner_obj.T_env)
 
         episode += 1
 

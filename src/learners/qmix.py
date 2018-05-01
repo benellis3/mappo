@@ -82,7 +82,7 @@ class QMIXLearner(BasicLearner):
         self.joint_scheme_dict = self.multiagent_controller.joint_scheme_dict
         pass
 
-    def train(self, batch_history, T_global=None):
+    def train(self, batch_history, T_env=None):
         # ------------------------------------------------------------------------------
         # |  We follow the algorithmic description of COMA as supplied in Algorithm 1  |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)        |
@@ -160,9 +160,9 @@ class QMIXLearner(BasicLearner):
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        self._add_stat("q_tot_loss", QMIX_loss.data.cpu().numpy(), T_global=self.T_q)
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_global=self.T_q)
-        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_global=self.T_q)
+        self._add_stat("q_tot_loss", QMIX_loss.data.cpu().numpy(), T_env=self.T_q)
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=self.T_q)
+        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_env=self.T_q)
 
         pass
 
