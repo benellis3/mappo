@@ -1,7 +1,7 @@
 #!/bin/bash
 # To be called from inside Docker container for now
 
-cd /pymarl/src
+#cd /pymarl/src
 export PYTHONPATH=$PYTHONPATH:/pymarl/src/
 
 TAG=$1
