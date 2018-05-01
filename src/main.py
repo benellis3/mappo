@@ -72,6 +72,10 @@ def my_main(_run, _config, _log, env_args):
     run(_run, _config, _log, mongo_client)
 
 if __name__ == '__main__':
+    import os
+    print(sys.path)
+    print(os.getcwd())
+
     from copy import deepcopy
     params = deepcopy(sys.argv)
 

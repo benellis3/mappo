@@ -689,10 +689,13 @@ class NStepRunner():
             self.env_stats_aggregator.aggregate(stats=[env_stats[_id]["env_stats"] for _id in range(self.batch_size)],
                                                 add_stat_fn=partial(self._add_stat, T_env=T_env))
 
-        self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env)
-        self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_env=T_env)
         if not self.test_mode:
             self._add_stat("T_env", T_env, T_env=T_env)
+            self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env)
+            self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_env=T_env)
+        else:
+            self._add_stat("episode_reward_test", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env)
+            self._add_stat("episode_length_test", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_env=T_env)
         pass
 
     def _add_stat(self, name, value, T_env):
@@ -737,7 +740,6 @@ class NStepRunner():
 
         logging_dict =  dict(
                          T_env=self.T_env,
-                         episode_length=_seq_mean(stats["episode_length"]),
                         )
 
         if "policy_entropy" in stats:
@@ -747,9 +749,11 @@ class NStepRunner():
             logging_dict["q_entropy"] = _seq_mean(stats["q_entropy"])
 
         if self.test_mode: # takes test mode from last forward run
-            logging_dict["episode_test_reward"] = _seq_mean(stats["episode_reward"])
+            logging_dict["episode_reward_test"] = _seq_mean(stats["episode_reward_test"])
+            logging_dict["episode_length_test"] = _seq_mean(stats["episode_length_test"])
         else:
             logging_dict["episode_reward"] = _seq_mean(stats["episode_reward"])
+            logging_dict["episode_length"] = _seq_mean(stats["episode_length"])
 
         logging_str = ""
         logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_env"]))
