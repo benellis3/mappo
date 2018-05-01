@@ -682,23 +682,25 @@ class NStepRunner():
 
     def _add_episode_stats(self, T_env):
 
+        test_suffix = "" if not self.test_mode else "_test"
         if self.env_stats_aggregator is not None:
             # receive episode stats from envs
             stats_msgs = ["STATS"]*self.batch_size
             env_stats = self._exch_msgs(msgs=stats_msgs, ids=range(self.batch_size))
             self.env_stats_aggregator.aggregate(stats=[env_stats[_id]["env_stats"] for _id in range(self.batch_size)],
-                                                add_stat_fn=partial(self._add_stat, T_env=T_env))
+                                                add_stat_fn=partial(self._add_stat, T_env=T_env, suffix=test_suffix),
+                                                test_mode=self.test_mode)
 
-        if not self.test_mode:
-            self._add_stat("T_env", T_env, T_env=T_env)
-            self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env)
-            self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_env=T_env)
-        else:
-            self._add_stat("episode_reward_test", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env)
-            self._add_stat("episode_length_test", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)), T_env=T_env)
+        self._add_stat("T_env", T_env, T_env=T_env, suffix=test_suffix)
+        self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env,
+                       suffix=test_suffix)
+        self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)),
+                       T_env=T_env, suffix=test_suffix)
         pass
 
-    def _add_stat(self, name, value, T_env):
+    def _add_stat(self, name, value, T_env, suffix=""):
+        name += suffix
+
         if isinstance(value, np.ndarray) and value.size == 1:
             value = float(value)
 
@@ -732,6 +734,7 @@ class NStepRunner():
 
         Logging is triggered in run.py
         """
+        test_suffix = "" if not self.test_mode else "_test"
 
         stats = self.get_stats()
         if stats == {}:
@@ -742,21 +745,15 @@ class NStepRunner():
                          T_env=self.T_env,
                         )
 
+        logging_dict["episode_reward"+test_suffix] = _seq_mean(stats["episode_reward"+test_suffix])
+        logging_dict["episode_length"+test_suffix] = _seq_mean(stats["episode_length"+test_suffix])
         if "policy_entropy" in stats:
-            logging_dict["policy_entropy"] = _seq_mean(stats["policy_entropy"])
-
+            logging_dict["policy_entropy"+test_suffix] = _seq_mean(stats["policy_entropy"+test_suffix])
         if "q_entropy" in stats:
-            logging_dict["q_entropy"] = _seq_mean(stats["q_entropy"])
-
-        if self.test_mode: # takes test mode from last forward run
-            logging_dict["episode_reward_test"] = _seq_mean(stats["episode_reward_test"])
-            logging_dict["episode_length_test"] = _seq_mean(stats["episode_length_test"])
-        else:
-            logging_dict["episode_reward"] = _seq_mean(stats["episode_reward"])
-            logging_dict["episode_length"] = _seq_mean(stats["episode_length"])
+            logging_dict["q_entropy"+test_suffix] = _seq_mean(stats["q_entropy"+test_suffix])
 
         logging_str = ""
-        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_env"]))
+        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_env"+test_suffix]))
 
         if self.env_stats_aggregator is not None:
             # get logging str from env_stats aggregator
