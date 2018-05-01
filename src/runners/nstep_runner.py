@@ -688,8 +688,7 @@ class NStepRunner():
             stats_msgs = ["STATS"]*self.batch_size
             env_stats = self._exch_msgs(msgs=stats_msgs, ids=range(self.batch_size))
             self.env_stats_aggregator.aggregate(stats=[env_stats[_id]["env_stats"] for _id in range(self.batch_size)],
-                                                add_stat_fn=partial(self._add_stat, T_env=T_env, suffix=test_suffix),
-                                                test_mode=self.test_mode)
+                                                add_stat_fn=partial(self._add_stat, T_env=T_env, suffix=test_suffix))
 
         self._add_stat("T_env", T_env, T_env=T_env, suffix=test_suffix)
         self._add_stat("episode_reward", np.mean(self.episode_buffer.get_stat("reward_sum", bs_ids=None)), T_env=T_env,
