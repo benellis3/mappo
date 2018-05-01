@@ -77,8 +77,7 @@ def run(_run, _config, _log, pymongo_client):
     print("Exiting script")
 
     # Making sure framework really exits
-    exit()
-
+    os._exit()
 
 def args_sanity_check(config, _log):
 

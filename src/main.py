@@ -71,6 +71,9 @@ def my_main(_run, _config, _log, env_args):
     # run the framework
     run(_run, _config, _log, mongo_client)
 
+    # force exit
+    os._exit()
+
 if __name__ == '__main__':
     import os
     print(sys.path)

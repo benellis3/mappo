@@ -920,7 +920,8 @@ class StatsAggregator():
                                                                                               [0]*len(current_stats["battles_won"]) if self.last_stats is None else self.last_stats["battles_won"],
                                                                                               current_stats["battles_game"],
                                                                                               [0]*len(current_stats["battles_game"]) if self.last_stats is None else
-                                                                                              self.last_stats["battles_game"])])
+                                                                                              self.last_stats["battles_game"])
+                                                if (_c - _d) != 0.0])
             else:
                 aggregate_stats[_k] = np.mean([_a-_b for _a, _b in zip(_v, [0]*len(_v) if self.last_stats is None else self.last_stats[_k])])
 
