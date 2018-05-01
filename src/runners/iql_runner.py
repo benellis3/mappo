@@ -87,7 +87,11 @@ class IQLRunner(NStepRunner):
 
     def _add_episode_stats(self, T_env):
         super()._add_episode_stats(T_env)
-        self._add_stat("qvalues_entropy", self.episode_buffer.get_stat("qvalues_entropy"), T_env=T_env)
+
+        test_suffix = "" if not self.test_mode else "_test"
+        self._add_stat("qvalues_entropy", self.episode_buffer.get_stat("qvalues_entropy"),
+                       T_env=T_env,
+                       suffix=test_suffix)
         return
 
     def reset(self):
