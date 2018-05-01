@@ -1,1 +1,1 @@
-from .predator_prey import PredPrey as PredatorPreyEnv
+from .predator_prey import PredatorPreyCapture

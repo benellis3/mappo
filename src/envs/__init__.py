@@ -1,7 +1,8 @@
 from functools import partial
 
 from components.transforms import _join_dicts
-from .predator_prey import PredatorPreyEnv
+from .predator_prey import PredatorPreyCapture
+from .predator_prey__old import PredatorPreyEnv as PredatorPreyOldEnv
 from .starcraft2 import StarCraft2Env
 from .test import IntegrationTestEnv
 
@@ -10,8 +11,10 @@ def env_fn(env, **kwargs): # TODO: this may be a more complex function
     return env(**kwargs)
 
 REGISTRY = {}
+REGISTRY["pred_prey__old"] = partial(env_fn,
+                                     env = PredatorPreyOldEnv)
 REGISTRY["pred_prey"] = partial(env_fn,
-                                    env = PredatorPreyEnv)
+                                     env = PredatorPreyCapture)
 REGISTRY["integration_test"] = partial(env_fn,
                                        env=IntegrationTestEnv)
 REGISTRY["sc2"] = partial(env_fn,
