@@ -746,9 +746,9 @@ class NStepRunner():
 
         logging_dict["episode_reward"+test_suffix] = _seq_mean(stats["episode_reward"+test_suffix])
         logging_dict["episode_length"+test_suffix] = _seq_mean(stats["episode_length"+test_suffix])
-        if "policy_entropy" in stats:
+        if "policy_entropy"+test_suffix in stats:
             logging_dict["policy_entropy"+test_suffix] = _seq_mean(stats["policy_entropy"+test_suffix])
-        if "q_entropy" in stats:
+        if "q_entropy"+test_suffix in stats:
             logging_dict["q_entropy"+test_suffix] = _seq_mean(stats["q_entropy"+test_suffix])
 
         logging_str = ""
