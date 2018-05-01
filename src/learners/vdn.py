@@ -171,29 +171,6 @@ class VDNLearner(BasicLearner):
         self.multiagent_controller.update_target()
         pass
 
-    def _add_stat(self, name, value, T_env):
-        if not hasattr(self, "_stats"):
-            self._stats = {}
-        if name not in self._stats:
-            self._stats[name] = []
-            self._stats[name+"_T"] = []
-        self._stats[name].append(value)
-        self._stats[name+"_T"].append(self.T_q)
-
-        if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
-            self._stats[name].pop(0)
-            self._stats[name+"_T"].pop(0)
-
-        # log to sacred if enabled
-        if hasattr(self.logging_struct, "sacred_log_scalar_fn"):
-            self.logging_struct.sacred_log_scalar_fn(_underscore_to_cap(name), value)
-
-        # log to tensorboard if enabled
-        if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
-            self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
-
-        return
-
     def get_stats(self):
         if hasattr(self, "_stats"):
             return self._stats
