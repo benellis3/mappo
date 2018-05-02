@@ -33,7 +33,7 @@ class IQLLoss(nn.Module):
 
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
-        
+
         chosen_qvalues[action_mask] = 0.0
         target[action_mask] = 0.0
 

@@ -110,7 +110,7 @@ class poMACERunner(NStepRunner):
             if self.args.pomace_use_epsilon_seed:
                 # write epsilon_variances into buffer (use episode-wide one,
                 # i.e. one per batch - could vary per batch entry if we wanted [not currently implemented])
-                epsilon_variances = ttype(self.batch_size, 1).fill_(self.pomace_epsilon_decay_schedule.eval(self.T))
+                epsilon_variances = ttype(self.batch_size, 1).fill_(self.pomace_epsilon_decay_schedule.eval(self.T_env))
                 self.episode_buffer.set_col(col="pomace_epsilon_variances",
                                             scope="episode",
                                             data=epsilon_variances.cuda() if self.episode_buffer.is_cuda else epsilon_variances.cpu())
@@ -120,7 +120,7 @@ class poMACERunner(NStepRunner):
                                             scope="episode",
                                             data=epsilon_seeds)
             else:
-                dist = Normal(self.pomace_epsilon_mean, self.pomace_epsilon_decay_schedule.eval(self.T))
+                dist = Normal(self.pomace_epsilon_mean, self.pomace_epsilon_decay_schedule.eval(self.T_env))
                 epsilons = dist.sample_n(self.batch_size * self.args.pomace_lambda_size).view(
                     self.batch_size,
                     self.args.pomace_lambda_size).view(self.batch_size, -1)
@@ -135,7 +135,7 @@ class poMACERunner(NStepRunner):
     def log(self, log_directly=True):
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
-            log_str += ", pomace_epsilon_variance={:g}".format(self.pomace_epsilon_decay_schedule.eval(self.T))
+            log_str += ", pomace_epsilon_variance={:g}".format(self.pomace_epsilon_decay_schedule.eval(self.T_env))
             self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
         else:
             self.logging_struct.py_logger.info("TEST RUNNER INFO: {}".format(log_str))

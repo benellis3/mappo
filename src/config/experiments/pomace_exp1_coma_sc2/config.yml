@@ -1,6 +1,12 @@
-batch_size: 2
+batch_size: 8
 defaults: default coma pomace sc2
 env_args:
   map_name: 3m_3m
+env_stats_aggregator: sc2
+n_loops_per_thread_or_sub_or_main_process: 1
+n_subprocesses: 8
 pomace_multiagent_network: pomace_nn_exp1
 pomace_exp_variant: 1
+n_learner_reps: 20
+
+
