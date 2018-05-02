@@ -2,7 +2,7 @@ from functools import partial
 
 from components.transforms import _join_dicts
 from .predator_prey import PredatorPreyCapture
-from .predator_prey import PredatorPreyCaptureCython
+#from .predator_prey import PredatorPreyCaptureCython
 from .predator_prey__old import PredatorPreyEnv as PredatorPreyOldEnv
 from .starcraft2 import StarCraft2Env
 from .test import IntegrationTestEnv
