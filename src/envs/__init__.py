@@ -16,8 +16,9 @@ REGISTRY["pred_prey__old"] = partial(env_fn,
                                      env = PredatorPreyOldEnv)
 REGISTRY["pred_prey"] = partial(env_fn,
                                      env = PredatorPreyCapture)
-REGISTRY["pred_prey_cython"] = partial(env_fn,
-                                     env = PredatorPreyCaptureCython)
+#REGISTRY["pred_prey_cython"] = partial(env_fn,
+#                                     env = PredatorPreyCaptureCython)
+
 REGISTRY["integration_test"] = partial(env_fn,
                                        env=IntegrationTestEnv)
 REGISTRY["sc2"] = partial(env_fn,
