@@ -2,7 +2,7 @@ import numpy as np
 import torch as th
 from torch.autograd import Variable
 from torch.distributions import Categorical
-from .transforms import _to_batch, _from_batch, _adim, _vdim
+from .transforms import _to_batch, _from_batch, _adim, _vdim, _bsdim
 
 REGISTRY = {}
 
@@ -52,11 +52,12 @@ class EpsilonGreedyActionSelector():
         agent_qvalues[avail_actions == 0.0] = -float("inf") # should never be selected!
 
         masked_qvalues, params, tformat = _to_batch(agent_qvalues * avail_actions, tformat)
-        _, _argmaxes = masked_qvalues.max(dim=1)
-        _argmaxes.unsqueeze_(1)
+        _, _argmaxes = masked_qvalues.max(dim=1, keepdim=True)
+        #_argmaxes.unsqueeze_(1)
 
         if not test_mode: # normal epsilon-greedy action selection
             epsilons, epsilons_tformat = self._get_epsilons()
+            epsilons = epsilons[:agent_qvalues.shape[_bsdim(tformat)], :]
             random_numbers = epsilons.clone().uniform_()
             _avail_actions, params, tformat = _to_batch(avail_actions, tformat)
             random_actions = Categorical(_avail_actions).sample().unsqueeze(1)

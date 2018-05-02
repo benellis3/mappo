@@ -2,12 +2,13 @@ env: pred_prey
 env_args:
   predator_prey_toroidal: True
   predator_prey_shape:
-    - 3
-    - 3
+    - 4
+    - 4
   n_prey: 1
   agent_obs:
     - 1
     - 1
-  episode_limit: 20
+  episode_limit: 50
   n_prey: 1
+  n_agents: 4
 
