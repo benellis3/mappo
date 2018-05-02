@@ -5,13 +5,13 @@ import numpy
 import scipy
 
 extensions = [
-    Extension("predator_prey",["predator_prey.pyx"],
+    Extension("predator_prey__cython",["predator_prey_numpy.pyx"],
     include_dirs=[numpy.get_include(),"."]),
 
 ]
 
 setup(
-    name='cblitzz',
+    name='predator_prey',
     version='0.0.1',
     description='''Cython support for Predator Prey Env''',
     url='...',

@@ -1,1 +1,2 @@
 from .predator_prey import PredatorPreyCapture
+from .predator_prey__cython import PredatorPreyCapture as PredatorPreyCaptureCython

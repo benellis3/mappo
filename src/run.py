@@ -4,9 +4,6 @@ from math import ceil
 import numpy as np
 import os
 import pprint
-import tensorboard
-if tensorboard:
-    from tensorboard_logger import configure, log_value
 import time
 import threading
 import torch as th
@@ -40,7 +37,10 @@ def run(_run, _config, _log, pymongo_client):
     # ----- configure logging
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-    if tensorboard:
+    if args.use_tensorboard:
+        import tensorboard
+        if tensorboard:
+            from tensorboard_logger import configure, log_value
         import os
         from os.path import dirname, abspath
         file_tb_path = os.path.join(dirname(dirname(abspath(__file__))), "tb_logs")
@@ -49,7 +49,7 @@ def run(_run, _config, _log, pymongo_client):
     # set up logging object to be passed on from now on
     logging_struct = SN(py_logger=_log,
                         sacred_log_scalar_fn=partial(append_scalar, run=_run))
-    if tensorboard:
+    if args.use_tensorboard:
         logging_struct.tensorboard_log_scalar_fn=log_value
 
     # ----- execute runners
@@ -77,7 +77,7 @@ def run(_run, _config, _log, pymongo_client):
     print("Exiting script")
 
     # Making sure framework really exits
-    os._exit()
+    os._exit(os.EX_OK)
 
 def args_sanity_check(config, _log):
 
