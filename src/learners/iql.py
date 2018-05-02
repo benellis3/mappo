@@ -27,8 +27,15 @@ class IQLLoss(nn.Module):
 
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
+        # actions which are nans are basically just ignored
+        action_mask = (actions!=actions)
+        actions[action_mask] = 0.0
+
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
+        
+        chosen_qvalues[action_mask] = 0.0
+        target[action_mask] = 0.0
 
         nans = (target != target)
         target[nans] = 0.0
@@ -132,6 +139,7 @@ class IQLLearner(BasicLearner):
 
         actions, actions_tformat = batch_history.get_col(col="actions",
                                                          agent_ids=list(range(self.n_agents)))
+        actions[actions!=actions] = 0.0 # so those are ignored in that kind of loss
 
         iql_loss_fn = partial(IQLLoss(),
                               target=Variable(td_targets, requires_grad=False),

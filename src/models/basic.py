@@ -187,9 +187,9 @@ class RNN(nn.Module):
             loss = loss_fn(_x, tformat=tformat)[0]
 
         return th.cat(output_x, t_dim), \
-               th.cat(h_list[1:], t_dim), \
-               loss, \
-               tformat
+           th.cat(h_list[1:], t_dim), \
+           loss, \
+           tformat
 
 class FCEncoder(nn.Module):
     def __init__(self, input_shapes, output_shapes=None, layer_args=None, args=None):
