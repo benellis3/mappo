@@ -6,12 +6,17 @@ batch_size_run: 64
 buffer_size: 128
 defaults: default qmix predator_prey
 env_args:
-  n_agents: 3
+  predator_prey_toroidal: True
   predator_prey_shape:
-    - 3
-    - 3
-  prey_movement: "escape"
-  nagent_capture_enabled: True
+    - 4
+    - 4
+  n_prey: 1
+  agent_obs:
+    - 1
+    - 1
+  episode_limit: 50
+  n_prey: 1
+  n_agents: 4
 qmix_epsilon_start: 0.5
 qmix_epsilon_finish: 0.05
 qmix_epsilon_time_length: 40000
