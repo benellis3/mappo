@@ -61,6 +61,7 @@ class EpsilonGreedyActionSelector():
             _avail_actions, params, tformat = _to_batch(avail_actions, tformat)
             random_actions = Categorical(_avail_actions).sample().unsqueeze(1)
             epsilon_pos = (random_numbers < epsilons).repeat(agent_qvalues.shape[_adim(tformat)], 1) # sampling uniformly from actions available
+            epsilon_pos = epsilon_pos[:random_actions.shape[0], :]
             _argmaxes[epsilon_pos] = random_actions[epsilon_pos]
             eps_argmaxes = _from_batch(_argmaxes, params, tformat)
             return eps_argmaxes, agent_qvalues, tformat
