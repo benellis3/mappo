@@ -13,6 +13,6 @@ N_UPPER=`expr $N_GPUS - 1`
 for i in $(seq 1 $N_REPEAT); do
   GPU_ID=`shuf -i0-${N_UPPER} -n1`
   echo "Starting repeat number $i on GPU $GPU_ID"
-  NV_GPU=${GPU_ID} ../.././docker.sh python3 /pymarl/src/main.py --exp_name=iql_baseline_pp with name=${TAG}__iql_baseline_pp_${TIMESTAMP}__repeat${i} &
+  NV_GPU=${GPU_ID} ../.././docker.sh python3 /pymarl/src/main.py --exp_name=iql_baseline_pp with name=${TAG}__iql_baseline_pp_${TIMESTAMP}__repeat${i} use_tensorboard=False &
   sleep 10s
 done

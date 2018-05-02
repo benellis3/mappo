@@ -11,6 +11,7 @@ share_agent_params: True
 tensorboard: True
 test_interval: 8000
 test_nepisode: 50
+use_tensorboard: True
 t_max: 100000000
 mongodb_profile: gandalf_pymarl
 
