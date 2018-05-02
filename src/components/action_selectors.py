@@ -57,7 +57,6 @@ class EpsilonGreedyActionSelector():
 
         if not test_mode: # normal epsilon-greedy action selection
             epsilons, epsilons_tformat = self._get_epsilons()
-            epsilons = epsilons[:agent_qvalues.shape[_bsdim(tformat)], :]
             random_numbers = epsilons.clone().uniform_()
             _avail_actions, params, tformat = _to_batch(avail_actions, tformat)
             random_actions = Categorical(_avail_actions).sample().unsqueeze(1)
