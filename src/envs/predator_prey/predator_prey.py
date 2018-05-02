@@ -29,14 +29,22 @@ State output is a list of length 2, giving location of all agents and all target
 
 TODO: Fine tune the reward to allow fast learning. 
 '''
+a = (lambda *k: k)(1,2,3)
 
-
-if torch.cuda.is_available():
-    Tensor = torch.cuda.FloatTensor
-    lTensor = torch.cuda.LongTensor
+use_numpy = True
+if use_numpy:
+    from functools import partial
+    Tensor = lambda *k: partial(np.empty, dtype=np.float32)(k) if len(k) > 1 else partial(np.array, dtype=np.float32)(*k)
+    lTensor = lambda *k: partial(np.empty, dtype=np.int32)(k) if len(k) > 1 else partial(np.array, dtype=np.int32)(*k)
+    tensor_sum = np.sum
 else:
-    Tensor = torch.FloatTensor
-    lTensor = torch.LongTensor
+    if torch.cuda.is_available():
+        Tensor = torch.cuda.FloatTensor
+        lTensor = torch.cuda.LongTensor
+    else:
+        Tensor = torch.FloatTensor
+        lTensor = torch.LongTensor
+    tensor_sum = torch.sum
 
 
 class PredatorPreyCapture(MultiAgentEnv):
@@ -59,7 +67,10 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.state_size = self.x_max * self.y_max * 2
         self.env_max = lTensor(shape)
         self.grid_shape = np.asarray(shape)
-        self.grid = Tensor(self.batch_size, self.x_max, self.y_max, 2).zero_()  # channels are 0: agents, 1: prey
+        if use_numpy:
+            self.grid = np.zeros([self.batch_size, self.x_max, self.y_max, 2], dtype=np.float32)
+        else:
+            self.grid = Tensor(self.batch_size, self.x_max, self.y_max, 2).zero_()  # channels are 0: agents, 1: prey
 
         # Define the agents
         self.actions = lTensor([[0, 1], [1, 0], [0, -1], [-1, 0], [0, 0]])
@@ -95,11 +106,10 @@ class PredatorPreyCapture(MultiAgentEnv):
             for a in range(actors.shape[0]):
                 is_free = False
                 while not is_free:
-                    # Draw actors's position randomly
                     actors[a, b, 0] = np.random.randint(self.env_max[0])
                     actors[a, b, 1] = np.random.randint(self.env_max[1])
                     # Check if position is valid
-                    is_free = torch.sum(self.grid[b, actors[a, b, 0], actors[a, b, 1], :]) == 0
+                    is_free = tensor_sum(self.grid[b, actors[a, b, 0], actors[a, b, 1], :]) == 0
                 self.grid[b, actors[a, b, 0], actors[a, b, 1], type_id] = 1
 
     def print_grid(self, batch=0, grid=None):
@@ -138,11 +148,17 @@ class PredatorPreyCapture(MultiAgentEnv):
     # ---------- INTERACTION METHODS -----------------------------------------------------------------------------------
     def reset(self):
         # Reset old episode
-        self.prey_alive.fill_(1)
+        if use_numpy:
+            self.prey_alive.fill(1)
+        else:
+            self.prey_alive.fill_(1)
         self.steps = 0
 
         # Clear the grid
-        self.grid.fill_(0.0)
+        if use_numpy:
+            self.grid.fill(0.0)
+        else:
+            self.grid.fill_(0.0)
 
         # Place n_agents and n_preys on the grid
         self._place_actors(self.agents, 0)
@@ -153,13 +169,17 @@ class PredatorPreyCapture(MultiAgentEnv):
     def step(self, actions):
         """ Execute a*bs actions in the environment. """
         if not self.batch_mode:
-            actions = lTensor(actions).unsqueeze(1)
+            if use_numpy:
+                actions = np.expand_dims(lTensor(actions), 1)
+            else:
+                actions = lTensor(actions).unsqueeze(1)
         assert len(actions.shape) == 2 and actions.shape[0] == self.n_agents and actions.shape[1] == self.batch_size, \
             "improper number of agents and/or parallel environments!"
-        actions = actions.long()
+
+        actions = actions.long() if not use_numpy else actions.astype(np.int32)
 
         # Initialise returned values and grid
-        reward = Tensor(self.batch_size).fill_(self.time_reward)
+        reward = Tensor(self.batch_size).fill_(self.time_reward) if not use_numpy else Tensor(self.batch_size).fill(self.time_reward)
         terminated = [False for _ in range(self.batch_size)]
 
         # Move the agents sequentially in random order
@@ -227,7 +247,10 @@ class PredatorPreyCapture(MultiAgentEnv):
         o_x, o_y = self.agent_obs
         x_range = range((a_x - o_x), (a_x + o_x + 1))
         y_range = range((a_y - o_y), (a_y + o_y + 1))
-        ex_grid = self.grid[batch, :, :, :].cpu().numpy().astype(dtype=np.float32)
+        if use_numpy:
+            ex_grid = self.grid[batch, :, :, :].astype(dtype=np.float32)
+        else:
+            ex_grid = self.grid[batch, :, :, :].cpu().numpy().astype(dtype=np.float32)
         agent_obs = ex_grid.take(x_range, 0, mode='wrap').take(y_range, 1, mode='wrap')
         return np.resize(agent_obs, self.obs_size)
 
@@ -239,7 +262,10 @@ class PredatorPreyCapture(MultiAgentEnv):
         if self.batch_mode:
             return self.grid.clone().view(self.state_size)
         else:
-            return self.grid[0, :, :, :].cpu().view(self.state_size).numpy()
+            if use_numpy:
+                return self.grid[0, :, :, :].reshape(self.state_size)
+            else:
+                return self.grid[0, :, :, :].cpu().view(self.state_size).numpy()
 
     # ---------- GETTERS -----------------------------------------------------------------------------------------------
     def get_total_actions(self):
