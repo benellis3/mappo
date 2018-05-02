@@ -1,1 +1,1 @@
-from .starcraft1 import SC1 as StarCraft1Env # TODO: check if anything needs to be added here
+from .starcraft1 import SC1 as StarCraft1Env, StatsAggregator
