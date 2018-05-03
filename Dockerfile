@@ -82,13 +82,14 @@ RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /insta
 #RUN cd /install/bwapi-git && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DOPENBW_DIR=/install/openbw-git -
 # DOPENBW_ENABLE_UI=1 -DCMAKE_INSTALL_PREFIX=/install && make
 
-#RUN apt-get install -y libzstd-dev
-#RUN wget https://github.com/zeromq/libzmq/releases/download/v4.2.2/zeromq-4.2.2.tar.gz
-#RUN tar xvzf zeromq-4.2.2.tar.gz
-#RUN sudo apt-get update && sudo apt-get install -y libtool pkg-config build-essential autoconf automake uuid-dev
-#RUN cd zeromq-4.2.2 && ./configure && sudo make -j 12 install && sudo ldconfig && ldconfig -p | grep zmq
+RUN apt-get purge -y libzmq*
+RUN wget https://github.com/zeromq/libzmq/releases/download/v4.2.2/zeromq-4.2.2.tar.gz
+RUN tar xvzf zeromq-4.2.2.tar.gz
+# RUN ulimit -n 1000 && apt-get update
+RUN apt-get install -y libtool pkg-config build-essential autoconf automake uuid-dev
+RUN cd zeromq-4.2.2 && ./configure && make install && ldconfig
 
-RUN apt-get install -y libzstd1 libzstd1-dev zstd libzmq-dev
+RUN apt-get install -y libzstd1-dev zstd
 RUN pip3 install pybind11
 RUN git clone https://github.com/oxwhirl/TorchCraft.git torchcraft
 RUN cd torchcraft && git submodule update --init --recursive && pip3 install .
