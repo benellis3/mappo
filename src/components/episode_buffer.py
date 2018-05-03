@@ -6,7 +6,7 @@ from torch.autograd import Variable
 import torch as th
 from types import SimpleNamespace as SN
 
-from .transforms import TRANSFORMS
+from .transforms import TRANSFORMS, _has_gradient
 from .scheme import Scheme
 
 
@@ -183,7 +183,8 @@ class BatchEpisodeBuffer():
         """
         set a single column from buffer (or a list of columns, labelled by agent_ids)
         """
-        assert not isinstance(data, Variable)
+
+        assert not _has_gradient(data), "data cannot have variables attached!"
 
         if agent_ids is not None:
             agent_ids = [agent_ids] if not isinstance(agent_ids, (list, tuple)) else agent_ids
