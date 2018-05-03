@@ -87,9 +87,11 @@ RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /insta
 #RUN tar xvzf zeromq-4.2.2.tar.gz
 #RUN sudo apt-get update && sudo apt-get install -y libtool pkg-config build-essential autoconf automake uuid-dev
 #RUN cd zeromq-4.2.2 && ./configure && sudo make -j 12 install && sudo ldconfig && ldconfig -p | grep zmq
-#RUN pip3 install pybind11
-#RUN git clone git@github.com:TorchCraft/TorchCraft.git torchcraft 
-#RUN cd torchcraft && git submodule update --init --recursive && pip3 install .
+
+RUN apt-get install -y libzstd1 libzstd1-dev zstd libzmq-dev
+RUN pip3 install pybind11
+RUN git clone https://github.com/oxwhirl/TorchCraft.git torchcraft
+RUN cd torchcraft && git submodule update --init --recursive && pip3 install .
 
 #### -------------------------------------------------------------------
 #### final steps
