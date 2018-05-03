@@ -132,8 +132,7 @@ class SC1(MultiAgentEnv):
                   "BWAPI_CONFIG_AI__RACE": '{}'.format(self._bot_race),
                   "BWAPI_CONFIG_AI__AI": '{}/bwapi/build/lib/BWEnv.dylib'.format(os.environ['SC1PATH']),
                   "BWAPI_CONFIG_AUTO_MENU__AUTO_MENU": "SINGLE_PLAYER",
-                  "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/bwapi/build/bin/Maps/BroodWar/micro/{}.scm'.format(
-                      os.environ['SC1PATH'], self.map_name),
+                  "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/envs/starcraft1/maps/{}.scm'.format(os.getcwd(), self.map_name),
                   # "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE MAP SETTINGS",
                   "TORCHCRAFT_PORT": '{}'.format(self.port)}
         launcher_path = '{}/bwapi/build/bin'.format(os.environ['SC1PATH'])
@@ -760,10 +759,11 @@ class SC1(MultiAgentEnv):
                 self.enemies[len(self.enemies)] = unit
 
             if self.agents == {}:
-                print('Waiting for agents to spawn... Iteration {}'.format(counter))
+                counter += 1
 
             if len(self.agents) == self.n_agents and len(self.enemies) == self.n_enemies:
                 # All good
+                # print('Spawned agents after iteration {}'.format(counter))
                 return
 
             # Might happen very rarely, just gonna do an additional environmental step
