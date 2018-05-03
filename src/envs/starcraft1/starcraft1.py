@@ -61,8 +61,6 @@ class SC1(MultiAgentEnv):
         self.debug_inputs = False
         self.debug_rewards = False
 
-        print(self.bs_id)
-
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
