@@ -64,9 +64,14 @@ class SC1(MultiAgentEnv):
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
+        if sys.platform == 'linux':
+            # self.game_version = "1.4.0"
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
+            self.env_file_type = 'so'
         if sys.platform == 'darwin':
             # self.game_version = "1.4.0"
             os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
+            self.env_file_type = 'dylib'
             # self.stalker_id = 1885
             # self.zealot_id = 1886
         # else:
@@ -130,7 +135,7 @@ class SC1(MultiAgentEnv):
     def _launch_server(self):
         my_env = {"OPENBW_ENABLE_UI": '0',
                   "BWAPI_CONFIG_AI__RACE": '{}'.format(self._bot_race),
-                  "BWAPI_CONFIG_AI__AI": '{}/bwapi/build/lib/BWEnv.dylib'.format(os.environ['SC1PATH']),
+                  "BWAPI_CONFIG_AI__AI": '{}/bwapi/build/lib/BWEnv.{}'.format(os.environ['SC1PATH'], self.env_file_type),
                   "BWAPI_CONFIG_AUTO_MENU__AUTO_MENU": "SINGLE_PLAYER",
                   "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/envs/starcraft1/maps/{}.scm'.format(os.getcwd(), self.map_name),
                   # "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE MAP SETTINGS",
