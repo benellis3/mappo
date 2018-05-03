@@ -98,10 +98,13 @@ class COMARunner(NStepRunner):
                                                                           time_length=self.args.coma_epsilon_time_length,
                                                                           decay=self.args.coma_epsilon_decay_mode)
 
+
             epsilons = ttype(self.batch_size, 1).fill_(self.coma_epsilon_decay_schedule.eval(self.T_env))
             self.episode_buffer.set_col(col="coma_epsilons",
                                         scope="episode",
                                         data=epsilons)
+
+
         pass
 
     def log(self, log_directly=True):

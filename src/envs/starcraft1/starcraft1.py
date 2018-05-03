@@ -61,6 +61,8 @@ class SC1(MultiAgentEnv):
         self.debug_inputs = False
         self.debug_rewards = False
 
+        print(self.bs_id)
+
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
@@ -794,7 +796,6 @@ class SC1(MultiAgentEnv):
             #     # iffy way, but would not thraw an error for sure
             #     self.full_restart()
             #     self.reset()
-
             # assert len(self.agents) == self.n_agents, "Incorrect number of agents: " + str(len(self.agents))
             # assert len(self.enemies) == self.n_enemies, "Incorrect number of enemies: " + str(len(self.enemies))
 

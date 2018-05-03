@@ -3,7 +3,8 @@ import torch as th
 
 from torch.autograd import Variable
 
-
+def _has_gradient(tensor):
+    return tensor.requires_grad
 
 def fillnan(series, value, **kwargs):
     """
