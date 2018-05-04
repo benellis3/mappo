@@ -2,7 +2,7 @@ action_selector: "epsilon_greedy"
 agent_model: "RNN"
 agent_output_type: "qvalues"
 batch_size: 64
-batch_size_run: 64
+batch_size_run: 8
 buffer_size: 128
 defaults: default iql predator_prey
 env_args:
