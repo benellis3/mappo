@@ -4,7 +4,13 @@ import torch as th
 from torch.autograd import Variable
 
 def _has_gradient(tensor):
-    return tensor.requires_grad
+    """
+    pytorch < 0.4 compatibility
+    """
+    if hasattr(tensor, "requires_grad"):
+        return tensor.requires_grad
+    else:
+        return False
 
 def fillnan(series, value, **kwargs):
     """

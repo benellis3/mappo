@@ -201,7 +201,8 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         else:
             episode_sample = episode_rollout
 
-        learner_obj.train(episode_sample, T_env=runner_obj.T_env)
+        if episode_sample is not None:
+            learner_obj.train(episode_sample, T_env=runner_obj.T_env)
 
         # Execute test runs once in a while
         n_test_runs = max(1, args.test_nepisode // runner_obj.batch_size)
