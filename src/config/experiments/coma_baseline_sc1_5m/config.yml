@@ -9,7 +9,7 @@ coma_epsilon_decay_mode: "exp"
 coma_exploration_mode: "softmax"
 coma_use_entropy_regularizer: False
 env_args:
-  map_name: 5m_5m
+  map_name: m5v5_c_far
 env_stats_aggregator: sc1
 n_learner_reps: 30
 n_loops_per_thread_or_sub_or_main_process: 1
