@@ -31,6 +31,8 @@ class SC1(MultiAgentEnv):
         if isinstance(args, dict):
             args = convert(args)
 
+        self._add_deepcopy_support()
+
         # Read arguments
         self.map_name = args.map_name
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
@@ -806,10 +808,10 @@ class SC1(MultiAgentEnv):
         n_enemy_alive = 0
 
         # Store previous state
-        self.previous_agent_units = copy(
-            self.agents)  # TODO: "copy" is just temporary--need to find alternative solution here
-        self.previous_enemy_units = copy(
-            self.enemies)  # TODO: "copy" is just temporary--need to find alternative solution here
+        self.previous_agent_units = deepcopy(self.agents)
+        self.previous_enemy_units = deepcopy(self.enemies)
+        # self.previous_agent_units = CloudpickleWrapper(self.agents).__getstate__()
+        # self.previous_enemy_units = CloudpickleWrapper(self.enemies).__getstate__()
 
         for al_id, al_unit in self.agents.items():
             updated = False
@@ -855,6 +857,71 @@ class SC1(MultiAgentEnv):
         stats["timeouts"] = self.timeouts
         stats["restarts"] = self.force_restarts
         return stats
+
+    def _add_deepcopy_support(self):
+        tc.replayer.Order.__deepcopy__ = _deepcopy_order
+        tc.replayer.UnitCommand.__deepcopy__ = _deepcopy_unit_command
+        tc.replayer.Unit.__deepcopy__ = _deepcopy_unit
+
+def _deepcopy_order(self, memo):
+    o = tc.replayer.Order()
+    o.first_frame = self.first_frame
+    o.type = self.type
+    o.targetId = self.targetId
+    o.targetX = self.targetX
+    o.targetY = self.targetY
+    return o
+
+def _deepcopy_unit_command(self, memo):
+    c = tc.replayer.UnitCommand()
+    c.frame = self.frame
+    c.type = self.type
+    c.targetId = self.targetId
+    c.targetX = self.targetX
+    c.targetY = self.targetY
+    c.extra = self.extra
+    return c
+
+def _deepcopy_unit(self, memo):
+    u = tc.replayer.Unit()
+    u.id = self.id
+    u.x = self.x
+    u.y = self.y
+    u.health = self.health
+    u.max_health = self.max_health
+    u.shield = self.shield
+    u.max_shield = self.max_shield
+    u.energy = self.energy
+    u.maxCD = self.maxCD
+    u.groundCD = self.groundCD
+    u.airCD = self.airCD
+    u.flags = self.flags
+    u.visible = self.visible
+    u.type = self.type
+    u.armor = self.armor
+    u.shieldArmor = self.shieldArmor
+    u.size = self.size
+    u.pixel_x = self.pixel_x
+    u.pixel_y = self.pixel_y
+    u.pixel_size_x = self.pixel_size_x
+    u.pixel_size_y = self.pixel_size_y
+    u.groundATK = self.groundATK
+    u.airATK = self.airATK
+    u.groundDmgType = self.groundDmgType
+    u.airDmgType = self.airDmgType
+    u.groundRange = self.groundRange
+    u.airRange = self.airRange
+
+    u.orders = deepcopy(self.orders)
+    u.command = deepcopy(self.command)
+
+    u.velocityX = self.velocityX
+    u.velocityY = self.velocityY
+
+    u.playerId = self.playerId
+    u.resources = self.resources
+
+    return u
 
 
 from components.transforms import _seq_mean
