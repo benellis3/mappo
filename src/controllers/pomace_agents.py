@@ -31,7 +31,7 @@ class poMACEMultiagentController():
         else:
             self.action_selector = action_selector
 
-        self.lambda_network_scheme =   Scheme([dict(name="pomace_epsilons",
+        self.lambda_network_scheme = Scheme([dict(name="pomace_epsilons",
                                                   scope="episode",
                                                   requires_grad=False,
                                                   switch=self.args.multiagent_controller in ["pomace_mac"] and \
@@ -154,9 +154,9 @@ class poMACEMultiagentController():
                isinstance(inputs["agent_input__agent0"], BatchEpisodeBuffer), "wrong format (inputs)"
         if self.args.share_agent_params:
             inputs, inputs_tformat = _build_model_inputs(self.input_columns,
-                                                 inputs,
-                                                 to_variable=True,
-                                                 inputs_tformat=tformat)
+                                                         inputs,
+                                                         to_variable=True,
+                                                         inputs_tformat=tformat)
 
             out, hidden_states, losses, tformat = self.lambda_network_model(inputs,
                                                                             hidden_states=hidden_states,
@@ -165,10 +165,11 @@ class poMACEMultiagentController():
                                                                             **kwargs)
             ret = {"hidden_states": hidden_states,
                    "losses": losses,
-                   "format":tformat}
+                   "format": tformat}
 
             out_key = self.agent_output_type
             ret[out_key] = out
+
             return ret, tformat
         else:
             assert False, "Not yet implemented."

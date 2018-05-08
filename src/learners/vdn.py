@@ -160,9 +160,9 @@ class VDNLearner(BasicLearner):
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy(), T_env=self.T_env)
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=self.T_env)
-        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_env=self.T_env)
+        self._add_stat("q_tot_loss", VDN_loss.data.cpu().numpy(), T_env=T_env)
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
+        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_env=T_env)
         self._add_stat("T_q", self.T_q, T_env=T_env)
 
         pass
@@ -186,10 +186,10 @@ class VDNLearner(BasicLearner):
         """
 
         stats = self.get_stats()
-        logging_dict =  dict(q_loss = _seq_mean(stats["q_tot_loss"]),
-                             target_q_tot_mean=_seq_mean(stats["target_q_tot_mean"]),
+        logging_dict =  dict(q_tot_loss = _seq_mean(stats["q_tot_loss"]),
+                             target_q_tot_mean = _seq_mean(stats["target_q_tot_mean"]),
                              target_q_mean = _seq_mean(stats["target_q_mean"]),
-                             T_q=self.T_q
+                             T_q = self.T_q
                             )
         logging_str = "T_q={:g}, ".format(logging_dict["T_q"])
         logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_q"]))

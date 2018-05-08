@@ -24,7 +24,6 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
         else:
             self.pomace_epsilon_size = self.args.pomace_epsilon_size
 
-
         # Set up input regions automatically if required (if sensible)
         expected_epsilon_input_shapes = {"pomace_epsilon_seeds"} if self.args.pomace_use_epsilon_seed else {"pomace_epsilons"}
         expected_epsilon_variances_input_shapes = {"pomace_epsilon_variances"}
@@ -40,9 +39,9 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
         if input_shapes is not None:
             self.input_shapes.update(input_shapes)
 
-        self.sigma_encoder = nn.Sequential(nn.Linear(self.input_shapes["agent_ids__agent0"] +
-                                                     self.args.agents_hidden_state_size +
-                                                     self.input_shapes["state"],
+        self.sigma_encoder = nn.Sequential(nn.Linear(self.input_shapes["agent_ids__agent0"]
+                                                     + self.args.agents_hidden_state_size
+                                                     + self.input_shapes["state"],
                                                      self.args.pomace_noise_hidden_layer_size),
                                            nn.ReLU(),
                                            nn.Linear(self.args.pomace_noise_hidden_layer_size,
@@ -56,13 +55,10 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
         """
         pass
 
-
     def forward(self, inputs, tformats, test_mode=False):
         # _check_inputs_validity(inputs, self.input_shapes, tformat, allow_nonseq=True)
         epsilon_variances = inputs.get("pomace_epsilon_variances", None)
         epsilon_seeds = inputs.get("pomace_epsilon_seeds", None)
-
-
 
         if not test_mode:
             # generate epsilon of necessary
@@ -86,7 +82,7 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
                                               self.pomace_epsilon_size).zero_(), requires_grad=False)
 
         # scale from bs*1 to 1*bs*t*1
-        h = inputs["h"][:,:,1:,:].contiguous()
+        h = inputs["h"][:, :, 1:, :].contiguous()
         a_dim = h.shape[_adim(tformats["h"])]
         t_dim = h.shape[_tdim(tformats["h"])]
 
@@ -105,10 +101,11 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
         sigma = self.sigma_encoder(th.cat([agent_id_inputs, h_inputs, state_inputs], 1))
         noise = sigma * epsilons_inputs
 
-        return _from_batch(noise, h_params, h_tformat), h_tformat
+        return dict(noise=_from_batch(noise, h_params, h_tformat),
+                    sigma=_from_batch(sigma, h_params, h_tformat)), h_tformat
 
 
-class poMACEExp1Network(nn.Module):
+class poMACEExp1MultiagentNetwork(nn.Module):
     def __init__(self,
                  input_shapes,
                  output_shapes=None,
@@ -121,8 +118,7 @@ class poMACEExp1Network(nn.Module):
         """
         assert args.share_agent_params, "global arg 'share_agent_params' has to be True for this setup!"
 
-
-        super(poMACEExp1Network, self).__init__()
+        super(poMACEExp1MultiagentNetwork, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -186,7 +182,6 @@ class poMACEExp1Network(nn.Module):
                                         n_actions=self.n_actions,
                                         n_agents=self.n_agents,
                                         args=self.args)
-
         pass
 
     def init_hidden(self):
@@ -198,14 +193,13 @@ class poMACEExp1Network(nn.Module):
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         test_mode = kwargs.get("test_mode", False)
 
-        #_check_inputs_validity(inputs, self.input_shapes, tformat)
+        # _check_inputs_validity(inputs, self.input_shapes, tformat)
         agent_inputs = inputs["agent_input"]["main"]
         agent_ids = th.stack([inputs["lambda_network"]["agent_ids__agent{}".format(_agent_id)] for _agent_id in range(agent_inputs.shape[_adim(tformat)])])
         loss = None
         t_dim = _tdim(tformat)
         assert t_dim == 2, "t_dim along unsupported axis"
         t_len = agent_inputs.shape[t_dim]
-
 
         # construct noise network input
         if self.args.pomace_use_epsilon_seed:
@@ -221,9 +215,8 @@ class poMACEExp1Network(nn.Module):
         # propagate through GRU
         h_list = [hidden_states]
         for t in range(t_len):
-
             # propagate agent input through agent network up until after recurrent unit
-            x =  enc_agent_inputs[:, :, slice(t, t + 1), :].contiguous()
+            x = enc_agent_inputs[:, :, slice(t, t + 1), :].contiguous()
             x, params_x, tformat_x = _to_batch(x, tformat)
             h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
             h = self.gru(x, h)
@@ -233,7 +226,7 @@ class poMACEExp1Network(nn.Module):
         h = th.cat(h_list, dim=_tdim(tformat))
 
         # get noise from noise network output: cast from bs*t*v to a*bs*t*v
-        noise_x, noise_x_tformat = self.noise_network(dict(**noise_inputs,
+        noise_ret, noise_x_tformat = self.noise_network(dict(**noise_inputs,
                                                            h=h,
                                                            agent_ids=agent_ids),
                                                       tformats=dict(state="bs*t*v",
@@ -241,15 +234,16 @@ class poMACEExp1Network(nn.Module):
                                                                     h="a*bs*t*v",),
                                                       test_mode=test_mode)
 
-
+        noise_x = noise_ret["noise"]
+        sigma = noise_ret["sigma"] # pass out of network
 
         if self.args.pomace_exp_variant == 1:
-            h, params_h, tformat_h = _to_batch(h[:,:,1:,:].contiguous(), "a*bs*t*v")
+            h, params_h, tformat_h = _to_batch(h[:, :, 1:, :].contiguous(), "a*bs*t*v")
             mu = F.relu(self.fc2(h))
             mu = _from_batch(mu, params_h, tformat_h)
             noise_mu = mu + noise_x
         elif self.args.pomace_exp_variant == 2:
-            h, params_h, tformat_h = _to_batch(h[:,:,1:,:].contiguous(), "a*bs*t*v")
+            h, params_h, tformat_h = _to_batch(h[:, :, 1:, :].contiguous(), "a*bs*t*v")
             noise_x, params_noise_x, tformat_noise_x = _to_batch(noise_x, "a*bs*t*v")
             noise_mu = self.fc2(th.cat([h, noise_x], dim=1))
             noise_mu = _from_batch(noise_mu,
@@ -284,12 +278,12 @@ class pomaceExp1AgentMLPEncoder(nn.Module):
 
         # Set up layer_args automatically if required
         self.layer_args = {}
-        self.layer_args["fc"] = {"in":input_shapes["main"],
-                                 "out":output_shapes["main"]}
+        self.layer_args["fc"] = {"in": input_shapes["main"],
+                                 "out": output_shapes["main"]}
         if layer_args is not None:
             self.layer_args.update(layer_args)
 
-        #Set up network layers
+        # Set up network layers
         self.fc = nn.Linear(self.layer_args["fc"]["in"], self.layer_args["fc"]["out"])
         pass
 

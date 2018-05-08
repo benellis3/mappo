@@ -19,7 +19,7 @@ class MultinomialActionSelector():
         if isinstance(inputs["policies"], Variable):
             agent_policies = inputs["policies"].data.clone()
         else:
-            agent_policies = inputs["policies"].clone() # might not be necessary
+            agent_policies = inputs["policies"].clone()  # might not be necessary
 
         masked_policies, params, tformat = _to_batch(agent_policies * avail_actions, tformat)
         _samples = Categorical(masked_policies).sample().unsqueeze(1)

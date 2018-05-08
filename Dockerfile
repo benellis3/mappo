@@ -76,11 +76,23 @@ RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /insta
 #### install OpenBW (from OxWhirl fork)
 #### -------------------------------------------------------------------
 
-RUN apt-get install -y libsdl2-dev libsdl2-2.0
-RUN git clone https://github.com/oxwhirl/openbw /install/openbw-git
-RUN git clone https://github.com/oxwhirl/bwapi /install/bwapi-git
-RUN cd /install/bwapi-git && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DOPENBW_DIR=/install/openbw-git -DOPENBW_ENABLE_UI=1 -DCMAKE_INSTALL_PREFIX=/install && make
+#RUN apt-get install -y libsdl2-dev libsdl2-2.0
+#RUN git clone https://github.com/oxwhirl/openbw /install/openbw-git
+#RUN git clone https://github.com/oxwhirl/bwapi /install/bwapi-git
+#RUN cd /install/bwapi-git && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DOPENBW_DIR=/install/openbw-git -
+# DOPENBW_ENABLE_UI=1 -DCMAKE_INSTALL_PREFIX=/install && make
 
+RUN apt-get purge -y libzmq*
+RUN wget https://github.com/zeromq/libzmq/releases/download/v4.2.2/zeromq-4.2.2.tar.gz
+RUN tar xvzf zeromq-4.2.2.tar.gz
+# RUN ulimit -n 1000 && apt-get update
+RUN apt-get install -y libtool pkg-config build-essential autoconf automake uuid-dev
+RUN cd zeromq-4.2.2 && ./configure && make install && ldconfig
+
+RUN apt-get install -y libzstd1-dev zstd
+RUN pip3 install pybind11
+RUN git clone https://github.com/oxwhirl/TorchCraft.git torchcraft
+RUN cd torchcraft && git submodule update --init --recursive && pip3 install .
 
 #### -------------------------------------------------------------------
 #### final steps

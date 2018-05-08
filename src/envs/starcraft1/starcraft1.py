@@ -141,6 +141,7 @@ class SC1(MultiAgentEnv):
                   "BWAPI_CONFIG_AUTO_MENU__AUTO_MENU": "SINGLE_PLAYER",
                   "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/envs/starcraft1/maps/{}.scm'.format(os.getcwd(), self.map_name),
                   # "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE MAP SETTINGS",
+                  "LD_LIBRARY_PATH": "{}/bwapi/build/lib/".format(os.environ['SC1PATH']),
                   "TORCHCRAFT_PORT": '{}'.format(self.port)}
         launcher_path = '{}/bwapi/build/bin'.format(os.environ['SC1PATH'])
         launcher = './BWAPILauncher'

@@ -127,7 +127,8 @@ if __name__ == '__main__':
     for _i in sorted(del_indices, reverse=True):
         del params[_i]
 
-    #set up mongodb / file observer
+    #set up mongodb / file observer 
+    print("CONFIG_DIC:", config_dic)
     mongo_client = setup_mongodb(config_dic["mongodb_profile"])
     ex.run_commandline(params)
 

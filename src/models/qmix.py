@@ -17,6 +17,8 @@ class HyperLinear():
     """
 
     def __init__(self, in_size, out_size, use_hypernetwork=True):
+        super(HyperLinear, self).__init__()
+
         self.use_hypernetwork = use_hypernetwork
 
         if not self.use_hypernetwork:
@@ -126,8 +128,9 @@ class QMIXMixer(nn.Module):
         if self.qmix_use_state is not None:
             assert states is not None, "states cannot be None if qmix is to use state"
 
-            w1 = self.hyper_fc1(states)
-            w2 = self.hyper_fc2(states)
+            # WTF?
+            w1 = self.hyper_network_1(states)
+            w2 = self.hyper_network_2(states)
             x = F.elu(self.hyper_fc1(chosen_qvalues, weights=w1))
             x = self.hyper_fc2(x, weights=w2)
 
@@ -232,10 +235,16 @@ class QMIXMixingNetwork(nn.Module):
 
         if actions is not None:
 
+
+
             if isinstance(actions, str) and actions in ["greedy"]:
                 chosen_qvalues, _ = th.max(qvalues, dim=_vdim(tformat), keepdim=True)
             else:
+                # actions which are nans are basically just ignored
+                action_mask = (actions != actions)
+                actions[action_mask] = 0.0
                 chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
+                chosen_qvalues[action_mask] = float("nan")
 
             q_tot = self.mixer_model(chosen_qvalues=chosen_qvalues,
                                      states=states,

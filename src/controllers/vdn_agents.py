@@ -98,9 +98,9 @@ class VDNMultiagentController():
 
         # set up lambda network
         self.mixing_network = m_REGISTRY[self.args.vdn_mixing_network](input_shapes=self.input_shapes,
-                                                                    n_actions=self.n_actions,
-                                                                    n_agents=self.n_agents,
-                                                                    args=self.args)
+                                                                       n_actions=self.n_actions,
+                                                                       n_agents=self.n_agents,
+                                                                       args=self.args)
 
         if self.args.use_cuda:
             self.mixing_network = self.mixing_network.cuda()

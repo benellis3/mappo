@@ -4,7 +4,13 @@ import torch as th
 from torch.autograd import Variable
 
 def _has_gradient(tensor):
-    return tensor.requires_grad
+    """
+    pytorch < 0.4 compatibility
+    """
+    if hasattr(tensor, "requires_grad"):
+        return tensor.requires_grad
+    else:
+        return False
 
 def fillnan(series, value, **kwargs):
     """
@@ -497,7 +503,7 @@ def _unpack_random_seed(seeds, output_shape, gen_fn):
         th.cuda.set_rng_state_all(_initial_rng_state_all)
     else:
         _initial_rng_state = th.get_rng_state()
-        epsilons = th.cuda.FloatTensor(*output_shape)
+        epsilons = th.FloatTensor(*output_shape)
         for _bs in range(output_shape[0]):  # could use pytorch dist
             th.manual_seed(int(seeds.data[_bs, 0]))
             epsilons[_bs] = gen_fn(out=epsilons[_bs],

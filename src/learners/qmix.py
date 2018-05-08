@@ -129,8 +129,11 @@ class QMIXLearner(BasicLearner):
         # now calculate q_tot from non-target network according to the actions that were actually taken
         actions, actions_tformat = batch_history.get_col(col="actions",
                                                          agent_ids=list(range(self.n_agents)))
+        #if actions[actions != actions].dim() != 0:
+        #    a = 5
+        #    pass
 
-        vdl_loss_fn = partial(QMIXLoss(),
+        qmix_loss_fn = partial(QMIXLoss(),
                               target=Variable(td_targets, requires_grad=False),)
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(len(batch_history))
@@ -138,7 +141,7 @@ class QMIXLearner(BasicLearner):
         mac_output, \
         mac_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
                                                                     hidden_states=hidden_states,
-                                                                    loss_fn=vdl_loss_fn,
+                                                                    loss_fn=qmix_loss_fn,
                                                                     tformat=data_inputs_tformat,
                                                                     test_mode=True, # irrelevant, as no action selection!
                                                                     target_mode=False,
@@ -160,9 +163,9 @@ class QMIXLearner(BasicLearner):
         self.T_q += len(batch_history) * batch_history._n_t
 
         # Calculate statistics
-        self._add_stat("q_tot_loss", QMIX_loss.data.cpu().numpy(), T_env=self.T_env)
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=self.T_env)
-        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_env=self.T_env)
+        self._add_stat("q_tot_loss", QMIX_loss.data.cpu().numpy(), T_env=T_env)
+        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
+        self._add_stat("target_q_tot_mean", target_mac_output["q_tot"].data.cpu().numpy().mean(), T_env=T_env)
         self._add_stat("T_q", self.T_q, T_env=T_env)
 
         pass

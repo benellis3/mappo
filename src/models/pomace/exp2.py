@@ -9,14 +9,14 @@ from components.transforms import _check_inputs_validity, \
     _pick_keys, _unpack_random_seed
 from models import REGISTRY as m_REGISTRY
 
-class poMACEExp2Network(nn.Module):
+class poMACEExp2NoiseNetwork(nn.Module):
     """
     takes as input state, pomace epsilon / pomace_epsilon_seed and (agent inputs[agent observations and (agent ids)])
     """
 
     def __init__(self, input_shapes, output_shapes=None, layer_args=None, n_agents=None, n_actions=None, args=None):
 
-        super(poMACEExp2Network, self).__init__()
+        super(poMACEExp2NoiseNetwork, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -25,7 +25,7 @@ class poMACEExp2Network(nn.Module):
         # Set up input regions automatically if required (if sensible)
         expected_epsilon_input_shapes = {"pomace_epsilon_seeds"} if self.args.pomace_use_epsilon_seed else {"pomace_epsilons"}
         expected_epsilon_variances_input_shapes = {"pomace_epsilon_variances"}
-        expected_state_input_shapes =   {"state"}
+        expected_state_input_shapes = {"state"}
         self.input_shapes = {}
         assert set(input_shapes.keys()) == expected_epsilon_input_shapes \
                                          | expected_state_input_shapes \
@@ -117,10 +117,9 @@ class poMACEExp2Network(nn.Module):
         sigma = F.relu(self.sigma_encoder(state_inputs))
         noise = sigma * epsilons_inputs # TODO: Check that epsilons are correctly aligned with states!
 
-
         return _from_batch(noise, epsilons_params, epsilons_tformat), epsilons_tformat
 
-class poMACEMultiagentNetwork(nn.Module):
+class poMACEExp2MultiagentNetwork(nn.Module):
     def __init__(self,
                  input_shapes,
                  output_shapes=None,
@@ -133,7 +132,7 @@ class poMACEMultiagentNetwork(nn.Module):
         """
         assert args.share_agent_params, "global arg 'share_agent_params' has to be True for this setup!"
 
-        super(poMACEMultiagentNetwork, self).__init__()
+        super(poMACEExp2MultiagentNetwork, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -186,14 +185,13 @@ class poMACEMultiagentNetwork(nn.Module):
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         test_mode = kwargs.get("test_mode", False)
 
-        #_check_inputs_validity(inputs, self.input_shapes, tformat)
+        # _check_inputs_validity(inputs, self.input_shapes, tformat)
         agent_inputs = inputs["agent_input"]["main"]
         agent_ids = th.stack([inputs["lambda_network"]["agent_ids__agent{}".format(_agent_id)] for _agent_id in range(agent_inputs.shape[_adim(tformat)])])
         loss = None
         t_dim = _tdim(tformat)
         assert t_dim == 2, "t_dim along unsupported axis"
         t_len = agent_inputs.shape[t_dim]
-
 
         # construct noise network input
         if self.args.pomace_use_epsilon_seed:
@@ -211,7 +209,7 @@ class poMACEMultiagentNetwork(nn.Module):
         for t in range(t_len):
 
             # propagate agent input through agent network up until after recurrent unit
-            x =  enc_agent_inputs[:, :, slice(t, t + 1), :].contiguous()
+            x = enc_agent_inputs[:, :, slice(t, t + 1), :].contiguous()
             x, params_x, tformat_x = _to_batch(x, tformat)
             h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
             h = self.gru(x, h)

@@ -113,7 +113,7 @@ class QMIXRunner(NStepRunner):
                                                                          time_length=self.args.qmix_epsilon_time_length,
                                                                          decay=self.args.qmix_epsilon_decay_mode)
 
-            epsilons = ttype(self.batch_size, 1).fill_(self.qmix_epsilon_decay_schedule.eval(self.T))
+            epsilons = ttype(self.batch_size, 1).fill_(self.qmix_epsilon_decay_schedule.eval(self.T_env))
             self.episode_buffer.set_col(col="qmix_epsilons",
                                         scope="episode",
                                         data=epsilons)
@@ -122,7 +122,7 @@ class QMIXRunner(NStepRunner):
     def log(self, log_directly=True):
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
-            log_str += ", QMIX_epsilon={:g}".format(self.qmix_epsilon_decay_schedule.eval(self.T))
+            log_str += ", QMIX_epsilon={:g}".format(self.qmix_epsilon_decay_schedule.eval(self.T_env))
             self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
         else:
             self.logging_struct.py_logger.info("TEST RUNNER INFO: {}".format(log_str))
