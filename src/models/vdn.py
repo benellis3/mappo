@@ -119,25 +119,30 @@ class VDNMixingNetwork(nn.Module):
 
         x_list = []
         h_list = [hidden_states]
+        #
+        # for t in range(t_len):
+        #
+        #     x = _inputs[:, :, slice(t, t + 1), :].contiguous()
+        #     x, tformat = self.encoder({"main":x}, tformat)
+        #
+        #     x, params_x, tformat_x = _to_batch(x, tformat)
+        #     h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
+        #
+        #     h = self.gru(x, h)
+        #     x = self.output_layer(h)
+        #
+        #     h = _from_batch(h, params_h, tformat_h)
+        #     x = _from_batch(x, params_x, tformat_x)
+        #
+        #     h_list.append(h)
+        #     x_list.append(x)
+        #
+        # qvalues = th.cat(x_list, dim=_tdim(tformat))
 
-        for t in range(t_len):
-
-            x = _inputs[:, :, slice(t, t + 1), :].contiguous()
-            x, tformat = self.encoder({"main":x}, tformat)
-
-            x, params_x, tformat_x = _to_batch(x, tformat)
-            h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
-
-            h = self.gru(x, h)
-            x = self.output_layer(h)
-
-            h = _from_batch(h, params_h, tformat_h)
-            x = _from_batch(x, params_x, tformat_x)
-
-            h_list.append(h)
-            x_list.append(x)
-
-        qvalues = th.cat(x_list, dim=_tdim(tformat))
+        # DEBUG: DQN-style
+        h_list = h_list + [h_list[0] for _ in range(t_len)]
+        x, _ =  self.encoder({"main":_inputs}, tformat)
+        qvalues = self.output_layer(x)
 
         if actions is not None:
 
@@ -166,6 +171,8 @@ class VDNMixingNetwork(nn.Module):
                    th.cat(h_list[1:], t_dim), \
                    loss, \
                    tformat
+
+    # th.cat(h_list[1:], t_dim), \
 
         else:
             assert loss_fn is None, "For VDN, loss_fn has to be None if actions are not supplied!"
