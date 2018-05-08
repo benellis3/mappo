@@ -2,6 +2,7 @@ action_selector: multinomial
 agent: coma_recursive_ac
 agent_model: coma_recursive
 agent_output_type: policies
+coma_critic_use_sampling: True
 coma_epsilon_start: 0.5
 coma_epsilon_finish: 0.05
 coma_epsilon_time_length: 20000

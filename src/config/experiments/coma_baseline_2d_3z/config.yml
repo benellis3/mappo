@@ -1,8 +1,0 @@
-defaults: default coma sc2
-batch_size: 8
-env_args:
-  map_name: 2d_3z
-env_stats_aggregator: sc2
-n_learner_reps: 20
-n_loops_per_thread_or_sub_or_main_process: 1
-n_subprocesses: 8

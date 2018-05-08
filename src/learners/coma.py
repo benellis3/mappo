@@ -1,18 +1,20 @@
 from copy import deepcopy
 from functools import partial
 import numpy as np
+from numpy.random import randint
 import torch as th
 from torch import nn
 from torch.autograd import Variable
 from torch.optim import RMSprop
 
 from debug.debug import IS_PYCHARM_DEBUG
-from models.coma import COMACritic
 from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
 from components.losses import EntropyRegularisationLoss
+from components.transforms import _to_batch, _from_batch
+from models.coma import COMACritic
 
 from .basic import BasicLearner
 
@@ -176,7 +178,10 @@ class COMALearner(BasicLearner):
         """
         pass
 
-    def train(self, batch_history, T_env=None):
+    def train(self,
+              batch_history,
+              T_env=None):
+
         # -------------------------------------------------------------------------------
         # |  We follow the algorithmic description of COMA as supplied in Algorithm 1   |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)         |
@@ -223,12 +228,21 @@ class COMALearner(BasicLearner):
             inputs_critic= kwargs["coma_model_inputs"]["critic"]
             inputs_target_critic=kwargs["coma_model_inputs"]["target_critic"]
 
-            output_critic, output_critic_tformat = self.critic.forward(inputs_critic,
-                                                                      tformat=coma_model_inputs_tformat)
+            if self.args.coma_critic_use_sampling:
+                critic_batched, critic_params, critic_tformat = _to_batch(inputs_critic)
+                critic_target_batched, critic_target_params, critic_target_tformat = _to_batch(inputs_target_critic)
+                sample_ids = randint(critic_batched.shape[0],
+                                     size=self.args.coma_critic_sample_size)
+                sampled_ids_tensor = th.LongTensor(sample_ids) if critic_batched.is_cuda else th.LongTensor().cuda()
+                _inputs_critic = critic_batched[sampled_ids_tensor, :].unsqueeze(0).unsqueeze(1)
+                _inputs_target_critic = critic_target_batched[sampled_ids_tensor, :].unsqueeze(0).unsqueeze(1)
+
+            output_critic, output_critic_tformat = self.critic.forward(_inputs_critic,
+                                                                       tformat=coma_model_inputs_tformat)
 
             # construct target-critic targets and carry out necessary forward passes
-             # same input scheme for both target critic and critic!
-            output_target_critic, output_target_critic_tformat = self.target_critic.forward(inputs_target_critic,
+            # same input scheme for both target critic and critic!
+            output_target_critic, output_target_critic_tformat = self.target_critic.forward(_inputs_target_critic,
                                                                                             tformat=coma_model_inputs_tformat)
 
 
@@ -249,7 +263,8 @@ class COMALearner(BasicLearner):
             # optimize critic loss
             self.critic_optimiser.zero_grad()
             critic_loss.backward()
-            critic_grad_norm = th.nn.utils.clip_grad_norm(self.critic_parameters, 50)
+            critic_grad_norm = th.nn.utils.clip_grad_norm(self.critic_parameters,
+                                                          50)
             self.critic_optimiser.step()
 
             # Calculate critic statistics and update
@@ -268,7 +283,8 @@ class COMALearner(BasicLearner):
         output_critic = None
         # optimize the critic as often as necessary to get the critic loss down reliably
         for _i in range(self.n_learner_reps):
-            output_critic = _optimize_critic(coma_model_inputs=coma_model_inputs, actions=actions)
+            output_critic = _optimize_critic(coma_model_inputs=coma_model_inputs,
+                                             actions=actions)
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(COMAPolicyLoss(),
