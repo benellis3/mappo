@@ -227,22 +227,13 @@ class COMALearner(BasicLearner):
         def _optimize_critic(**kwargs):
             inputs_critic= kwargs["coma_model_inputs"]["critic"]
             inputs_target_critic=kwargs["coma_model_inputs"]["target_critic"]
+            inputs_critic_tformat=kwargs["tformat"]
+            inputs_target_critic_tformat = kwargs["tformat"]
 
-            if self.args.coma_critic_use_sampling:
-                critic_batched, critic_params, critic_tformat = _to_batch(inputs_critic)
-                critic_target_batched, critic_target_params, critic_target_tformat = _to_batch(inputs_target_critic)
-                sample_ids = randint(critic_batched.shape[0],
-                                     size=self.args.coma_critic_sample_size)
-                sampled_ids_tensor = th.LongTensor(sample_ids) if critic_batched.is_cuda else th.LongTensor().cuda()
-                _inputs_critic = critic_batched[sampled_ids_tensor, :].unsqueeze(0).unsqueeze(1)
-                _inputs_target_critic = critic_target_batched[sampled_ids_tensor, :].unsqueeze(0).unsqueeze(1)
-
-            output_critic, output_critic_tformat = self.critic.forward(_inputs_critic,
-                                                                       tformat=coma_model_inputs_tformat)
 
             # construct target-critic targets and carry out necessary forward passes
             # same input scheme for both target critic and critic!
-            output_target_critic, output_target_critic_tformat = self.target_critic.forward(_inputs_target_critic,
+            output_target_critic, output_target_critic_tformat = self.target_critic.forward(inputs_target_critic,
                                                                                             tformat=coma_model_inputs_tformat)
 
 
@@ -255,9 +246,51 @@ class COMALearner(BasicLearner):
                                                                        to_variable=True,
                                                                        to_cuda=self.args.use_cuda)
 
+
+            # sample!!
+            if self.args.coma_critic_use_sampling:
+                critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
+                sample_ids = randint(critic_shape[_bsdim(inputs_target_critic_tformat)] \
+                                        * critic_shape[_tdim(inputs_target_critic_tformat)],
+                                     size = self.args.coma_critic_sample_size)
+                sampled_ids_tensor = th.LongTensor(sample_ids).cuda() if inputs_critic[list(inputs_critic.keys())[0]].is_cuda else th.LongTensor()
+                # batch_sample_qvals = output_critic["qvalue"].view(output_critic["qvalue"].shape[_adim(inputs_critic_tformat)],
+                #                                                   -1,
+                #                                                   output_critic["qvalue"].shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                # qvalues = batch_sample_qvals.view(output_critic["qvalue"].shape[_adim(inputs_critic_tformat)],
+                #                                   -1,
+                #                                   1,
+                #                                   output_critic["qvalue"].shape[_vdim(inputs_critic_tformat)])
+
+                _inputs_critic = {}
+                for _k, _v in inputs_critic.items():
+                    batch_sample = _v.view(
+                        _v.shape[_adim(inputs_critic_tformat)],
+                        -1,
+                        _v.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                    _inputs_critic[_k] = batch_sample.view(_v.shape[_adim(inputs_critic_tformat)],
+                                                      -1,
+                                                      1,
+                                                      _v.shape[_vdim(inputs_critic_tformat)])
+
+                batch_sample_qtargets = target_critic_td_targets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                                                                      -1,
+                                                                      target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                qtargets = batch_sample_qtargets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                                                      -1,
+                                                      1,
+                                                      target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])
+            else:
+                _inputs_critic = inputs_critic
+                qtargets = target_critic_td_targets
+
+            output_critic, output_critic_tformat = self.critic.forward(_inputs_critic,
+                                                                       tformat=coma_model_inputs_tformat)
+
+
             critic_loss, \
             critic_loss_tformat = COMACriticLoss()(input=output_critic["qvalue"],
-                                                   target=Variable(target_critic_td_targets, requires_grad=False),
+                                                   target=Variable(qtargets, requires_grad=False),
                                                    tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
@@ -283,13 +316,21 @@ class COMALearner(BasicLearner):
         output_critic = None
         # optimize the critic as often as necessary to get the critic loss down reliably
         for _i in range(self.n_learner_reps):
-            output_critic = _optimize_critic(coma_model_inputs=coma_model_inputs,
+            _ = _optimize_critic(coma_model_inputs=coma_model_inputs,
+                                             tformat=coma_model_inputs_tformat,
                                              actions=actions)
+
+
+
+        # get advantages
+        output_critic, output_critic_tformat = self.critic.forward(coma_model_inputs["critic"],
+                                                                   tformat=coma_model_inputs_tformat)
+        advantages = output_critic["advantage"]
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(COMAPolicyLoss(),
                                        actions=Variable(actions),
-                                       advantages=output_critic["advantage"])
+                                       advantages=advantages)
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
             len(batch_history))
