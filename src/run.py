@@ -82,7 +82,7 @@ def run(_run, _config, _log, pymongo_client):
 def args_sanity_check(config, _log):
 
     # set CUDA flags
-    config["use_cuda"] = True # Use cuda whenever possible!
+    # config["use_cuda"] = True # Use cuda whenever possible!
     if config["use_cuda"] and not th.cuda.is_available():
         config["use_cuda"] = False
         _log.warning("CUDA flag use_cuda was switched OFF automatically because no CUDA devices are available!")
@@ -208,7 +208,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         n_test_runs = max(1, args.test_nepisode // runner_obj.batch_size)
         if ( runner_obj.T_env - last_test_T) / args.test_interval > 1.0:
 
-            _logging_struct.py_logger.info("T_env: {}".format( runner_obj.T_env))
+            _logging_struct.py_logger.info("T_env: {}".format(runner_obj.T_env))
             runner_obj.log() # log runner statistics derived from training runs
 
             last_test_T =  runner_obj.T_env

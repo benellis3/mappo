@@ -144,7 +144,11 @@ class VDNMixingNetwork(nn.Module):
             if isinstance(actions, str) and actions in ["greedy"]:
                 chosen_qvalues, _ = th.max(qvalues, dim=_vdim(tformat), keepdim=True)
             else:
+                action_mask = (actions != actions)
+                actions[action_mask] = 0.0
                 chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
+                chosen_qvalues[action_mask] = float("nan")
+                #chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
 
             q_tot = self.mixer_model(chosen_qvalues=chosen_qvalues,
                                      states=states,
@@ -152,6 +156,7 @@ class VDNMixingNetwork(nn.Module):
 
             if loss_fn is not None:
                 loss = loss_fn(q_tot, tformat=tformat)[0]
+                pass
 
             ret = dict(qvalues=qvalues,
                        chosen_qvalues=chosen_qvalues,

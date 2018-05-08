@@ -105,7 +105,8 @@ class poMACEExp0NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
         sigma = self.sigma_encoder(th.cat([agent_id_inputs, h_inputs, state_inputs], 1))
         noise = sigma * epsilons_inputs
 
-        return _from_batch(noise, h_params, h_tformat), h_tformat
+        return dict(noise=_from_batch(noise, h_params, h_tformat),
+                    sigma=_from_batch(sigma, h_params, h_tformat)), h_tformat
 
 
 class poMACEExp0Network(nn.Module):
@@ -175,8 +176,14 @@ class poMACEExp0Network(nn.Module):
         self.gru = nn.GRUCell(self.layer_args["gru"]["in"], self.layer_args["gru"]["hidden"])
 
         assert self.args.pomace_exp_variant == 1 or self.args.pomace_exp_variant == 2, "No other variants implemented"
-        self.fc2 = nn.Linear(self.layer_args["fc2"]["in"],
-                             self.n_actions)
+        if self.args.pomace_exp_variant == 1: # distill using hypernetwork
+            self.hyper_network_1 = nn.Linear(self.input_shapes["states"],
+                                             self.layer_args["hyper_fc1"]["in"]*self.layer_args["hyper_fc1"]["out"])
+            self.fc2 = nn.HyperLinear(self.layer_args["fc2"]["in"],
+                                 self.n_actions)
+        elif self.args.pomace_exp_variant == 2:
+            self.fc2 = nn.Linear(self.layer_args["fc2"]["in"],
+                                 self.n_actions)
 
         self.output_layer = nn.Linear(self.layer_args["output_layer"]["in"], self.layer_args["output_layer"]["out"])
 
@@ -233,7 +240,7 @@ class poMACEExp0Network(nn.Module):
         h = th.cat(h_list, dim=_tdim(tformat))
 
         # get noise from noise network output: cast from bs*t*v to a*bs*t*v
-        noise_x, noise_x_tformat = self.noise_network(dict(**noise_inputs,
+        noise_ret, noise_x_tformat = self.noise_network(dict(**noise_inputs,
                                                            h=h,
                                                            agent_ids=agent_ids),
                                                       tformats=dict(state="bs*t*v",
@@ -241,13 +248,14 @@ class poMACEExp0Network(nn.Module):
                                                                     h="a*bs*t*v",),
                                                       test_mode=test_mode)
 
-
+        noise_x = noise_ret["noise"]
+        sigma = noise_ret["sigma"] # pass out of network
 
         if self.args.pomace_exp_variant == 1:
             h, params_h, tformat_h = _to_batch(h[:,:,1:,:].contiguous(), "a*bs*t*v")
-            mu = F.relu(self.fc2(h))
-            mu = _from_batch(mu, params_h, tformat_h)
-            noise_mu = mu + noise_x
+            w = self.hyper_network_1(noise_x)
+            mu = F.relu(self.fc2(h, weights=w))
+            noise_mu = _from_batch(mu, params_h, tformat_h)
         elif self.args.pomace_exp_variant == 2:
             h, params_h, tformat_h = _to_batch(h[:,:,1:,:].contiguous(), "a*bs*t*v")
             noise_x, params_noise_x, tformat_noise_x = _to_batch(noise_x, "a*bs*t*v")
@@ -260,7 +268,9 @@ class poMACEExp0Network(nn.Module):
         if loss_fn is not None:
             loss = loss_fn(x, tformat=tformat)[0]
 
-        return x, \
+        \
+
+        return dict(pi=x, sigma=sigma), \
                h, \
                loss, \
                tformat

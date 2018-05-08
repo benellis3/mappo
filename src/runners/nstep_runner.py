@@ -630,7 +630,8 @@ class NStepRunner():
                 self.multiagent_controller.get_outputs(multiagent_controller_inputs,
                                                        hidden_states=self.hidden_states[:, ids_envs_not_terminated_tensor, :,:],
                                                        tformat=multiagent_controller_inputs_tformat,
-                                                       test_mode=test_mode)
+                                                       test_mode=test_mode,
+                                                       info=None)
             self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = multiagent_controller_outputs["hidden_states"]
 
 

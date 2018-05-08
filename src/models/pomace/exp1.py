@@ -105,7 +105,8 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
         sigma = self.sigma_encoder(th.cat([agent_id_inputs, h_inputs, state_inputs], 1))
         noise = sigma * epsilons_inputs
 
-        return _from_batch(noise, h_params, h_tformat), h_tformat
+        return dict(noise=_from_batch(noise, h_params, h_tformat),
+                    sigma=_from_batch(sigma, h_params, h_tformat)), h_tformat
 
 
 class poMACEExp1Network(nn.Module):
@@ -233,7 +234,7 @@ class poMACEExp1Network(nn.Module):
         h = th.cat(h_list, dim=_tdim(tformat))
 
         # get noise from noise network output: cast from bs*t*v to a*bs*t*v
-        noise_x, noise_x_tformat = self.noise_network(dict(**noise_inputs,
+        noise_ret, noise_x_tformat = self.noise_network(dict(**noise_inputs,
                                                            h=h,
                                                            agent_ids=agent_ids),
                                                       tformats=dict(state="bs*t*v",
@@ -241,6 +242,8 @@ class poMACEExp1Network(nn.Module):
                                                                     h="a*bs*t*v",),
                                                       test_mode=test_mode)
 
+        noise_x = noise_ret["noise"]
+        sigma = noise_ret["sigma"] # pass out of network
 
 
         if self.args.pomace_exp_variant == 1:
