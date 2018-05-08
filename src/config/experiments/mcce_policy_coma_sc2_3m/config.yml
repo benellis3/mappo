@@ -1,0 +1,12 @@
+batch_size: 8
+defaults: default coma mcce sc2
+env_args:
+  map_name: 3m_3m
+env_stats_aggregator: sc2
+n_loops_per_thread_or_sub_or_main_process: 1
+n_subprocesses: 8
+mcce_multiagent_network: mcce_policy_multiagent_nn
+mcce_exp_variant: 1
+n_learner_reps: 20
+
+

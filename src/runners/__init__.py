@@ -9,6 +9,9 @@ REGISTRY["coma"] = COMARunner
 from .pomace_runner import poMACERunner
 REGISTRY["pomace"] = poMACERunner
 
+from .mcce_runner import MCCERunner
+REGISTRY["mcce"] = MCCERunner
+
 from .iql_runner import IQLRunner
 REGISTRY["iql"] = IQLRunner
 

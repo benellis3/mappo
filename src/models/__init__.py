@@ -14,12 +14,18 @@ from .pomace.basic import poMACENoiseNetwork, poMACEMultiagentNetwork
 REGISTRY["pomace_noise_nn1"] = poMACENoiseNetwork
 REGISTRY["pomace_noise_multiagent_nn1"] = poMACEMultiagentNetwork
 
-from .pomace.exp1 import poMACEExp1NoiseNetwork, poMACEExp1Network
+from .pomace.exp1 import poMACEExp1NoiseNetwork, poMACEExp1MultiagentNetwork
 REGISTRY["pomace_noise_exp1_nn1"] = poMACEExp1NoiseNetwork
-REGISTRY["pomace_nn_exp1"] = poMACEExp1Network
+REGISTRY["pomace_nn_exp1"] = poMACEExp1MultiagentNetwork
 
-from .pomace.exp2 import poMACEExp2Network
-REGISTRY["pomace_nn_exp2"] = poMACEExp2Network
+from .pomace.exp2 import poMACEExp2NoiseNetwork, poMACEExp2MultiagentNetwork
+REGISTRY["pomace_noise_exp2_nn1"] = poMACEExp2NoiseNetwork
+REGISTRY["pomace_nn_exp2"] = poMACEExp2MultiagentNetwork
+
+from .mcce.mcce_policy import MCCECoordinationNetwork, MCCEDecentralizedPolicyNetwork, MCCEMultiAgentNetwork
+REGISTRY["mcce_policy_coordination_nn"] = MCCECoordinationNetwork
+REGISTRY["mcce_policy_decentralized_policy_nn"] = MCCEDecentralizedPolicyNetwork
+REGISTRY["mcce_policy_multiagent_nn"] = MCCEMultiAgentNetwork
 
 from .vdn import VDNMixingNetwork, VDNMixer
 REGISTRY["vdn_mixing_network"] = VDNMixingNetwork

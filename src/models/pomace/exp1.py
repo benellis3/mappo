@@ -82,7 +82,7 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
                                               self.pomace_epsilon_size).zero_(), requires_grad=False)
 
         # scale from bs*1 to 1*bs*t*1
-        h = inputs["h"][:,:,1:,:].contiguous()
+        h = inputs["h"][:, :, 1:, :].contiguous()
         a_dim = h.shape[_adim(tformats["h"])]
         t_dim = h.shape[_tdim(tformats["h"])]
 
@@ -104,7 +104,7 @@ class poMACEExp1NoiseNetwork(nn.Module):  # Mainly copied from poMACENoiseNetwor
         return _from_batch(noise, h_params, h_tformat), h_tformat
 
 
-class poMACEExp1Network(nn.Module):
+class poMACEExp1MultiagentNetwork(nn.Module):
     def __init__(self,
                  input_shapes,
                  output_shapes=None,
@@ -117,7 +117,7 @@ class poMACEExp1Network(nn.Module):
         """
         assert args.share_agent_params, "global arg 'share_agent_params' has to be True for this setup!"
 
-        super(poMACEExp1Network, self).__init__()
+        super(poMACEExp1MultiagentNetwork, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -274,8 +274,8 @@ class pomaceExp1AgentMLPEncoder(nn.Module):
 
         # Set up layer_args automatically if required
         self.layer_args = {}
-        self.layer_args["fc"] = {"in":input_shapes["main"],
-                                 "out":output_shapes["main"]}
+        self.layer_args["fc"] = {"in": input_shapes["main"],
+                                 "out": output_shapes["main"]}
         if layer_args is not None:
             self.layer_args.update(layer_args)
 
