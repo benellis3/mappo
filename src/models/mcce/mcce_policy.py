@@ -261,6 +261,7 @@ class MCCEDecentralizedPolicyNetwork(nn.Module):
         h, params_h, tformat_h = _to_batch(h[:, :, 1:, :].contiguous(), "a*bs*t*v")
         f = F.relu(self.decoder(h))
         f = _from_batch(f, params_h, tformat_h)
+        h = _from_batch(h, params_h, tformat_h)
         pi_decentralized = F.softmax(f, dim=_vdim(tformat))
 
         # if loss_fn is not None:
@@ -367,12 +368,14 @@ class MCCEMultiAgentNetwork(nn.Module):
 
         # initialize centralized policies
         pi_central = copy(pi_decentralized)
-        multiagent_controller_outputs_centralized["policies"] = pi_central
 
         for a in range(self.n_agents):
             if a == 0:
                 pass
             else:
+                # if th.min(multiagent_controller_outputs_centralized["policies"]) < 0:
+                print("------------------------------BREAK------------------------------")
+                print(multiagent_controller_outputs_centralized["policies"])
                 selected_actions, modified_inputs, selected_actions_format = \
                     action_selector.select_action(multiagent_controller_outputs_centralized,
                                                   avail_actions=avail_actions,
@@ -394,7 +397,20 @@ class MCCEMultiAgentNetwork(nn.Module):
                                                                   test_mode=test_mode)
 
                 # update agent's centralized policy using the centralized coordination function psi
-                pi_central[a] = pi_central[:a] + psi[:a]
+
+                multiagent_controller_outputs_centralized["policies"][1:a+1] = copy(F.softmax(pi_central[1:a+1] + psi[:a],
+                                                                                              dim=_vdim(tformat)))
+
+                # pi_central_temp = copy(pi_central[1:(a+1)]) + copy(psi[:a])
+                # pi_central_shifted = (pi_central_temp + th.max(pi_central_temp))
+                # pi_central_normalized = pi_central_shifted * (1 / th.sum(pi_central_shifted, 3).unsqueeze(3))
+                # multiagent_controller_outputs_centralized["policies"][1:(a+1)] = copy(pi_central_normalized)
+
+        pi_central = copy(F.softmax(th.cat((pi_central[:1], pi_central[1:self.n_agents] + psi), 0), dim=_vdim(tformat)))
+
+        if th.min(pi_central) < 0:
+            print("-----------------------BREAK-----------------------")
+            print(pi_central)
 
         if loss_fn is not None:
             loss = loss_fn(pi_central, tformat=tformat)[0]

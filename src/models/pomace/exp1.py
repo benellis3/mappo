@@ -249,6 +249,7 @@ class poMACEExp1MultiagentNetwork(nn.Module):
             noise_mu = _from_batch(noise_mu,
                                    params_noise_x,
                                    tformat_noise_x)
+        h = _from_batch(h, params_h, tformat_h)
         x = F.softmax(noise_mu, dim=_vdim(tformat))
 
         if loss_fn is not None:
