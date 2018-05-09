@@ -41,8 +41,8 @@ WORKDIR /install
 # RUN apt-get install -y cmake gcc 
 # RUN cd /install/pytorch && python3 setup.py install
 #RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl 
-#RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
-RUN pip3 install http://download.pytorch.org/whl/cu90/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
+RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
+#RUN pip3 install http://download.pytorch.org/whl/cu90/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
 RUN pip3 install torchvision snakeviz
 
 #### -------------------------------------------------------------------
@@ -50,7 +50,6 @@ RUN pip3 install torchvision snakeviz
 #### -------------------------------------------------------------------
 RUN pip3 install tensorflow-gpu
 #RUN pip3 install --upgrade https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.6.0-cp34-cp34m-linux_x86_64.whl
-
 
 #### -------------------------------------------------------------------
 #### install MongoDB (for Sacred)
@@ -78,11 +77,6 @@ RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /insta
 #### -------------------------------------------------------------------
 
 RUN apt-get update && apt-get install -y libsdl2-dev libsdl2-2.0
-#RUN git clone https://github.com/oxwhirl/openbw /install/openbw-git
-#RUN git clone https://github.com/oxwhirl/bwapi /install/bwapi-git
-#RUN cd /install/bwapi-git && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DOPENBW_DIR=/install/openbw-git -
-# DOPENBW_ENABLE_UI=1 -DCMAKE_INSTALL_PREFIX=/install && make
-
 RUN apt-get purge -y libzmq*
 RUN wget https://github.com/zeromq/libzmq/releases/download/v4.2.2/zeromq-4.2.2.tar.gz
 RUN tar xvzf zeromq-4.2.2.tar.gz
@@ -113,8 +107,7 @@ RUN pip3 install cloudpickle ruamel.yaml
 
 EXPOSE 8888
 
-
-WORKDIR /pymarl
+WORKDIR /pymarl/src
 # RUN echo "mongod --fork --logpath /var/log/mongod.log" >> ~/.bashrc
 #CMD ["mongod", "--fork", "--logpath", "/var/log/mongod.log"]
 # EXPOSE 27017
