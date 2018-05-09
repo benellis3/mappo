@@ -305,7 +305,6 @@ class SC1(MultiAgentEnv):
         return reward, terminated, info
 
     def get_agent_action(self, a_id, action):
-
         unit = self.get_unit_by_id(a_id)
         x = unit.x
         y = unit.y
@@ -319,14 +318,14 @@ class SC1(MultiAgentEnv):
 
         elif action == 1:
             # stop
-            sc_action = [tcc.command_unit_protected, a_id, tcc.unitcommandtypes.Stop]
+            sc_action = [tcc.command_unit_protected, unit.id, tcc.unitcommandtypes.Stop]
             if self.debug_inputs:
                 print("Agent %d: Stop" % a_id)
 
         elif action == 2:
             # north
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x),
@@ -337,7 +336,7 @@ class SC1(MultiAgentEnv):
         elif action == 3:
             # south
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x),
@@ -348,7 +347,7 @@ class SC1(MultiAgentEnv):
         elif action == 4:
             # east
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x + self._move_amount),
@@ -359,7 +358,7 @@ class SC1(MultiAgentEnv):
         elif action == 5:
             # west
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x - self._move_amount),
@@ -369,7 +368,8 @@ class SC1(MultiAgentEnv):
         else:
             # attack units that are in range
             enemy_id = action - self.n_actions_no_attack
-            sc_action = [tcc.command_unit_protected, a_id, tcc.unitcommandtypes.Attack_Unit, enemy_id]
+            enemy_unit = self.enemies[enemy_id]
+            sc_action = [tcc.command_unit_protected, unit.id, tcc.unitcommandtypes.Attack_Unit, enemy_unit.id]
             if self.debug_inputs:
                 print("Agent %d attacks enemy # %d" % (a_id, enemy_id))
 
