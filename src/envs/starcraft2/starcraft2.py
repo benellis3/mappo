@@ -104,13 +104,18 @@ class SC2(MultiAgentEnv):
             os.environ['SC2PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftII')
             self.stalker_id = 1885
             self.zealot_id = 1886
+        # elif sys.platform == 'darwin':
+        #     self.game_version = "3.16.1"
+        #     os.environ['SC2PATH'] = os.path.join(os.getcwd(), '../' '3rdparty', 'StarCraftII')
+        #     self.stalker_id = 1885
+        #     self.zealot_id = 1886
         else:
-            self.game_version = "4.1.2" # latest release, uses visualisations
+            self.game_version = "4.1.2"  # latest release, uses visualisations
             self.stalker_id = 1922
             self.zealot_id = 1923
 
         if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            self._agent_race = "P" # Protoss
+            self._agent_race = "P"  # Protoss
             self._bot_race = "P"   # Protoss
 
             self.unit_health_max_z = 160
