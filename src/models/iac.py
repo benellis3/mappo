@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from components.transforms import _tdim, _vdim, _to_batch, _from_batch, _check_inputs_validity, _shift
+from models.basic import RNN as RecursiveAgent, DQN as NonRecursiveAgent
 
 class IACVQFunction(nn.Module):
-    # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
 
@@ -58,7 +58,6 @@ class IACVQFunction(nn.Module):
         return _from_batch(qvalues, params, tformat), _from_batch(vvalues, params, tformat), tformat
 
 class IACTDError(nn.Module):
-    # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, n_actions, input_shapes, output_shapes={}, layer_args={}, args=None):
         """
@@ -93,7 +92,6 @@ class IACTDError(nn.Module):
 
 
 class IACAdvantage(nn.Module):
-    # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, n_actions, input_shapes, output_shapes={}, layer_args={}, args=None):
         """
@@ -220,3 +218,69 @@ class IACCritic(nn.Module):
             ret_dict["td_errors"] = td_errors
 
         return ret_dict, tformat
+
+class IACNonRecursiveAgent(NonRecursiveAgent):
+
+    def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
+        x, params, tformat = _to_batch(inputs["main"], tformat)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        x = F.softmax(x, dim=1)
+
+        # add softmax exploration (if switched on)
+        if self.args.coma_exploration_mode in ["softmax"]:
+            epsilons = inputs["epsilons"].repeat(x.shape[0], 1)
+            x = epsilons/self.n_actions + x * (1-epsilons)
+        x = _from_batch(x, params, tformat)
+
+        if loss_fn is not None:
+            losses, _ = loss_fn(x, tformat=tformat)
+
+        return x, hidden_states, losses, tformat
+
+class IACRecursiveAgent(RecursiveAgent):
+
+    def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
+        #_check_inputs_validity(inputs, self.input_shapes, tformat)
+        test_mode = kwargs["test_mode"]
+
+        _inputs = inputs["main"]
+        loss = None
+        t_dim = _tdim(tformat)
+        assert t_dim == 2, "t_dim along unsupported axis"
+        t_len = _inputs.shape[t_dim]
+
+        x_list = []
+        h_list = [hidden_states]
+
+        for t in range(t_len):
+
+            x = _inputs[:, :, slice(t, t + 1), :].contiguous()
+            x, tformat = self.encoder({"main":x}, tformat)
+
+            x, params_x, tformat_x = _to_batch(x, tformat)
+            h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
+
+            h = self.gru(x, h)
+            x = self.output(h)
+            x = F.softmax(x, dim=1)
+
+            if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
+                epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+                epsilons, _, _ = _to_batch(epsilons, tformat)
+                x = epsilons / self.n_actions + x * (1 - epsilons)
+
+            h = _from_batch(h, params_h, tformat_h)
+            x = _from_batch(x, params_x, tformat_x)
+
+            h_list.append(h)
+            x_list.append(x)
+
+        if loss_fn is not None:
+            _x = th.cat(x_list, dim=_tdim(tformat))
+            loss = loss_fn(_x, tformat=tformat)[0]
+
+        return th.cat(x_list, t_dim), \
+               th.cat(h_list[1:], t_dim), \
+               loss, \
+               tformat

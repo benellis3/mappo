@@ -1,5 +1,6 @@
 from copy import deepcopy
 from functools import partial
+from numpy.random import randint
 import torch as th
 from torch import nn
 from torch.autograd import Variable
@@ -75,7 +76,7 @@ class IACvLearner(BasicLearner):
         self.T_critic = 0
         self.target_critic_update_interval=args.target_critic_update_interval
         self.stats = {}
-        self.n_learner_reps = args.n_learner_reps
+        self.n_critic_learner_reps = args.n_critic_learner_reps
 
         # set up input schemes for all of our models
         self.critic_scheme_fn = lambda _agent_id: Scheme([dict(name="agent_id",
@@ -168,10 +169,10 @@ class IACvLearner(BasicLearner):
 
     def train(self, batch_history):
         # -------------------------------------------------------------------------------
-        # |  We follow the algorithmic description of COMA as supplied in Algorithm 1   |
+        # |  We follow the algorithmic description of IAC_v as supplied in Section 3/4  |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)         |
         # |  Note: Instead of for-looping backwards through the sample, we just run     |
-        # |  n_learner_reps repetitions of the optimization procedure on the same batch |
+        # |  repetitions of the optimization procedure sampling from the same batch     |
         # -------------------------------------------------------------------------------
 
         #if IS_PYCHARM_DEBUG:
@@ -208,15 +209,13 @@ class IACvLearner(BasicLearner):
         def _optimize_critic(**kwargs):
             inputs_critic= kwargs["iac_model_inputs"]["critic"]
             inputs_target_critic=kwargs["iac_model_inputs"]["target_critic"]
-
-            output_critic, output_critic_tformat = self.critic.forward(inputs_critic,
-                                                                       tformat=iac_model_inputs_tformat)
+            inputs_critic_tformat=kwargs["tformat"]
+            inputs_target_critic_tformat = kwargs["tformat"]
 
             # construct target-critic targets and carry out necessary forward passes
             # same input scheme for both target critic and critic!
             output_target_critic, output_target_critic_tformat = self.target_critic.forward(inputs_target_critic,
                                                                                             tformat=iac_model_inputs_tformat)
-
 
             target_critic_td_targets, \
             target_critic_td_targets_tformat = batch_history.get_stat("td_lambda_targets",
@@ -226,11 +225,44 @@ class IACvLearner(BasicLearner):
                                                                        value_function_values=output_target_critic["vvalues"].detach(),
                                                                        to_variable=True,
                                                                        to_cuda=self.args.use_cuda)
+            # sample!!
+            if self.args.coma_critic_use_sampling:
+                critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
+                sample_ids = randint(critic_shape[_bsdim(inputs_target_critic_tformat)] \
+                                     * critic_shape[_tdim(inputs_target_critic_tformat)],
+                                     size=self.args.coma_critic_sample_size)
+                sampled_ids_tensor = th.LongTensor(sample_ids).cuda() if inputs_critic[
+                    list(inputs_critic.keys())[0]].is_cuda else th.LongTensor()
+                _inputs_critic = {}
+                for _k, _v in inputs_critic.items():
+                    batch_sample = _v.view(
+                        _v.shape[_adim(inputs_critic_tformat)],
+                        -1,
+                        _v.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                    _inputs_critic[_k] = batch_sample.view(_v.shape[_adim(inputs_critic_tformat)],
+                                                           -1,
+                                                           1,
+                                                           _v.shape[_vdim(inputs_critic_tformat)])
 
-            #a = target_critic_td_targets
+                batch_sample_qtargets = target_critic_td_targets.view(
+                    target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                    -1,
+                    target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                qtargets = batch_sample_qtargets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                                                      -1,
+                                                      1,
+                                                      target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])
+            else:
+                _inputs_critic = inputs_critic
+                qtargets = target_critic_td_targets
+
+            output_critic, output_critic_tformat = self.critic.forward(_inputs_critic,
+                                                                       tformat=iac_model_inputs_tformat)
+
+
             critic_loss, \
             critic_loss_tformat = IACvCriticLoss()(input=output_critic["vvalues"],
-                                                   target=Variable(target_critic_td_targets, requires_grad=False),
+                                                   target=Variable(qtargets, requires_grad=False),
                                                    tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
@@ -253,8 +285,10 @@ class IACvLearner(BasicLearner):
 
         # optimize the critic as often as necessary to get the critic loss down reliably
         output_critic = None
-        for _i in range(self.n_learner_reps):
-            output_critic = _optimize_critic(iac_model_inputs=iac_model_inputs, actions=actions)
+        for _i in range(self.n_critic_learner_reps):
+            output_critic = _optimize_critic(iac_model_inputs=iac_model_inputs,
+                                             actions=actions,
+                                             tformat=iac_model_inputs_tformat)
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(IACvPolicyLoss(),
