@@ -67,7 +67,7 @@ class SC1(MultiAgentEnv):
 
         if sys.platform == 'linux':
             # self.game_version = "1.4.0"
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI') # os.pardir,
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI') # os.pardir,
             self.env_file_type = 'so'
         if sys.platform == 'darwin':
             # self.game_version = "1.4.0"
@@ -81,8 +81,8 @@ class SC1(MultiAgentEnv):
         #     self.zealot_id = 1923
 
         if self.map_name == 'm5v5_c_far':
-            self._agent_race = "Terran"  # Protoss
-            self._bot_race = "Terran"  # Protoss
+            self._agent_race = "Terran"
+            self._bot_race = "Terran"
 
             # TODO: add more specs for other maps
             self.unit_health_max_m = 40
@@ -151,6 +151,12 @@ class SC1(MultiAgentEnv):
         self.controller = tc.Client()
         self.controller.connect(self.hostname, self.port)
         self._obs = self.controller.init(micro_battles=True)
+
+        self.controller.send([
+            [tcc.set_speed, 0],
+            [tcc.set_gui, 1],
+            [tcc.set_cmd_optim, 1],
+        ])
 
     def reset(self):
         """Start a new episode."""
@@ -299,7 +305,6 @@ class SC1(MultiAgentEnv):
         return reward, terminated, info
 
     def get_agent_action(self, a_id, action):
-
         unit = self.get_unit_by_id(a_id)
         x = unit.x
         y = unit.y
@@ -313,14 +318,14 @@ class SC1(MultiAgentEnv):
 
         elif action == 1:
             # stop
-            sc_action = [tcc.command_unit_protected, a_id, tcc.unitcommandtypes.Stop]
+            sc_action = [tcc.command_unit_protected, unit.id, tcc.unitcommandtypes.Stop]
             if self.debug_inputs:
                 print("Agent %d: Stop" % a_id)
 
         elif action == 2:
             # north
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x),
@@ -331,7 +336,7 @@ class SC1(MultiAgentEnv):
         elif action == 3:
             # south
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x),
@@ -342,7 +347,7 @@ class SC1(MultiAgentEnv):
         elif action == 4:
             # east
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x + self._move_amount),
@@ -353,7 +358,7 @@ class SC1(MultiAgentEnv):
         elif action == 5:
             # west
             sc_action = [tcc.command_unit_protected,
-                         a_id,
+                         unit.id,
                          tcc.unitcommandtypes.Move,
                          -1,
                          int(x - self._move_amount),
@@ -363,7 +368,8 @@ class SC1(MultiAgentEnv):
         else:
             # attack units that are in range
             enemy_id = action - self.n_actions_no_attack
-            sc_action = [tcc.command_unit_protected, a_id, tcc.unitcommandtypes.Attack_Unit, enemy_id]
+            enemy_unit = self.enemies[enemy_id]
+            sc_action = [tcc.command_unit_protected, unit.id, tcc.unitcommandtypes.Attack_Unit, enemy_unit.id]
             if self.debug_inputs:
                 print("Agent %d attacks enemy # %d" % (a_id, enemy_id))
 

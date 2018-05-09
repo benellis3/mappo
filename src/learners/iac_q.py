@@ -7,10 +7,11 @@ from torch.optim import RMSprop
 
 from debug.debug import IS_PYCHARM_DEBUG
 from models.iac import IACCritic
+from numpy.random import randint
 from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
-    _generate_input_shapes, _generate_scheme_shapes, \
-    _build_model_inputs, _join_dicts
+    _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
+    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
 
 from .basic import BasicLearner
 
@@ -19,10 +20,11 @@ class IACqPolicyLoss(nn.Module):
     def __init__(self):
         super(IACqPolicyLoss, self).__init__()
 
-    def forward(self, log_policies, advantage, actions, tformat):
+    def forward(self, policies, advantages, actions, tformat):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
-        _adv = advantage.clone().detach()
+        log_policies = th.log(policies)
+        _adv = advantages.clone().detach()
         _act = actions.clone()
 
         assert not (_act!=_act).any(), "_act has nan!"
@@ -32,7 +34,7 @@ class IACqPolicyLoss(nn.Module):
 
         _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
 
-        loss_mean = (-1)*(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat))
+        loss_mean = -(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
         output_tformat = "a*t"
         return loss_mean, output_tformat
 
@@ -65,22 +67,23 @@ class IACqCriticLoss(nn.Module):
 
 class IACqLearner(BasicLearner):
 
-    def __init__(self, multiagent_controller, args):
+    def __init__(self, multiagent_controller, logging_struct, args):
         self.args = args
         self.multiagent_controller = multiagent_controller
         self.agents = multiagent_controller.agents # for now, do not use any other multiagent controller functionality!!
         self.n_agents = len(self.agents)
         self.n_actions = self.multiagent_controller.n_actions
-        self.T = 0
+        self.T_policy = 0
         self.T_critic = 0
         self.target_critic_update_interval=args.target_critic_update_interval
         self.stats = {}
-        self.n_learner_reps = args.n_learner_reps
+        self.n_critic_learner_reps = args.n_critic_learner_reps
+        self.logging_struct = logging_struct
 
         # set up input schemes for all of our models
         self.critic_scheme_fn = lambda _agent_id: Scheme([dict(name="agent_id",
                                                                 select_agent_ids=[_agent_id],
-                                                                transforms=[("one_hot", dict(range=(0, self.args.n_agents-1)))],
+                                                                transforms=[("one_hot", dict(range=(0, self.n_agents-1)))],
                                                                ),
                                                            dict(name="observations",
                                                                 rename="agent_observation",
@@ -95,11 +98,7 @@ class IACqLearner(BasicLearner):
                                                                 rename="agent_action",
                                                                 select_agent_ids=[_agent_id], # do NOT one-hot!
                                                                 ),
-                                                          dict(name="actions",
-                                                               rename="agent_action",
-                                                               select_agent_ids=[_agent_id],  # do NOT one-hot!
-                                                               ),
-                                                          dict(name="policies",
+                                                           dict(name="policies",
                                                                rename="agent_policy",
                                                                select_agent_ids=[_agent_id], )
                                                            ])
@@ -135,7 +134,6 @@ class IACqLearner(BasicLearner):
         self.input_shapes = _generate_input_shapes(input_columns=self.input_columns,
                                                    scheme_shapes=self.scheme_shapes)
 
-
         # only use one critic model as all agents have same input shapes
         # if we cannot make this assumption one day, then just create one input shape per agent
         self.critic = IACCritic(input_shapes=self.input_shapes["critic__agent{}".format(0)],
@@ -143,6 +141,7 @@ class IACqLearner(BasicLearner):
                                 args=self.args,
                                 version="advantage")
         self.target_critic = deepcopy(self.critic)
+
         for parameter in self.target_critic.parameters():
             parameter.requires_grad = False
 
@@ -173,12 +172,12 @@ class IACqLearner(BasicLearner):
         """
         pass
 
-    def train(self, batch_history):
+    def train(self, batch_history, T_env):
         # -------------------------------------------------------------------------------
         # |  We follow the algorithmic description of COMA as supplied in Algorithm 1   |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)         |
         # |  Note: Instead of for-looping backwards through the sample, we just run     |
-        # |  n_learner_reps repetitions of the optimization procedure on the same batch |
+        # |  n_critic_learner_reps repetitions of the optimization procedure on the same batch |
         # -------------------------------------------------------------------------------
 
         #if IS_PYCHARM_DEBUG:
@@ -215,9 +214,8 @@ class IACqLearner(BasicLearner):
         def _optimize_critic(**kwargs):
             inputs_critic= kwargs["iac_model_inputs"]["critic"]
             inputs_target_critic=kwargs["iac_model_inputs"]["target_critic"]
-
-            output_critic, output_critic_tformat = self.critic.forward(inputs_critic,
-                                                                       tformat=iac_model_inputs_tformat)
+            inputs_critic_tformat=kwargs["tformat"]
+            inputs_target_critic_tformat = kwargs["tformat"]
 
             # construct target-critic targets and carry out necessary forward passes
             # same input scheme for both target critic and critic!
@@ -234,10 +232,43 @@ class IACqLearner(BasicLearner):
                                                                        to_variable=True,
                                                                        to_cuda=self.args.use_cuda)
 
-            #a = target_critic_td_targets
+            # sample!!
+            if self.args.iac_critic_use_sampling:
+                critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
+                sample_ids = randint(critic_shape[_bsdim(inputs_target_critic_tformat)] \
+                                     * critic_shape[_tdim(inputs_target_critic_tformat)],
+                                     size=self.args.iac_critic_sample_size)
+                sampled_ids_tensor = th.LongTensor(sample_ids).cuda() if inputs_critic[
+                    list(inputs_critic.keys())[0]].is_cuda else th.LongTensor()
+                _inputs_critic = {}
+                for _k, _v in inputs_critic.items():
+                    batch_sample = _v.view(
+                        _v.shape[_adim(inputs_critic_tformat)],
+                        -1,
+                        _v.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                    _inputs_critic[_k] = batch_sample.view(_v.shape[_adim(inputs_critic_tformat)],
+                                                           -1,
+                                                           1,
+                                                           _v.shape[_vdim(inputs_critic_tformat)])
+
+                batch_sample_qtargets = target_critic_td_targets.view(
+                    target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                    -1,
+                    target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                qtargets = batch_sample_qtargets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                                                      -1,
+                                                      1,
+                                                      target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])
+            else:
+                _inputs_critic = inputs_critic
+                qtargets = target_critic_td_targets
+
+            output_critic, output_critic_tformat = self.critic.forward(_inputs_critic,
+                                                                       tformat=iac_model_inputs_tformat)
+
             critic_loss, \
             critic_loss_tformat = IACqCriticLoss()(input=output_critic["qvalue"],
-                                                   target=Variable(target_critic_td_targets, requires_grad=False),
+                                                   target=Variable(qtargets, requires_grad=False),
                                                    tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
@@ -249,24 +280,30 @@ class IACqLearner(BasicLearner):
             # Calculate critic statistics
             target_critic_mean = output_target_critic["qvalue"].mean().data.cpu().numpy()
             critic_mean = output_critic["qvalue"].mean().data.cpu().numpy()
-            self._add_stat("critic_loss", critic_loss.data.cpu().numpy())
-            self._add_stat("critic_mean", critic_mean)
-            self._add_stat("target_critic_mean", target_critic_mean)
-            self._add_stat("critic_grad_norm", critic_grad_norm)
+            self._add_stat("critic_loss", critic_loss.data.cpu().numpy(), T_env=T_env)
+            self._add_stat("critic_mean", critic_mean, T_env=T_env)
+            self._add_stat("target_critic_mean", target_critic_mean, T_env=T_env)
+            self._add_stat("critic_grad_norm", critic_grad_norm, T_env=T_env)
 
             self.T_critic += len(batch_history) * batch_history._n_t
 
             return output_critic
 
         # optimize the critic as often as necessary to get the critic loss down reliably
-        output_critic = None
-        for _i in range(self.n_learner_reps):
-            output_critic = _optimize_critic(iac_model_inputs=iac_model_inputs, actions=actions)
+        for _i in range(self.n_critic_learner_reps):
+            _ = _optimize_critic(iac_model_inputs=iac_model_inputs,
+                                             actions=actions,
+                                             tformat=iac_model_inputs_tformat)
+
+        # get advantages
+        output_critic, output_critic_tformat = self.critic.forward(iac_model_inputs["critic"],
+                                                                   tformat=iac_model_inputs_tformat)
+        advantages = output_critic["advantage"]
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(IACqPolicyLoss(),
                                        actions=Variable(actions),
-                                       advantage=output_critic["advantage"])
+                                       advantages=advantages)
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
             len(batch_history))
@@ -275,8 +312,8 @@ class IACqLearner(BasicLearner):
         agent_controller_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
                                                                                  hidden_states=hidden_states,
                                                                                  loss_fn=policy_loss_function,
-                                                                                 log_softmax=True,
-                                                                                 tformat=data_inputs_tformat)
+                                                                                 tformat=data_inputs_tformat,
+                                                                                 test_mode=False)
         COMA_loss = agent_controller_output["losses"]
         COMA_loss = COMA_loss.mean()
 
@@ -288,14 +325,40 @@ class IACqLearner(BasicLearner):
 
         # Calculate policy statistics
         advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
-        self._add_stat("advantage_mean", advantage_mean)
-        self._add_stat("policy_grad_norm", policy_grad_norm)
-        self._add_stat("policy_loss", COMA_loss.data.cpu().numpy())
+        self._add_stat("advantage_mean", advantage_mean, T_env=T_env)
+        self._add_stat("policy_grad_norm", policy_grad_norm, T_env=T_env)
+        self._add_stat("policy_loss", COMA_loss.data.cpu().numpy(), T_env=T_env)
 
         # increase episode counter (the fastest one is always)
-        self.T += len(batch_history) * batch_history._n_t
+        self.T_policy += len(batch_history) * batch_history._n_t
 
         pass
+
+
+    def log(self, log_directly = True):
+        """
+        Each learner has it's own logging routine, which logs directly to the python-wide logger if log_directly==True,
+        and returns a logging string otherwise
+
+        Logging is triggered in run.py
+        """
+        stats = self.get_stats()
+        logging_dict =  dict(advantage_mean = _seq_mean(stats["advantage_mean"]),
+                             critic_grad_norm = _seq_mean(stats["critic_grad_norm"]),
+                             critic_loss =_seq_mean(stats["critic_loss"]),
+                             policy_grad_norm = _seq_mean(stats["policy_grad_norm"]),
+                             policy_loss = _seq_mean(stats["policy_loss"]),
+                             target_critic_mean = _seq_mean(stats["target_critic_mean"]),
+                             T_critic=self.T_critic,
+                             T_policy=self.T_policy
+                            )
+        logging_str = "T_policy={:g}, T_critic={:g}, ".format(logging_dict["T_policy"], logging_dict["T_critic"])
+        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_policy", "T_critic"]))
+
+        if log_directly:
+            self.logging_struct.py_logger.info("{} LEARNER INFO: {}".format(self.args.learner.upper(), logging_str))
+
+        return logging_str, logging_dict
 
     def update_target_nets(self):
         self.target_critic.load_state_dict(self.critic.state_dict())

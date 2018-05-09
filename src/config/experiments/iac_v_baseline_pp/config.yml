@@ -1,0 +1,16 @@
+batch_size: 32
+defaults: default iac_v predator_prey
+env_args:
+  predator_prey_toroidal: True
+  predator_prey_shape:
+    - 4
+    - 4
+  n_prey: 1
+  agent_obs:
+    - 1
+    - 1
+  episode_limit: 50
+  n_prey: 1
+  n_agents: 4
+iac_critic_sample_size: 800
+use_replay_buffer: False

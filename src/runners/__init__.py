@@ -6,6 +6,9 @@ REGISTRY["nstep"] = NStepRunner
 from .coma_runner import COMARunner
 REGISTRY["coma"] = COMARunner
 
+from .iac_runner import IACRunner
+REGISTRY["iac"] = IACRunner
+
 from .pomace_runner import poMACERunner
 REGISTRY["pomace"] = poMACERunner
 

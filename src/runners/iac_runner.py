@@ -8,7 +8,7 @@ from runners import REGISTRY as r_REGISTRY
 
 NStepRunner = r_REGISTRY["nstep"]
 
-class COMARunner(NStepRunner):
+class IACRunner(NStepRunner):
 
     def _setup_data_scheme(self, data_scheme):
         self.data_scheme = Scheme([dict(name="observations",
@@ -57,7 +57,7 @@ class COMARunner(NStepRunner):
                                         shape=(1,),
                                         dtype=np.bool,
                                         missing=False),
-                                   dict(name="coma_epsilons",
+                                   dict(name="iac_epsilons",
                                         scope="episode",
                                         shape=(1,),
                                         dtype=np.float32,
@@ -81,15 +81,15 @@ class COMARunner(NStepRunner):
         # if no test_mode, calculate fresh set of epsilons/epsilon seeds and update epsilon variance
         if not self.test_mode:
             ttype = th.cuda.FloatTensor if self.episode_buffer.is_cuda else th.FloatTensor
-            # calculate COMA_epsilon_schedule
-            if not hasattr(self, "coma_epsilon_decay_schedule"):
-                 self.coma_epsilon_decay_schedule = FlatThenDecaySchedule(start=self.args.coma_epsilon_start,
-                                                                          finish=self.args.coma_epsilon_finish,
-                                                                          time_length=self.args.coma_epsilon_time_length,
-                                                                          decay=self.args.coma_epsilon_decay_mode)
+            # calculate IAC_epsilon_schedule
+            if not hasattr(self, "iac_epsilon_decay_schedule"):
+                 self.iac_epsilon_decay_schedule = FlatThenDecaySchedule(start=self.args.iac_epsilon_start,
+                                                                         finish=self.args.iac_epsilon_finish,
+                                                                         time_length=self.args.iac_epsilon_time_length,
+                                                                         decay=self.args.iac_epsilon_decay_mode)
 
-            epsilons = ttype(self.batch_size, 1).fill_(self.coma_epsilon_decay_schedule.eval(self.T_env))
-            self.episode_buffer.set_col(col="coma_epsilons",
+            epsilons = ttype(self.batch_size, 1).fill_(self.iac_epsilon_decay_schedule.eval(self.T_env))
+            self.episode_buffer.set_col(col="iac_epsilons",
                                         scope="episode",
                                         data=epsilons)
         pass
@@ -97,7 +97,7 @@ class COMARunner(NStepRunner):
     def log(self, log_directly=True):
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
-            log_str += ", COMA_epsilon={:g}".format(self.coma_epsilon_decay_schedule.eval(self.T_env))
+            log_str += ", IAC_epsilon={:g}".format(self.iac_epsilon_decay_schedule.eval(self.T_env))
             self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
         else:
             self.logging_struct.py_logger.info("TEST RUNNER INFO: {}".format(log_str))
