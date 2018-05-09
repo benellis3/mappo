@@ -265,7 +265,7 @@ class IACRecursiveAgent(RecursiveAgent):
             x = self.output(h)
             x = F.softmax(x, dim=1)
 
-            if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
+            if self.args.iac_exploration_mode in ["softmax"] and not test_mode:
                 epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
                 epsilons, _, _ = _to_batch(epsilons, tformat)
                 x = epsilons / self.n_actions + x * (1 - epsilons)

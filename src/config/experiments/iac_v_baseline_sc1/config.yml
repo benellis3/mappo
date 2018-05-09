@@ -13,6 +13,7 @@ env_args:
   hostname: localhost
   port: 11111
 env_stats_aggregator: sc1
+iac_critic_sample_size: 800
 n_critic_learner_reps: 30
 n_loops_per_thread_or_sub_or_main_process: 1
 n_subprocesses: 30

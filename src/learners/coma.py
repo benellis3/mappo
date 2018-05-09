@@ -312,8 +312,6 @@ class COMALearner(BasicLearner):
                                              tformat=coma_model_inputs_tformat,
                                              actions=actions)
 
-
-
         # get advantages
         output_critic, output_critic_tformat = self.critic.forward(coma_model_inputs["critic"],
                                                                    tformat=coma_model_inputs_tformat)

@@ -12,4 +12,5 @@ env_args:
   episode_limit: 50
   n_prey: 1
   n_agents: 4
+iac_critic_sample_size: 800
 use_replay_buffer: False
