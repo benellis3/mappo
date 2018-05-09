@@ -1,8 +1,12 @@
 batch_size: 2
+coma_critic_sample_size: 1600
 defaults: default coma sc1
 env_args:
   map_name: m5v5_c_far
   hostname: localhost
   port: 11111
 env_stats_aggregator: sc1
+n_critic_learner_reps: 10
+test_interval: 5
+test_nepisode: 2
 
