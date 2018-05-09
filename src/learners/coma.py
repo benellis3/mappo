@@ -81,7 +81,7 @@ class COMALearner(BasicLearner):
         self.T_critic = 0
         self.T_target_critic_update_interval=args.target_critic_update_interval
         self.stats = {}
-        self.n_learner_reps = args.n_learner_reps
+        self.n_critic_learner_reps = args.n_critic_learner_reps
         self.logging_struct = logging_struct
 
         # set up input schemes for all of our models
@@ -186,7 +186,7 @@ class COMALearner(BasicLearner):
         # |  We follow the algorithmic description of COMA as supplied in Algorithm 1   |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)         |
         # |  Note: Instead of for-looping backwards through the sample, we just run     |
-        # |  n_learner_reps repetitions of the optimization procedure on the same batch |
+        # |  repetitions of the optimization procedure sampling from the same batch     |
         # -------------------------------------------------------------------------------
 
         #if IS_PYCHARM_DEBUG:
@@ -254,14 +254,6 @@ class COMALearner(BasicLearner):
                                         * critic_shape[_tdim(inputs_target_critic_tformat)],
                                      size = self.args.coma_critic_sample_size)
                 sampled_ids_tensor = th.LongTensor(sample_ids).cuda() if inputs_critic[list(inputs_critic.keys())[0]].is_cuda else th.LongTensor()
-                # batch_sample_qvals = output_critic["qvalue"].view(output_critic["qvalue"].shape[_adim(inputs_critic_tformat)],
-                #                                                   -1,
-                #                                                   output_critic["qvalue"].shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
-                # qvalues = batch_sample_qvals.view(output_critic["qvalue"].shape[_adim(inputs_critic_tformat)],
-                #                                   -1,
-                #                                   1,
-                #                                   output_critic["qvalue"].shape[_vdim(inputs_critic_tformat)])
-
                 _inputs_critic = {}
                 for _k, _v in inputs_critic.items():
                     batch_sample = _v.view(
@@ -315,7 +307,7 @@ class COMALearner(BasicLearner):
 
         output_critic = None
         # optimize the critic as often as necessary to get the critic loss down reliably
-        for _i in range(self.n_learner_reps):
+        for _i in range(self.n_critic_learner_reps):
             _ = _optimize_critic(coma_model_inputs=coma_model_inputs,
                                              tformat=coma_model_inputs_tformat,
                                              actions=actions)

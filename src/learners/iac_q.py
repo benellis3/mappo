@@ -7,6 +7,7 @@ from torch.optim import RMSprop
 
 from debug.debug import IS_PYCHARM_DEBUG
 from models.iac import IACCritic
+from numpy.random import randint
 from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, \
@@ -75,7 +76,7 @@ class IACqLearner(BasicLearner):
         self.T_critic = 0
         self.target_critic_update_interval=args.target_critic_update_interval
         self.stats = {}
-        self.n_learner_reps = args.n_learner_reps
+        self.n_critic_learner_reps = args.n_critic_learner_reps
 
         # set up input schemes for all of our models
         self.critic_scheme_fn = lambda _agent_id: Scheme([dict(name="agent_id",
@@ -95,11 +96,7 @@ class IACqLearner(BasicLearner):
                                                                 rename="agent_action",
                                                                 select_agent_ids=[_agent_id], # do NOT one-hot!
                                                                 ),
-                                                          dict(name="actions",
-                                                               rename="agent_action",
-                                                               select_agent_ids=[_agent_id],  # do NOT one-hot!
-                                                               ),
-                                                          dict(name="policies",
+                                                           dict(name="policies",
                                                                rename="agent_policy",
                                                                select_agent_ids=[_agent_id], )
                                                            ])
@@ -135,7 +132,6 @@ class IACqLearner(BasicLearner):
         self.input_shapes = _generate_input_shapes(input_columns=self.input_columns,
                                                    scheme_shapes=self.scheme_shapes)
 
-
         # only use one critic model as all agents have same input shapes
         # if we cannot make this assumption one day, then just create one input shape per agent
         self.critic = IACCritic(input_shapes=self.input_shapes["critic__agent{}".format(0)],
@@ -143,6 +139,7 @@ class IACqLearner(BasicLearner):
                                 args=self.args,
                                 version="advantage")
         self.target_critic = deepcopy(self.critic)
+
         for parameter in self.target_critic.parameters():
             parameter.requires_grad = False
 
@@ -178,7 +175,7 @@ class IACqLearner(BasicLearner):
         # |  We follow the algorithmic description of COMA as supplied in Algorithm 1   |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)         |
         # |  Note: Instead of for-looping backwards through the sample, we just run     |
-        # |  n_learner_reps repetitions of the optimization procedure on the same batch |
+        # |  n_critic_learner_reps repetitions of the optimization procedure on the same batch |
         # -------------------------------------------------------------------------------
 
         #if IS_PYCHARM_DEBUG:
@@ -215,9 +212,8 @@ class IACqLearner(BasicLearner):
         def _optimize_critic(**kwargs):
             inputs_critic= kwargs["iac_model_inputs"]["critic"]
             inputs_target_critic=kwargs["iac_model_inputs"]["target_critic"]
-
-            output_critic, output_critic_tformat = self.critic.forward(inputs_critic,
-                                                                       tformat=iac_model_inputs_tformat)
+            inputs_critic_tformat=kwargs["tformat"]
+            inputs_target_critic_tformat = kwargs["tformat"]
 
             # construct target-critic targets and carry out necessary forward passes
             # same input scheme for both target critic and critic!
@@ -234,10 +230,43 @@ class IACqLearner(BasicLearner):
                                                                        to_variable=True,
                                                                        to_cuda=self.args.use_cuda)
 
-            #a = target_critic_td_targets
+            # sample!!
+            if self.args.coma_critic_use_sampling:
+                critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
+                sample_ids = randint(critic_shape[_bsdim(inputs_target_critic_tformat)] \
+                                     * critic_shape[_tdim(inputs_target_critic_tformat)],
+                                     size=self.args.coma_critic_sample_size)
+                sampled_ids_tensor = th.LongTensor(sample_ids).cuda() if inputs_critic[
+                    list(inputs_critic.keys())[0]].is_cuda else th.LongTensor()
+                _inputs_critic = {}
+                for _k, _v in inputs_critic.items():
+                    batch_sample = _v.view(
+                        _v.shape[_adim(inputs_critic_tformat)],
+                        -1,
+                        _v.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                    _inputs_critic[_k] = batch_sample.view(_v.shape[_adim(inputs_critic_tformat)],
+                                                           -1,
+                                                           1,
+                                                           _v.shape[_vdim(inputs_critic_tformat)])
+
+                batch_sample_qtargets = target_critic_td_targets.view(
+                    target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                    -1,
+                    target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
+                qtargets = batch_sample_qtargets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                                                      -1,
+                                                      1,
+                                                      target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])
+            else:
+                _inputs_critic = inputs_critic
+                qtargets = target_critic_td_targets
+
+            output_critic, output_critic_tformat = self.critic.forward(_inputs_critic,
+                                                                       tformat=iac_model_inputs_tformat)
+
             critic_loss, \
             critic_loss_tformat = IACqCriticLoss()(input=output_critic["qvalue"],
-                                                   target=Variable(target_critic_td_targets, requires_grad=False),
+                                                   target=Variable(qtargets, requires_grad=False),
                                                    tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
@@ -260,8 +289,10 @@ class IACqLearner(BasicLearner):
 
         # optimize the critic as often as necessary to get the critic loss down reliably
         output_critic = None
-        for _i in range(self.n_learner_reps):
-            output_critic = _optimize_critic(iac_model_inputs=iac_model_inputs, actions=actions)
+        for _i in range(self.n_critic_learner_reps):
+            output_critic = _optimize_critic(iac_model_inputs=iac_model_inputs,
+                                             actions=actions,
+                                             tformat=iac_model_inputs_tformat)
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(IACqPolicyLoss(),

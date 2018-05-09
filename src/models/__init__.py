@@ -9,6 +9,10 @@ from .coma import COMANonRecursiveAgent, COMARecursiveAgent
 REGISTRY["coma_recursive"] = COMARecursiveAgent
 REGISTRY["coma_non_recursive"] = COMANonRecursiveAgent
 
+from .iac import IACNonRecursiveAgent, IACRecursiveAgent
+REGISTRY["iac_recursive"] = IACRecursiveAgent
+REGISTRY["iac_non_recursive"] = IACNonRecursiveAgent
+
 from .pomace.basic import poMACENoiseNetwork, poMACEMultiagentNetwork
 
 REGISTRY["pomace_noise_nn1"] = poMACENoiseNetwork

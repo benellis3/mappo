@@ -42,7 +42,7 @@ def test1():
                  test_nepisode=50,
                  batch_size=32,
                  batch_size_run=32,
-                 n_learner_reps=200
+                 n_critic_learner_reps=200
                  )
 
     # required args
@@ -165,7 +165,7 @@ def test3():
                  test_nepisode=50,
                  batch_size=3,
                  batch_size_run=3,
-                 n_learner_reps=20
+                 n_critic_learner_reps=20
                  )
 
     # required args

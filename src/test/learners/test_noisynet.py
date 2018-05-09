@@ -29,7 +29,7 @@ conf = {"n_agents": 4, "obs_agent_id": 0, "obs_last_action": True, "obs_epsilon"
         "action_selector": "multinomial", "epsilon_start": 1.0, "epsilon_finish": 0.05,
         "epsilon_time_length": 1000, "epsilon_decay": "exp",
         "lr": 5e-4,
-        "n_learner_reps":1,
+        "n_critic_learner_reps":1,
         "target_critic_update_interval":800,
         "lr_agent":5e-4,
         "lr_critic":5e-4,

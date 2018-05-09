@@ -634,7 +634,6 @@ class NStepRunner():
                                                        info=None)
             self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = multiagent_controller_outputs["hidden_states"]
 
-
             # retrieve avail_actions from episode_buffer
             avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,
                                                                               col="avail_actions",
