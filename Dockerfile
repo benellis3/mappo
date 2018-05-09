@@ -41,6 +41,7 @@ WORKDIR /install
 # RUN apt-get install -y cmake gcc 
 # RUN cd /install/pytorch && python3 setup.py install
 #RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl 
+#RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
 RUN pip3 install http://download.pytorch.org/whl/cu90/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
 RUN pip3 install torchvision snakeviz
 
@@ -76,7 +77,7 @@ RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /insta
 #### install OpenBW (from OxWhirl fork)
 #### -------------------------------------------------------------------
 
-#RUN apt-get install -y libsdl2-dev libsdl2-2.0
+RUN apt-get update && apt-get install -y libsdl2-dev libsdl2-2.0
 #RUN git clone https://github.com/oxwhirl/openbw /install/openbw-git
 #RUN git clone https://github.com/oxwhirl/bwapi /install/bwapi-git
 #RUN cd /install/bwapi-git && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DOPENBW_DIR=/install/openbw-git -

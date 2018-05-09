@@ -1,5 +1,6 @@
 agents_encoder_size: 64
 agents_hidden_state_size: 64
+mongodb_profile: gandalf_pymarl
 n_loops_per_thread_or_sub_or_main_process: 0
 n_threads_per_subprocess_or_main_process: 0
 n_subprocesses: 0
@@ -13,6 +14,5 @@ test_interval: 8000
 test_nepisode: 50
 use_tensorboard: True
 t_max: 100000000
-mongodb_profile: gandalf_pymarl
 use_cuda: True
 

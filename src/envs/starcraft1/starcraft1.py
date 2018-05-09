@@ -10,7 +10,6 @@ import math
 import time
 from operator import attrgetter
 from copy import deepcopy
-from copy import copy
 
 import socket, errno
 
@@ -68,7 +67,7 @@ class SC1(MultiAgentEnv):
 
         if sys.platform == 'linux':
             # self.game_version = "1.4.0"
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI') # os.pardir,
             self.env_file_type = 'so'
         if sys.platform == 'darwin':
             # self.game_version = "1.4.0"
@@ -140,7 +139,7 @@ class SC1(MultiAgentEnv):
                   "BWAPI_CONFIG_AI__AI": '{}/bwapi/build/lib/BWEnv.{}'.format(os.environ['SC1PATH'], self.env_file_type),
                   "BWAPI_CONFIG_AUTO_MENU__AUTO_MENU": "SINGLE_PLAYER",
                   "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/envs/starcraft1/maps/{}.scm'.format(os.getcwd(), self.map_name),
-                  # "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE MAP SETTINGS",
+                  "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE MAP SETTINGS",
                   "LD_LIBRARY_PATH": "{}/bwapi/build/lib/".format(os.environ['SC1PATH']),
                   "TORCHCRAFT_PORT": '{}'.format(self.port)}
         launcher_path = '{}/bwapi/build/bin'.format(os.environ['SC1PATH'])
@@ -735,12 +734,29 @@ class SC1(MultiAgentEnv):
         # self.controller.debug(sc_pb.RequestDebug(debug = debug_create_command))
 
     def kill_all_units(self):
-
         # TODO: updated this for SC1
         # units_alive = [unit.tag for unit in self.agents.values() if unit.health > 0] + [unit.tag for unit in self.enemies.values() if unit.health > 0]
         # debug_command = [d_pb.DebugCommand(kill_unit = d_pb.DebugKillUnit(tag = units_alive))]
         # self.controller.debug(sc_pb.RequestDebug(debug = debug_command))
-        pass
+        self.agents = {}
+        self.enemies = {}
+
+        commands = []
+        for j in range(2):
+            for i in range(len(self._obs.units[j])):
+                u = self._obs.units[j][i]
+                command = [
+                    tcc.command_openbw,
+                    tcc.openbwcommandtypes.KillUnit,
+                    u.id,
+                ]
+                commands.append(command)
+
+        # There is probably a bug in TorchCraft. Sending the kill command does not always kill the units.
+        while len(self._obs.units[0]) > 0 or len(self._obs.units[1]) > 0:
+            sent = self.controller.send(commands)
+            if sent:
+                self._obs = self.controller.recv()
 
     def init_units(self):
 
