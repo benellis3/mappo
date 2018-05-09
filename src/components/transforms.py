@@ -39,21 +39,33 @@ def _join_dicts(*dicts):
 
 def _to_batch(item, tformat):
     assert tformat in ["a*bs*t*v", "bs*t*v"], "unknown format: {}".format(tformat)
-    if tformat in ["a*bs*t*v"]:
-        a, bs, t, v = item.shape
-        return item.view(a*bs*t, v), (a, bs, t, v), tformat
-    elif tformat in ["bs*t*v"]:
-        bs, t, v = item.shape
-        return item.view(bs*t, v), (bs, t, v), tformat
+    if isinstance(item, dict):
+        res_dict = {}
+        for _k, _v in item.items():
+            res_dict[_k], params, tformat = _to_batch(_v, tformat)
+        return res_dict, params, tformat
+    else:
+        if tformat in ["a*bs*t*v"]:
+            a, bs, t, v = item.shape
+            return item.view(a*bs*t, v), (a, bs, t, v), tformat
+        elif tformat in ["bs*t*v"]:
+            bs, t, v = item.shape
+            return item.view(bs*t, v), (bs, t, v), tformat
 
 def _from_batch(item, params, tformat):
     assert tformat in ["a*bs*t*v", "bs*t*v"], "unknown format: {}".format(tformat)
-    if tformat in ["a*bs*t*v"]:
-        a, bs, t, _ = params
-        return item.view(a, bs, t, -1)
-    elif tformat in ["bs*t*v"]:
-        bs, t, _ = params
-        return item.view(bs, t, -1)
+    if isinstance(item, dict):
+        res_dict = {}
+        for _k, _v in item.items():
+            res_dict[_k]  = _from_batch(_v, params, tformat)
+        return res_dict
+    else:
+        if tformat in ["a*bs*t*v"]:
+            a, bs, t, _ = params
+            return item.view(a, bs, t, -1)
+        elif tformat in ["bs*t*v"]:
+            bs, t, _ = params
+            return item.view(bs, t, -1)
 
 def _check_inputs_validity(inputs, input_shapes, formats, allow_nonseq=False):
 

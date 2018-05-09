@@ -67,7 +67,7 @@ class SC1(MultiAgentEnv):
 
         if sys.platform == 'linux':
             # self.game_version = "1.4.0"
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI') # os.pardir,
             self.env_file_type = 'so'
         if sys.platform == 'darwin':
             # self.game_version = "1.4.0"

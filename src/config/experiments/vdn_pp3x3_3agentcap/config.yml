@@ -1,15 +1,15 @@
 action_selector: "epsilon_greedy"
 agent_model: "RNN"
 agent_output_type: "qvalues"
-batch_size: 16
-batch_size_run: 16
+batch_size: 32
+batch_size_run: 32
 buffer_size: 2000
 defaults: default vdn predator_prey
 env_args:
   predator_prey_toroidal: True
   predator_prey_shape:
-    - 3
-    - 3
+    - 4
+    - 4
   n_prey: 1
   agent_obs:
     - 1
@@ -17,7 +17,7 @@ env_args:
   episode_limit: 50
   n_prey: 1
   n_agents: 4
-vdn_epsilon_start: 0.5
+vdn_epsilon_start: 1.0
 vdn_epsilon_finish: 0.05
 vdn_epsilon_time_length: 40000
 vdn_epsilon_decay_mode: "exp"
