@@ -81,8 +81,8 @@ class SC1(MultiAgentEnv):
         #     self.zealot_id = 1923
 
         if self.map_name == 'm5v5_c_far':
-            self._agent_race = "Terran"  # Protoss
-            self._bot_race = "Terran"  # Protoss
+            self._agent_race = "Terran"
+            self._bot_race = "Terran"
 
             # TODO: add more specs for other maps
             self.unit_health_max_m = 40
@@ -151,6 +151,12 @@ class SC1(MultiAgentEnv):
         self.controller = tc.Client()
         self.controller.connect(self.hostname, self.port)
         self._obs = self.controller.init(micro_battles=True)
+
+        self.controller.send([
+            [tcc.set_speed, 0],
+            [tcc.set_gui, 1],
+            [tcc.set_cmd_optim, 1],
+        ])
 
     def reset(self):
         """Start a new episode."""
