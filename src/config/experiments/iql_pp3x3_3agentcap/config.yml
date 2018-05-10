@@ -21,6 +21,6 @@ iql_epsilon_start: 0.5
 iql_epsilon_finish: 0.05
 iql_epsilon_time_length: 40000
 iql_epsilon_decay_mode: "exp"
-target_critic_update_interval: 661500
+target_update_interval: 66150
 test_nepisode: 50
 use_replay_buffer: True
