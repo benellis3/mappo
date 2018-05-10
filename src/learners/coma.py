@@ -246,7 +246,6 @@ class COMALearner(BasicLearner):
                                                                        to_variable=True,
                                                                        to_cuda=self.args.use_cuda)
 
-
             # sample!!
             if self.args.coma_critic_use_sampling:
                 critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
