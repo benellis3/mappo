@@ -1,4 +1,6 @@
 batch_size: 8
+coma_critic_use_sampling: True
+coma_critic_sample_size: 1620
 defaults: default coma pomace sc2
 env_args:
   map_name: 3m_3m
