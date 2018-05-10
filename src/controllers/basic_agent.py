@@ -50,10 +50,11 @@ class BasicAgentController():
             self.input_columns["main"] = {}
             # if args.agent_model in ["DQN", "RNN"]:
             self.input_columns["main"]["main"] = Scheme([dict(name="agent_id", select_agent_ids=[self.agent_id]),
-                                                                                         dict(name="agent_observation", select_agent_ids=[self.agent_id]),
-                                                                                         dict(name="past_action",
-                                                                                              select_agent_ids=[self.agent_id],
-                                                                                              switch=self.args.obs_last_action)]).agent_flatten()
+                                                         dict(name="agent_observation", select_agent_ids=[self.agent_id]),
+                                                         dict(name="past_action",
+                                                              select_agent_ids=[self.agent_id],
+                                                              switch=self.args.obs_last_action)]).agent_flatten()
+            #self.input_columns["main"]["avail_actions"] = Scheme()
         else:
             self.input_columns = input_columns
         #else:

@@ -113,7 +113,9 @@ class COMALearner(BasicLearner):
                                                            dict(name="state"),
                                                            dict(name="policies",
                                                                 rename="agent_policy",
-                                                                select_agent_ids=[_agent_id],)
+                                                                select_agent_ids=[_agent_id],),
+                                                           dict(name="avail_actions",
+                                                               select_agent_ids=[_agent_id])
                                                            ])
         self.target_critic_scheme_fn = self.critic_scheme_fn
 
@@ -127,6 +129,7 @@ class COMALearner(BasicLearner):
         self.input_columns = {}
         for _agent_id in range(self.n_agents):
             self.input_columns["critic__agent{}".format(_agent_id)] = {}
+            self.input_columns["critic__agent{}".format(_agent_id)]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
             self.input_columns["critic__agent{}".format(_agent_id)]["qfunction"] = Scheme([dict(name="other_agents_actions", select_agent_ids=list(range(self.n_agents))), # select all agent ids here, as have mask=0 transform on current agent action
                                                                                            dict(name="state"),
                                                                                            dict(name="agent_observation", select_agent_ids=[_agent_id]),
@@ -135,6 +138,7 @@ class COMALearner(BasicLearner):
             self.input_columns["critic__agent{}".format(_agent_id)]["agent_action"] = Scheme([dict(name="agent_action", select_agent_ids=[_agent_id])]).agent_flatten()
             self.input_columns["critic__agent{}".format(_agent_id)]["agent_policy"] = Scheme([dict(name="agent_policy", select_agent_ids=[_agent_id])]).agent_flatten()
             self.input_columns["target_critic__agent{}".format(_agent_id)] = self.input_columns["critic__agent{}".format(_agent_id)]
+
 
         self.last_target_update_T_critic = 0
         pass
