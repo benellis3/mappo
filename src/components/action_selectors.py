@@ -24,7 +24,7 @@ class MultinomialActionSelector():
         masked_policies, params, tformat = _to_batch(agent_policies * avail_actions, tformat)
         _samples = Categorical(masked_policies).sample().unsqueeze(1)
         samples = _from_batch(_samples, params, tformat)
-        return samples, agent_policies, tformat
+        return samples, masked_policies, tformat
 
 REGISTRY["multinomial"] = MultinomialActionSelector
 
@@ -68,6 +68,6 @@ class EpsilonGreedyActionSelector():
         else: # don't use epsilon!
             # sanity check: there always has to be at least one action available.
             argmaxes = _from_batch(_argmaxes, params, tformat)
-            return argmaxes, agent_qvalues, tformat
+            return argmaxes, masked_qvalues, tformat
 
 REGISTRY["epsilon_greedy"] = EpsilonGreedyActionSelector
