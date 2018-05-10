@@ -21,8 +21,9 @@ class MultinomialActionSelector():
         else:
             agent_policies = inputs["policies"].clone()  # might not be necessary
 
-        masked_policies, params, tformat = _to_batch(agent_policies * avail_actions, tformat)
-        _samples = Categorical(masked_policies).sample().unsqueeze(1)
+        masked_policies = agent_policies * avail_actions
+        masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
+        _samples = Categorical(masked_policies_batch).sample().unsqueeze(1)
         samples = _from_batch(_samples, params, tformat)
         return samples, masked_policies, tformat
 
@@ -49,10 +50,12 @@ class EpsilonGreedyActionSelector():
         # greedy action selection
         assert avail_actions.sum(dim=_vdim(tformat)).prod() > 0.0, \
             "at least one batch entry has no available action!"
+
+        # mask actions that are excluded from selection
         agent_qvalues[avail_actions == 0.0] = -float("inf") # should never be selected!
 
-        masked_qvalues, params, tformat = _to_batch(agent_qvalues * avail_actions, tformat)
-        _, _argmaxes = masked_qvalues.max(dim=1, keepdim=True)
+        masked_qvalues_batch, params, tformat = _to_batch(agent_qvalues, tformat)
+        _, _argmaxes = masked_qvalues_batch.max(dim=1, keepdim=True)
         #_argmaxes.unsqueeze_(1)
 
         if not test_mode: # normal epsilon-greedy action selection
@@ -68,6 +71,6 @@ class EpsilonGreedyActionSelector():
         else: # don't use epsilon!
             # sanity check: there always has to be at least one action available.
             argmaxes = _from_batch(_argmaxes, params, tformat)
-            return argmaxes, masked_qvalues, tformat
+            return argmaxes, agent_qvalues, tformat
 
 REGISTRY["epsilon_greedy"] = EpsilonGreedyActionSelector
