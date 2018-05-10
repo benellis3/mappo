@@ -88,11 +88,6 @@ class COMAAdvantage(nn.Module):
         agent_action, params_aa, tformat_aa = _to_batch(inputs.get("agent_action"), tformat)
         agent_policy, params_ap, tformat_ap = _to_batch(inputs.get("agent_policy"), tformat)
 
-        # mask qvalues corresponding to unavailable actions
-        avail_actions, params_aa, tformat_aa = _to_batch(inputs["avail_actions"], tformat)
-        qvalues[(avail_actions.detach() == 0.0)] = float("-inf")
-
-        # baseline = True # DEBUG
         if baseline:
         # Fuse to COMA advantage
             baseline = th.bmm(
@@ -102,6 +97,7 @@ class COMAAdvantage(nn.Module):
             baseline = 0
         Q = th.gather(qvalues, 1, agent_action.long())
         A = Q - baseline
+
         return _from_batch(A, params_qv, tformat_qv), _from_batch(Q, params_qv, tformat_qv), tformat
 
 
