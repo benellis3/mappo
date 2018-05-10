@@ -255,8 +255,8 @@ class COMALearner(BasicLearner):
                 critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
                 sample_ids = randint(critic_shape[_bsdim(inputs_target_critic_tformat)] \
                                         * critic_shape[_tdim(inputs_target_critic_tformat)],
-                                     size = self.args.coma_critic_sample_size).astype(np.int64)
-                sampled_ids_tensor = th.from_numpy(sample_ids).long().cuda() if inputs_critic[list(inputs_critic.keys())[0]].is_cuda else th.LongTensor()
+                                     size = self.args.coma_critic_sample_size)
+                sampled_ids_tensor = th.from_numpy(sample_ids).long().cuda() if inputs_critic[list(inputs_critic.keys())[0]].is_cuda else th.from_numpy(sample_ids).long()
                 _inputs_critic = {}
                 for _k, _v in inputs_critic.items():
                     batch_sample = _v.view(
