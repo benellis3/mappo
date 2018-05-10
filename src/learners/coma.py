@@ -13,7 +13,7 @@ from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
 from components.losses import EntropyRegularisationLoss
-from components.transforms import _to_batch, _from_batch
+from components.transforms import _to_batch, _from_batch, _naninfmean
 from models.coma import COMACritic
 
 from .basic import BasicLearner
@@ -29,6 +29,7 @@ class COMAPolicyLoss(nn.Module):
         log_policies = th.log(policies)
         _adv = advantages.clone().detach()
         _act = actions.clone()
+        _act[_act!=_act] = 0.0 # mask NaNs in _act
 
         assert not (_act!=_act).any(), "_act has nan!"
         assert not (_act > log_policies.shape[_vdim(tformat)]).any(), "_act too large!: {} vs. {}".format(_act.max(),
@@ -36,6 +37,7 @@ class COMAPolicyLoss(nn.Module):
         assert not (_act < 0).any(), "_act too small!"
 
         _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
+        _active_logits[actions!=actions] = 0.0 # mask logits for actions that are actually NaNs
 
         loss_mean = -(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
         output_tformat = "a*t"
@@ -215,7 +217,6 @@ class COMALearner(BasicLearner):
                                                          col="actions",
                                                          agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
-        actions[actions != actions] = 0.0  # mask NaNs
 
         # do single forward pass in critic
         coma_model_inputs, coma_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns,
@@ -296,12 +297,13 @@ class COMALearner(BasicLearner):
             self.critic_optimiser.step()
 
             # Calculate critic statistics and update
-            target_critic_mean = output_target_critic["qvalue"].mean().data.cpu().numpy()
-            critic_mean = output_critic["qvalue"].mean().data.cpu().numpy()
+            target_critic_mean = _naninfmean(output_target_critic["qvalue"])
+
+            critic_mean = _naninfmean(output_critic["qvalue"])
 
             critic_loss_arr.append(np.asscalar(critic_loss.data.cpu().numpy()))
-            critic_mean_arr.append(np.asscalar(critic_mean))
-            target_critic_mean_arr.append(np.asscalar(target_critic_mean))
+            critic_mean_arr.append(critic_mean)
+            target_critic_mean_arr.append(target_critic_mean)
             critic_grad_norm_arr.append(critic_grad_norm)
 
             self.T_critic += len(batch_history) * batch_history._n_t
@@ -312,8 +314,8 @@ class COMALearner(BasicLearner):
         # optimize the critic as often as necessary to get the critic loss down reliably
         for _i in range(self.n_critic_learner_reps):
             _ = _optimize_critic(coma_model_inputs=coma_model_inputs,
-                                             tformat=coma_model_inputs_tformat,
-                                             actions=actions)
+                                 tformat=coma_model_inputs_tformat,
+                                 actions=actions)
 
         # get advantages
         output_critic, output_critic_tformat = self.critic.forward(coma_model_inputs["critic"],
@@ -346,13 +348,13 @@ class COMALearner(BasicLearner):
         self.agent_optimiser.zero_grad()
         COMA_loss.backward()
         policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
-        self.agent_optimiser.step()  # DEBUG
+        self.agent_optimiser.step() # DEBUG
 
         # increase episode counter (the fastest one is always)
         self.T_policy += len(batch_history) * batch_history._n_t
 
         # Calculate policy statistics
-        advantage_mean = output_critic["advantage"].mean().data.cpu().numpy()
+        advantage_mean = _naninfmean(output_critic["advantage"])
         self._add_stat("advantage_mean", advantage_mean, T_env=T_env)
         self._add_stat("policy_grad_norm", policy_grad_norm, T_env=T_env)
         self._add_stat("policy_loss", COMA_loss.data.cpu().numpy(), T_env=T_env)

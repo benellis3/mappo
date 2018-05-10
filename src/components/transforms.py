@@ -95,6 +95,15 @@ def _check_nan_inf(series):
     is_inf = any([ str(_s) in ["inf", "-inf"]  for _s in series]) #only reliable way I found!
     return is_nan, is_inf
 
+def _naninfmean(tensor):
+    _tensor = tensor.clone()
+    if isinstance(tensor, Variable):
+        _tensor = tensor.data
+    _tensor[_tensor != _tensor] = 0.0
+    _tensor[_tensor == float("nan")] = 0.0
+    _tensor[_tensor == float("-nan")] = 0.0
+    return _tensor.mean()
+
 def _to_numpy_cpu(item):
     if issubclass(type(item), Variable):
         item = item.data

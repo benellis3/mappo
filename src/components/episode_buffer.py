@@ -473,11 +473,12 @@ class BatchEpisodeBuffer():
                               data=[[self.data._transition[_i, _j, self.columns._transition[col][0]:self.columns._transition[col][1]].cpu().numpy().tolist()
                                      if len(self.data._transition[_i, _j, self.columns._transition[col][0]:self.columns._transition[col][1]].cpu().numpy().tolist()) > 1 else self.data._transition[_i, _j, self.columns._transition[col][0]:self.columns._transition[col][1]].cpu().numpy().tolist()[0] for col in cols_transition] for _j in range(self._n_t)],
                               index=list(range(0, self._n_t))) for _i in range(len(self)) ]
-        episode_pds =        [ pd.DataFrame(columns=cols_episode,
-                              data=[[self.data._episode[_i, _j, self.columns._episode[col][0]:self.columns._episode[col][1]].cpu().numpy().tolist()
-                                     if len(self.data._episode[_i, _j, self.columns._episode[col][0]:self.columns._episode[col][1]].cpu().numpy().tolist()) > 1 else self.data._episode[_i, _j, self.columns._episode[col][0]:self.columns._episode[col][1]].cpu().numpy().tolist()[0] for col in cols_episode] for _j in range(self._n_t)],
-                              index=list(range(0, self._n_t))) for _i in range(len(self)) ]
-        return [dict(_transition=_tr, episode=_ep) for _tr, _ep in zip(transition_pds, episode_pds) ]
+        #episode_pds =        [ pd.DataFrame(columns=cols_episode,
+        #                      data=[[self.data._episode[_i, _j, self.columns._episode[col][0]:self.columns._episode[col][1]].cpu().numpy().tolist()
+        #                             if len(self.data._episode[_i, _j, self.columns._episode[col][0]:self.columns._episode[col][1]].cpu().numpy().tolist()) > 1 else self.data._episode[_i, _j, self.columns._episode[col][0]:self.columns._episode[col][1]].cpu().numpy().tolist()[0] for col in cols_episode] for _j in range(self._n_t)],
+        #                      index=list(range(0, self._n_t))) for _i in range(len(self)) ]
+        #return [dict(_transition=_tr, episode=_ep) for _tr, _ep in zip(transition_pds, episode_pds) ]
+        return [_tr for _tr in transition_pds]
 
     def get_stat(self, label, **kwargs):
         """

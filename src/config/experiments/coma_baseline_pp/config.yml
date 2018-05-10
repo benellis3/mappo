@@ -1,4 +1,5 @@
 batch_size: 32
+coma_critic_sample_size: 800
 defaults: default coma predator_prey
 env_args:
   predator_prey_toroidal: True
