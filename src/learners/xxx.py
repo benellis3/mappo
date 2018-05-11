@@ -99,7 +99,6 @@ class COMALearner(BasicLearner):
                                                  select_agent_ids=list(range(self.n_agents))),
                                             dict(name="actions_level1",
                                                  rename="past_actions_level1",
-                                                 select_agent_ids=list(range(self.n_agents)),
                                                  transforms=[("shift", dict(steps=1)),
                                                              ("one_hot", dict(range=(0, self.n_actions-1)))],
                                                  switch=self.args.xxx_critic_level1_use_past_actions),

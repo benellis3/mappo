@@ -84,58 +84,66 @@ class XXXMultiagentController():
         # Set up schemes
         self.schemes = {}
         # level 1
-        self.schemes["agent_input_level1"] = self.agent_scheme_level1
+        self.schemes_level1 = {}
+        self.schemes_level1["agent_input_level1"] = self.agent_scheme_level1
+
         # level 2
+        self.schemes_level2 = {}
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-            self.schemes["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.agent_scheme_level2_fn(_agent_id1,
+            self.schemes_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.agent_scheme_level2_fn(_agent_id1,
                                                                                                                          _agent_id2).agent_flatten()
         # level 3
+        self.schemes_level3 = {}
         for _agent_id in range(self.n_agents):
-            self.schemes["agent_input_level3__agent{}".format(_agent_id)] = self.agent_scheme_level3_fn(_agent_id).agent_flatten()
+            self.schemes_level3["agent_input__agent{}".format(_agent_id)] = self.agent_scheme_level3_fn(_agent_id).agent_flatten()
 
         # create joint scheme from the agents schemes
-        self.joint_scheme_dict = _join_dicts(self.schemes)
+        self.joint_scheme_dict_level1 = _join_dicts(self.schemes_level1)
+        self.joint_scheme_dict_level2 = _join_dicts(self.schemes_level2)
+        self.joint_scheme_dict_level3 = _join_dicts(self.schemes_level3)
 
         # construct model-specific input regions
-        self.input_columns = {}
 
         # level 1
-        self.input_columns["agent_input_level1"] = {}
-        self.input_columns["agent_input_level1"]["main"] = \
+        self.input_columns_level1 = {}
+        self.input_columns_level1["agent_input_level1"] = {}
+        self.input_columns_level1["agent_input_level1"]["main"] = \
             Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents))),
                     dict(name="past_actions_level1",
                          switch=self.args.xxx_obs_last_actions_level1),
                     ])
-        self.input_columns["agent_input_level1"]["epsilon_central_level1"] = \
+        self.input_columns_level1["agent_input_level1"]["epsilon_central_level1"] = \
             Scheme([dict(name="xxx_epsilon_central_level1")])
-        self.input_columns["agent_input_level1"]["epsilon_level1"] = \
+        self.input_columns_level1["agent_input_level1"]["epsilon_level1"] = \
             Scheme([dict(name="xxx_epsilon_level1")])
 
         # level 2
+        self.input_columns_level2 = {}
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-            self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
-            self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
+            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
+            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
                         dict(name="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
                              switch=self.args.xxx_obs_last_actions_level2),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
-            self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilon_central_level2"] = \
+            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilon_central_level2"] = \
                 Scheme([dict(name="xxx_epsilon_central_level2")])
-            self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilon_level2"] = \
+            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilon_level2"] = \
                 Scheme([dict(name="xxx_epsilon_level2")])
 
         # level 3
+        self.input_columns_level3 = {}
         for _agent_id in range(self.n_agents):
-            self.input_columns["agent_input_level3__agent{}".format(_agent_id)] = {}
-            self.input_columns["agent_input_level3__agent{}".format(_agent_id)]["main"] = \
+            self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)] = {}
+            self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["main"] = \
                 Scheme([dict(name="agent_observation", select_agent_ids=[_agent_id]),
                         dict(name="past_action_level3",
                              select_agent_ids=[_agent_id],
                              switch=self.args.xxx_obs_last_actions_level3),
                         dict(name="agent_id", select_agent_ids=[_agent_id])])
-            self.input_columns["agent_input_level3__agent{}".format(_agent_id)]["epsilon_central_level3"] = \
+            self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilon_central_level3"] = \
                 Scheme([dict(name="xxx_epsilon_central_level3")])
-            self.input_columns["agent_input_level3__agent{}".format(_agent_id)]["epsilon_level3"] = \
+            self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilon_level3"] = \
                 Scheme([dict(name="xxx_epsilon_level3")])
 
         pass
@@ -164,30 +172,42 @@ class XXXMultiagentController():
         return selected_actions, modified_inputs, selected_actions_format
 
     def create_model(self, transition_scheme):
-        assert False, "Need to set up input shapes!"
 
-        self.scheme_shapes = _generate_scheme_shapes(transition_scheme=transition_scheme,
-                                                     dict_of_schemes=self.schemes)
+        self.scheme_shapes_level1 = _generate_scheme_shapes(transition_scheme=transition_scheme,
+                                                            dict_of_schemes=self.schemes_level1)
 
-        self.input_shapes = _generate_input_shapes(input_columns=self.input_columns,
-                                                   scheme_shapes=self.scheme_shapes)
+        self.input_shapes_level1 = _generate_input_shapes(input_columns=self.input_columns_level1,
+                                                   scheme_shapes=self.scheme_shapes_level1)
+
+        self.scheme_shapes_level2 = _generate_scheme_shapes(transition_scheme=transition_scheme,
+                                                     dict_of_schemes=self.schemes_level2)
+
+        self.input_shapes_level2 = _generate_input_shapes(input_columns=self.input_columns_level2,
+                                                   scheme_shapes=self.scheme_shapes_level2)
+
+        self.scheme_shapes_level3 = _generate_scheme_shapes(transition_scheme=transition_scheme,
+                                                     dict_of_schemes=self.schemes_level3)
+
+        self.input_shapes_level3 = _generate_input_shapes(input_columns=self.input_columns_level3,
+                                                   scheme_shapes=self.scheme_shapes_level3)
+
 
         # TODO: Set up agent models
         self.models = {}
 
         # set up models level 1
-        self.models["level1"] = self.model_level1(input_shapes=self.input_shapes["main"],
+        self.models["level1"] = self.model_level1(input_shapes=self.input_shapes_level1["main"],
                                                   n_actions=self.n_actions,
-                                                  output_type=self.output_type,
+                                                  output_type=self.agent_output_type,
                                                   args=self.args)
         if self.args.use_cuda:
             self.models["level1"] = self.models["level1"].cuda()
 
         # set up models level 2
         if self.args.share_params:
-            model_level2 = self.model_level2(input_shapes=self.input_shapes["main"],
+            model_level2 = self.model_level2(input_shapes=self.input_shapes_level2["main"],
                                              n_actions=self.n_actions,
-                                             output_type=self.output_type,
+                                             output_type=self.agent_output_type,
                                              args=self.args)
             if self.args.use_cuda:
                 model_level2 = model_level2.cuda()
@@ -202,9 +222,9 @@ class XXXMultiagentController():
         # set up models level 3
         self.models_level3 = {}
         if self.args.share_params:
-            model_level3 = self.model_level3(input_shapes=self.input_shapes["main"],
+            model_level3 = self.model_level3(input_shapes=self.input_shapes_level3["main"],
                                              n_actions=self.n_actions,
-                                             output_type=self.output_type,
+                                             output_type=self.agent_output_type,
                                              args=self.args)
             if self.args.use_cuda:
                 model_level3 = model_level3.cuda()
