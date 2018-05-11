@@ -489,6 +489,7 @@ class BatchEpisodeBuffer():
         to_cuda = kwargs.get("to_cuda", False)
         to_variable = kwargs.get("to_variable", False)
         bs = kwargs.get("bs", None)
+        policy_label = kwargs.get("policy_label", None)
 
         if label in []:
             pass # batch-wise or custom statistics go in here
@@ -500,7 +501,13 @@ class BatchEpisodeBuffer():
         elif label in ["episode_length"]:
             return self.seq_lens
         elif label in ["policy_entropy"]:
-            entropies = [ np.nanmean(np.nansum((-th.log(self["policies__agent{}".format(_aid)][0]) * self["policies__agent{}".format(_aid)][0]).cpu().numpy(), axis=2)) for _aid in range(self.n_agents)]
+            if policy_label is None:
+                entropies = [ np.nanmean(np.nansum((-th.log(self["policies__agent{}".format(_aid)][0]) *
+                                                    self["policies__agent{}".format(_aid)][0]).cpu().numpy(), axis=2)) for _aid in range(self.n_agents)]
+            else:
+                entropies = [np.nanmean(np.nansum((-th.log(self["policies__agent{}".format(_aid)][0]) *
+                                                   self["{}__agent{}".format(policy_label, _aid)][0]).cpu().numpy(), axis=2))
+                             for _aid in range(self.n_agents)]
             return np.asscalar(np.mean(entropies))
         elif label in ["qvalues_entropy"]:
             entropies = [ np.nanmean(np.nansum((-th.log(self["qvalues__agent{}".format(_aid)][0]) * self["qvalues__agent{}".format(_aid)][0]).cpu().numpy(), axis=2)) for _aid in range(self.n_agents)]
@@ -524,7 +531,6 @@ class BatchEpisodeBuffer():
         """
         uses efficient update rule for calculating consecutive G_t_n_lambda in reverse (see docs)
         """
-
 
         V_tensor = value_function_values
         if isinstance(V_tensor, Variable):
