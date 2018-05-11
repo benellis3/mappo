@@ -39,7 +39,6 @@ class XXXMultiagentController():
                                                 select_agent_ids=list(range(self.n_agents))),
                                            dict(name="actions_level1",
                                                 rename="past_action_level1",
-                                                select_agent_ids=list(range(self.n_agents)),
                                                 transforms=[("shift", dict(steps=1)),
                                                             ("one_hot", dict(range=(0, self.n_actions-1)))],
                                                 switch=self.args.xxx_obs_last_actions_level1),
@@ -105,7 +104,6 @@ class XXXMultiagentController():
         self.input_columns["agent_input_level1"]["main"] = \
             Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents))),
                     dict(name="past_actions_level1",
-                         select_agent_ids=list(range(self.n_agents)),
                          switch=self.args.xxx_obs_last_actions_level1),
                     ])
         self.input_columns["agent_input_level1"]["epsilon_central_level1"] = \
@@ -259,6 +257,10 @@ class XXXMultiagentController():
             #
             # out_key = self.agent_output_type
             # ret[out_key] = out
+
+            # top level: aa' ~ Pi_c sample which pair to coordinate
+            # second level: pick up correct pair (given aa'), sample u^a, u^a' from the pair coordinator
+            # either decode u^a, u^a' from the sampled action, or refer to level
 
             return #ret, tformat
         else:
