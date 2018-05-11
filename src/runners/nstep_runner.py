@@ -450,11 +450,8 @@ class NStepRunner():
 
         else:
 
-            try:
-                reward, terminated, env_info = \
-                    _env.step([int(_i) for _i in chosen_actions])
-            except Exception as e:
-                pass
+            reward, terminated, env_info = \
+                _env.step([int(_i) for _i in chosen_actions])
 
             # perform environment steps and add to transition buffer
             observations = _env.get_obs()
@@ -611,6 +608,13 @@ class NStepRunner():
                 # send chosen actions to non-terminated envs - this will fill the transition buffer with a new transition
                 ret = self.step(actions=self.selected_actions,
                                 ids=ids_envs_not_terminated)
+
+                # retrieve ids of all envs that have not yet terminated.
+                # NOTE: for efficiency reasons, will perform final action selection in terminal state
+                ids_envs_not_terminated = [_b for _b in range(self.batch_size) if not self.envs_terminated[_b]]
+                ids_envs_not_terminated_tensor = th.cuda.LongTensor(ids_envs_not_terminated) \
+                    if self.episode_buffer.is_cuda \
+                    else th.LongTensor(ids_envs_not_terminated)
 
                 # update which envs have terminated
                 for _id, _v in ret.items():

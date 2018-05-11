@@ -1,6 +1,6 @@
 batch_size: 2
+coma_critic_use_sampling: False
 defaults: default coma sc2
 env_args:
   map_name: 3m_3m
 env_stats_aggregator: sc2
-
