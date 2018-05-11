@@ -690,11 +690,19 @@ class NStepRunner():
                                             data=action_selector_outputs)
 
             # write selected actions to episode_buffer
-            self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                        col="actions",
-                                        t=self.t_episode,
-                                        agent_ids=list(range(self.n_agents)),
-                                        data=selected_actions)
+            if isinstance(selected_actions, dict):
+               for _k, _v in selected_actions.items():
+                   self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                               col=_k,
+                                               t=self.t_episode,
+                                               agent_ids=list(range(self.n_agents)),
+                                               data=_v)
+            else:
+                self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                            col="actions",
+                                            t=self.t_episode,
+                                            agent_ids=list(range(self.n_agents)),
+                                            data=selected_actions)
 
             # keep a copy of selected actions explicitely in transition_buffer device context
             self.selected_actions = selected_actions.cuda() if self.transition_buffer.is_cuda else selected_actions.cpu()
