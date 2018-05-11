@@ -41,6 +41,7 @@ class COMAPolicyLoss(nn.Module):
 
         loss_mean = -(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
         output_tformat = "a*t"
+
         return loss_mean, output_tformat
 
 class COMACriticLoss(nn.Module):
@@ -290,6 +291,7 @@ class COMALearner(BasicLearner):
             # optimize critic loss
             self.critic_optimiser.zero_grad()
             critic_loss.backward()
+
             critic_grad_norm = th.nn.utils.clip_grad_norm(self.critic_parameters,
                                                           50)
             self.critic_optimiser.step()
@@ -307,6 +309,7 @@ class COMALearner(BasicLearner):
             self.T_critic += len(batch_history) * batch_history._n_t
 
             return output_critic
+
 
         output_critic = None
         # optimize the critic as often as necessary to get the critic loss down reliably
@@ -345,8 +348,9 @@ class COMALearner(BasicLearner):
         # carry out optimization for agents
         self.agent_optimiser.zero_grad()
         COMA_loss.backward()
+
         policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
-        self.agent_optimiser.step() # DEBUG
+        self.agent_optimiser.step()
 
         # increase episode counter (the fastest one is always)
         self.T_policy += len(batch_history) * batch_history._n_t

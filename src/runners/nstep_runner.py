@@ -450,8 +450,11 @@ class NStepRunner():
 
         else:
 
-            reward, terminated, env_info = \
-                _env.step([int(_i) for _i in chosen_actions])
+            try:
+                reward, terminated, env_info = \
+                    _env.step([int(_i) for _i in chosen_actions])
+            except Exception as e:
+                pass
 
             # perform environment steps and add to transition buffer
             observations = _env.get_obs()
@@ -489,9 +492,9 @@ class NStepRunner():
                                          in_queue=None,
                                          out_queue=None,
                                          buffer_insert_fn=partial(self.buffer_insert,
-                                                                  subproc_id_set=[id],
-                                                                  column_scheme=self.transition_buffer.columns._transition if hasattr(self, "transition_buffer") else None,),
+                                                                  subproc_id_set=[id],),
                                          msg=msg))
+            # column_scheme=self.transition_buffer.columns._transition if hasattr(self, "transition_buffer") else None,),
         return res
 
     def _exch_msgs(self, ids, msgs):
@@ -553,6 +556,10 @@ class NStepRunner():
         # reset environments
         self.reset_envs()
 
+        if self.test_mode:
+            a = self.transition_buffer.to_pd()
+            pass
+
         # copy initial transition into episode buffer
         self.episode_buffer.insert(self.transition_buffer, t_ids=0, bs_ids=list(range(0, self.batch_size)))
 
@@ -576,6 +583,10 @@ class NStepRunner():
     def run(self, test_mode):
         self.test_mode = test_mode
 
+        if self.test_mode:  # DEBUG
+            a = 5
+            pass
+
         # don't reset at initialization as don't have access to hidden state size then
         self.reset()
 
@@ -590,6 +601,7 @@ class NStepRunner():
             ids_envs_not_terminated_tensor = th.cuda.LongTensor(ids_envs_not_terminated) \
                                                 if self.episode_buffer.is_cuda \
                                                 else th.LongTensor(ids_envs_not_terminated)
+
 
             if self.t_episode > 0:
 
@@ -615,7 +627,6 @@ class NStepRunner():
                 if not self.test_mode:
                     self.T_env += len(ids_envs_not_terminated)
 
-
             # generate multiagent_controller inputs for policy forward pass
             multiagent_controller_inputs, \
             multiagent_controller_inputs_tformat = self.episode_buffer.view(dict_of_schemes=self.multiagent_controller.joint_scheme_dict,
@@ -634,6 +645,9 @@ class NStepRunner():
                                                        tformat=multiagent_controller_inputs_tformat,
                                                        test_mode=test_mode,
                                                        info=None)
+
+            # if th.sum(multiagent_controller_outputs["policies"].data!=multiagent_controller_outputs["policies"].data) > 0.0:
+            #    pass
             self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = multiagent_controller_outputs["hidden_states"]
 
             # retrieve avail_actions from episode_buffer
@@ -675,7 +689,7 @@ class NStepRunner():
                 terminated = True
             # Check whether envs may have failed to terminate
             if self.t_episode == self.env_episode_limit+1 and not terminated:
-                assert False, "Envs seem to have failed returing terminated=True, thus not respecting their own episode_limit. Please fix envs."
+                assert False, "Envs seem to have failed returning terminated=True, thus not respecting their own episode_limit. Please fix envs."
 
             pass
 

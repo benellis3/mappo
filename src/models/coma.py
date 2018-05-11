@@ -1,3 +1,4 @@
+import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -189,8 +190,8 @@ class COMANonRecursiveAgent(NonRecursiveAgent):
         # mask policy elements corresponding to unavailable actions
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
         x = th.exp(x)
-        x = x.masked_fill(1 - avail_actions, 0.0)
-        x = x / x.sum(dim=1, keepdim=True).repeat(1, x.shape[1])
+        x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+        x = th.div(x, x.sum(dim=1, keepdim=True))
 
         # add softmax exploration (if switched on)
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
@@ -208,11 +209,7 @@ class COMANonRecursiveAgent(NonRecursiveAgent):
 class COMARecursiveAgent(RecursiveAgent):
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
-        try:
-            _check_inputs_validity(inputs, self.input_shapes, tformat)
-        except Exception as e:
-            a = 5
-            pass
+        _check_inputs_validity(inputs, self.input_shapes, tformat)
 
         test_mode = kwargs["test_mode"]
 
@@ -243,13 +240,19 @@ class COMARecursiveAgent(RecursiveAgent):
             # mask policy elements corresponding to unavailable actions
             n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
             x = th.exp(x)
-            x = x.masked_fill((1 - avail_actions).byte(), 0.0)
-            x = x / x.sum(dim=1, keepdim=True).repeat(1, x.shape[1])
+            x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+            x = th.div(x, x.sum(dim=1, keepdim=True))
+
+            # Alternative variant
+            #x = th.nn.functional.softmax(x).clone()
+            #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
+            #x = th.div(x, x.sum(dim=1, keepdim=True))
+
             # add softmax exploration (if switched on)
             if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-                epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-                epsilons, _, _ = _to_batch(epsilons, tformat)
-                x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+               epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+               epsilons, _, _ = _to_batch(epsilons, tformat)
+               x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
