@@ -229,23 +229,24 @@ class COMALearner(BasicLearner):
         else:
             assert False, "TODO"
 
+        # set up optimizers
         if self.args.share_params:
             self.agent_parameters = self.multiagent_controller.get_parameters(level=1)
         else:
             assert False, "TODO"
-        self.agent_optimiser_level1 = RMSprop(self.agent_parameters, lr=self.args.lr_agent)
+        self.agent_optimiser_level1 = RMSprop(self.agent_parameters, lr=self.args.lr_agent_level1)
 
         if self.args.share_params:
             self.agent_parameters = self.multiagent_controller.get_parameters(level=1)
         else:
             assert False, "TODO"
-        self.agent_optimiser_level2 = RMSprop(self.agent_parameters, lr=self.args.lr_agent)
+        self.agent_optimiser_level2 = RMSprop(self.agent_parameters, lr=self.args.lr_agent_level2)
 
         if self.args.share_params:
             self.agent_parameters = self.multiagent_controller.get_parameters(level=3)
         else:
             assert False, "TODO"
-        self.agent_optimiser_level3 = RMSprop(self.agent_parameters, lr=self.args.lr_agent)
+        self.agent_optimiser_level3 = RMSprop(self.agent_parameters, lr=self.args.lr_agent_level3)
 
         self.critic_level1_parameters = []
         if self.args.share_params:
