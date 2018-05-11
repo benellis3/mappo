@@ -43,7 +43,10 @@ class XXXMultiagentController():
                                                 transforms=[("shift", dict(steps=1)),
                                                             ("one_hot", dict(range=(0, self.n_actions-1)))],
                                                 switch=self.args.xxx_obs_last_actions_level1),
-                                         ])
+                                           dict(name="xxx_epsilon_central_level1",
+                                                scope="episode"),
+                                           dict(name="xxx_epsilon_level1")
+                                           ])
 
 
         self.agent_scheme_level2_fn = lambda _agent_id1, _agent_id2: Scheme([dict(name="agent_id",
@@ -55,10 +58,13 @@ class XXXMultiagentController():
                                                                              *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
                                                                                     rename="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
                                                                                     transforms=[("shift", dict(steps=1)),
-                                                                                                ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
+                                                                                                ("one_hot", dict(range=(0, self.n_actions-1)))],
                                                                                     switch=self.args.xxx_obs_last_actions_level2) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
-                                                                             dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id])
-                                                                            ])
+                                                                             dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
+                                                                             dict(name="xxx_epsilon_central_level2",
+                                                                                  scope="episode"),
+                                                                             dict(name="xxx_epsilon_level2")
+                                                                             ])
 
         self.agent_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
                                                                      transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
@@ -72,6 +78,8 @@ class XXXMultiagentController():
                                                                                  ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
                                                                      switch=self.args.xxx_obs_last_actions_level3),
                                                                 dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id])
+                                                                dict(name="xxx_epsilon_central_level3", scope="episode"),
+                                                                dict(name="xxx_epsilon_level3")
                                                                ])
 
         # Set up schemes
@@ -91,6 +99,7 @@ class XXXMultiagentController():
 
         # construct model-specific input regions
         self.input_columns = {}
+
         # level 1
         self.input_columns["agent_input_level1"] = {}
         self.input_columns["agent_input_level1"]["main"] = \
@@ -99,15 +108,23 @@ class XXXMultiagentController():
                          select_agent_ids=list(range(self.n_agents)),
                          switch=self.args.xxx_obs_last_actions_level1),
                     ])
+        self.input_columns["agent_input_level1"]["epsilon_central_level1"] = \
+            Scheme([dict(name="xxx_epsilon_central_level1")])
+        self.input_columns["agent_input_level1"]["epsilon_level1"] = \
+            Scheme([dict(name="xxx_epsilon_level1")])
+
         # level 2
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
             self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
-                        dict(name="past_actions_level2",
-                             select_agent_ids=[_agent_id1, _agent_id2],
+                        dict(name="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
                              switch=self.args.xxx_obs_last_actions_level2),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
+            self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilon_central_level2"] = \
+                Scheme([dict(name="xxx_epsilon_central_level2")])
+            self.input_columns["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilon_level2"] = \
+                Scheme([dict(name="xxx_epsilon_level2")])
 
         # level 3
         for _agent_id in range(self.n_agents):
@@ -118,6 +135,10 @@ class XXXMultiagentController():
                              select_agent_ids=[_agent_id],
                              switch=self.args.xxx_obs_last_actions_level3),
                         dict(name="agent_id", select_agent_ids=[_agent_id])])
+            self.input_columns["agent_input_level3__agent{}".format(_agent_id)]["epsilon_central_level3"] = \
+                Scheme([dict(name="xxx_epsilon_central_level3")])
+            self.input_columns["agent_input_level3__agent{}".format(_agent_id)]["epsilon_level3"] = \
+                Scheme([dict(name="xxx_epsilon_level3")])
 
         pass
 

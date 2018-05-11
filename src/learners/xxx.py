@@ -1,5 +1,6 @@
 from copy import deepcopy
 from functools import partial
+from itertools import combinations
 import numpy as np
 from numpy.random import randint
 import torch as th
@@ -142,15 +143,16 @@ class COMALearner(BasicLearner):
         #     self.input_columns["critic__agent{}".format(_agent_id)]["agent_policy"] = Scheme([dict(name="agent_policy", select_agent_ids=[_agent_id])]).agent_flatten()
         #     self.input_columns["target_critic__agent{}".format(_agent_id)] = self.input_columns["critic__agent{}".format(_agent_id)]
 
-        self.agent_scheme_level1 = Scheme([dict(name="observations",
-                                                select_agent_ids=list(range(self.n_agents))),
-                                           dict(name="actions_level1",
-                                                rename="past_action_level1",
-                                                select_agent_ids=list(range(self.n_agents)),
-                                                transforms=[("shift", dict(steps=1)),
-                                                            ("one_hot", dict(range=(0, self.n_actions-1)))],
-                                                switch=self.args.xxx_obs_last_actions_level1),
-                                         ])
+        self.critic_scheme_level1 = Scheme([dict(name="observations",
+                                                 select_agent_ids=list(range(self.n_agents))),
+                                            dict(name="actions_level1",
+                                                 rename="past_actions_level1",
+                                                 select_agent_ids=list(range(self.n_agents)),
+                                                 transforms=[("shift", dict(steps=1)),
+                                                             ("one_hot", dict(range=(0, self.n_actions-1)))],
+                                                 switch=self.args.xxx_obs_last_actions_level1),
+                                            dict(name="state")
+                                          ])
 
 
         self.agent_scheme_level2_fn = lambda _agent_id1, _agent_id2: Scheme([dict(name="agent_id",
@@ -159,13 +161,15 @@ class COMALearner(BasicLearner):
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],),
                                                                              dict(name="observations",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             dict(name="actions_level2_agents{}:{}".format(),
-                                                                                  rename="past_actions_level2",
-                                                                                  select_agent_ids=[_agent_id1, _agent_id2],
-                                                                                  transforms=[("shift", dict(steps=1)),
-                                                                                              ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
-                                                                                  switch=self.args.xxx_obs_last_actions_level2),
-                                                                             dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id])
+                                                                             *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                                                                    rename="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                                                                    transforms=[("shift", dict(steps=1)),
+                                                                                                ("one_hot", dict(range=(
+                                                                                                0, self.n_actions - 1)))],
+                                                                                    switch=self.args.xxx_obs_last_actions_level2)
+                                                                               for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
+                                                                             dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
+                                                                             dict(name="state")
                                                                             ])
 
         self.agent_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
