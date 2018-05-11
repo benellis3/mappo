@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim
-from models.basic import RNN as RecursiveAgent, DQN as NonRecursiveAgent
+from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
 class COMAQFunction(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
@@ -176,7 +176,7 @@ class COMACritic(nn.Module):
 
 
 
-class COMANonRecursiveAgent(NonRecursiveAgent):
+class COMANonRecurrentAgent(NonRecurrentAgent):
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
@@ -206,7 +206,7 @@ class COMANonRecursiveAgent(NonRecursiveAgent):
 
         return x, hidden_states, losses, tformat
 
-class COMARecursiveAgent(RecursiveAgent):
+class COMARecurrentAgent(RecurrentAgent):
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
