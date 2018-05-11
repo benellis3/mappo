@@ -77,7 +77,7 @@ class XXXMultiagentController():
                                                                      transforms=[("shift", dict(steps=1)),
                                                                                  ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
                                                                      switch=self.args.xxx_obs_last_actions_level3),
-                                                                dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id])
+                                                                dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
                                                                 dict(name="xxx_epsilon_central_level3", scope="episode"),
                                                                 dict(name="xxx_epsilon_level3")
                                                                ])

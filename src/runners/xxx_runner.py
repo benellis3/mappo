@@ -78,16 +78,28 @@ class XXXRunner(NStepRunner):
                                         dtype=np.bool,
                                         missing=False),
                                    dict(name="xxx_epsilons_level1",
-                                        scope="episode",
                                         shape=(1,),
                                         dtype=np.float32,
                                         missing=float("nan")),
                                    dict(name="xxx_epsilons_level2",
-                                        scope="episode",
                                         shape=(1,),
                                         dtype=np.float32,
                                         missing=float("nan")),
                                    dict(name="xxx_epsilons_level3",
+                                        shape=(1,),
+                                        dtype=np.float32,
+                                        missing=float("nan")),
+                                   dict(name="xxx_epsilons_central_level1",
+                                        scope="episode",
+                                        shape=(1,),
+                                        dtype=np.float32,
+                                        missing=float("nan")),
+                                   dict(name="xxx_epsilons_central_level2",
+                                        scope="episode",
+                                        shape=(1,),
+                                        dtype=np.float32,
+                                        missing=float("nan")),
+                                   dict(name="xxx_epsilons_central_level3",
                                         scope="episode",
                                         shape=(1,),
                                         dtype=np.float32,
@@ -121,7 +133,7 @@ class XXXRunner(NStepRunner):
                                                                                 decay=self.args.xxx_epsilon_decay_mode_level1)
 
             epsilons = ttype(self.batch_size, 1).fill_(self.xxx_epsilon_decay_schedule_level1.eval(self.T_env))
-            self.episode_buffer.set_col(col="xxx_epsilons_level1",
+            self.episode_buffer.set_col(col="xxx_epsilons_central_level1",
                                         scope="episode",
                                         data=epsilons)
 
@@ -132,7 +144,7 @@ class XXXRunner(NStepRunner):
                                                                                 decay=self.args.xxx_epsilon_decay_mode_level2)
 
             epsilons = ttype(self.batch_size, 1).fill_(self.xxx_epsilon_decay_schedule_level2.eval(self.T_env))
-            self.episode_buffer.set_col(col="xxx_epsilons_level2",
+            self.episode_buffer.set_col(col="xxx_epsilons_central_level2",
                                         scope="episode",
                                         data=epsilons)
 
@@ -143,7 +155,7 @@ class XXXRunner(NStepRunner):
                                                                          decay=self.args.xxx_epsilon_decay_mode_level3)
 
             epsilons = ttype(self.batch_size, 1).fill_(self.xxx_epsilon_decay_schedule_level3.eval(self.T_env))
-            self.episode_buffer.set_col(col="xxx_epsilons_level3",
+            self.episode_buffer.set_col(col="xxx_epsilons_central_level3",
                                         scope="episode",
                                         data=epsilons)
 
