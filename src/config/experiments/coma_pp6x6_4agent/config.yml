@@ -1,0 +1,18 @@
+batch_size: 32
+coma_critic_use_sampling: True
+coma_critic_sample_size: 1620
+coma_epsilon_decay_mode: linear
+coma_epsilon_finish: 0.0
+coma_epsilon_start: 1.0
+coma_epsilon_time_length: 100000
+defaults: default coma predator_prey
+env_args:
+  agent_obs:
+    - 2
+    - 2
+  episode_limit: 50
+  predator_prey_shape:
+    - 6
+    - 6
+  predator_prey_toroidal: True
+  n_agents: 4
