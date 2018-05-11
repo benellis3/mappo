@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from components.transforms import _tdim, _vdim, _to_batch, _from_batch, _check_inputs_validity, _shift
-from models.basic import RNN as RecursiveAgent, DQN as NonRecursiveAgent
+from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
 class IACVQFunction(nn.Module):
 
@@ -219,7 +219,7 @@ class IACCritic(nn.Module):
 
         return ret_dict, tformat
 
-class IACNonRecursiveAgent(NonRecursiveAgent):
+class IACNonRecurrentAgent(NonRecurrentAgent):
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         x, params, tformat = _to_batch(inputs["main"], tformat)
@@ -238,7 +238,7 @@ class IACNonRecursiveAgent(NonRecursiveAgent):
 
         return x, hidden_states, losses, tformat
 
-class IACRecursiveAgent(RecursiveAgent):
+class IACRecurrentAgent(RecurrentAgent):
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)

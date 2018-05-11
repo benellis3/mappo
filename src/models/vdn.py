@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _pick_keys
 from models import REGISTRY as m_REGISTRY
-from models.basic import RNN as RecursiveAgent, DQN as NonRecursiveAgent
+from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
 class VDNMixer(nn.Module):
 
@@ -182,7 +182,7 @@ class VDNMixingNetwork(nn.Module):
                    loss, \
                    tformat
 
-# class VDNNonRecursiveAgent(NonRecursiveAgent):
+# class VDNNonRecurrentAgent(NonRecurrentAgent):
 #
 #     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
 #         x, params, tformat = _to_batch(inputs["main"], tformat)
@@ -201,7 +201,7 @@ class VDNMixingNetwork(nn.Module):
 #
 #         return x, hidden_states, losses, tformat
 #
-# class VDNRecursiveAgent(RecursiveAgent):
+# class VDNRecurrentAgent(RecurrentAgent):
 #
 #     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
 #         #_check_inputs_validity(inputs, self.input_shapes, tformat)

@@ -5,13 +5,13 @@ REGISTRY["DQN"] = DQN
 REGISTRY["RNN"] = RNN
 REGISTRY["fc_encoder"] = FCEncoder
 
-from .coma import COMANonRecursiveAgent, COMARecursiveAgent
-REGISTRY["coma_recursive"] = COMARecursiveAgent
-REGISTRY["coma_non_recursive"] = COMANonRecursiveAgent
+from .coma import COMANonRecurrentAgent, COMARecurrentAgent
+REGISTRY["coma_recursive"] = COMARecurrentAgent
+REGISTRY["coma_non_recursive"] = COMANonRecurrentAgent
 
-from .iac import IACNonRecursiveAgent, IACRecursiveAgent
-REGISTRY["iac_recursive"] = IACRecursiveAgent
-REGISTRY["iac_non_recursive"] = IACNonRecursiveAgent
+from .iac import IACNonRecurrentAgent, IACRecurrentAgent
+REGISTRY["iac_recursive"] = IACRecurrentAgent
+REGISTRY["iac_non_recursive"] = IACNonRecurrentAgent
 
 from .pomace.basic import poMACENoiseNetwork, poMACEMultiagentNetwork
 
