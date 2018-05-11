@@ -1,0 +1,19 @@
+defaults: default xxx sc2
+batch_size: 30
+coma_critic_use_sampling: True
+coma_critic_sample_size: 1620
+coma_epsilon_start: 0.5
+coma_epsilon_finish: 0.02
+coma_epsilon_time_length: 750000
+coma_epsilon_decay_mode: "exp"
+coma_exploration_mode: "softmax"
+coma_use_entropy_regularizer: False
+env_args:
+  map_name: 3m_3m
+env_stats_aggregator: sc2
+n_critic_learner_reps: 30
+n_loops_per_thread_or_sub_or_main_process: 1
+n_subprocesses: 30
+target_critic_update_interval: 162000
+test_interval: 48600
+test_nepisode: 30
