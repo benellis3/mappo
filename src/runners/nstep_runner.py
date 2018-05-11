@@ -34,8 +34,6 @@ class CloudpickleWrapper():
         import pickle
         self.x = pickle.loads(ob)
 
-
-
 class NStepRunner():
 
     def __init__(self, multiagent_controller=None,
@@ -322,7 +320,6 @@ class NStepRunner():
         envs = kwargs["envs"]
         in_queue = kwargs["in_queue"]
         out_queue = kwargs["out_queue"]
-        #T_queue = kwargs["T_queue"]
         n_threads_per_subprocess_or_main_process = kwargs["n_threads_per_subprocess_or_main_process"]
         n_subprocesses = kwargs["n_subprocesses"]
         n_loops_per_thread_or_sub_or_main_process = kwargs["n_loops_per_thread_or_sub_or_main_process"]
@@ -643,16 +640,25 @@ class NStepRunner():
 
             # a = multiagent_controller_inputs[list(multiagent_controller_inputs.keys())[0]].to_pd()
             # forward-pass to obtain current agent policy
+            if isinstance(self.hidden_states, dict):
+                hidden_states = {_k:_v[:, ids_envs_not_terminated_tensor, :,:] for _k, _v in self.hidden_states.items()}
+            else:
+                hidden_states = self.hidden_states[:, ids_envs_not_terminated_tensor, :,:]
+
             multiagent_controller_outputs, multiagent_controller_outputs_tformat = \
                 self.multiagent_controller.get_outputs(multiagent_controller_inputs,
-                                                       hidden_states=self.hidden_states[:, ids_envs_not_terminated_tensor, :,:],
+                                                       hidden_states=hidden_states,
                                                        tformat=multiagent_controller_inputs_tformat,
                                                        test_mode=test_mode,
                                                        info=None)
 
             # if th.sum(multiagent_controller_outputs["policies"].data!=multiagent_controller_outputs["policies"].data) > 0.0:
             #    pass
-            self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = multiagent_controller_outputs["hidden_states"]
+            if isinstance(multiagent_controller_outputs["hidden_states"], dict):
+                for _v, _k in multiagent_controller_outputs["hidden_states"].items():
+                    self.hidden_states[_k][:, ids_envs_not_terminated_tensor, :, :] = _v
+            else:
+                self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = multiagent_controller_outputs["hidden_states"]
 
             # retrieve avail_actions from episode_buffer
             avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,

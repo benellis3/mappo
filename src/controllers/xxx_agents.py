@@ -142,9 +142,19 @@ class XXXMultiagentController():
 
         pass
 
-    def get_parameters(self):
-        assert False, "TODO" # TODO
-        return parameters
+    def get_parameters(self, level):
+        if level == 1:
+            return list(self.models["level1"].parameters())
+        elif level == 2:
+            param_list = []
+            for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
+                param_list.extend(self.models["level2_{}:{}".format(_agent_id1, _agent_id2)].parameters())
+            return param_list
+        elif level == 3:
+            param_list = []
+            for _agent_id in range(self.n_agents):
+                param_list.extend(self.models["level3_{}".format(_agent_id)].parameters())
+            return param_list
 
     def select_actions(self, inputs, avail_actions, tformat, info, test_mode=False):
         #selected_actions, modified_inputs, selected_actions_format = \
@@ -211,23 +221,20 @@ class XXXMultiagentController():
     def generate_initial_hidden_states(self, batch_size):
         """
         generates initial hidden states for each agent
-        TODO: would be nice to expand for use with recurrency in lambda (could just be last first slice of hidden states though, \
-        or dict element
         """
 
-        # TODO: Set up hidden states for all levels - and propagate througn the runner!
-        # CAN DO JUST ONE GIANT CAT VECTOR
-
-
-        #agent_hidden_states = th.stack([Variable(th.zeros(batch_size, 1, self.args.agents_hidden_state_size)) for _
-        #                                in range(self.n_agents)])
-        #agent_hidden_states = agent_hidden_states.cuda() if self.args.use_cuda else agent_hidden_states.cpu()
-        assert False, "TODO"
-        return #agent_hidden_states, "a*bs*t*v"
+        # Set up hidden states for all levels - and propagate througn the runner!
+        hidden_dict = {}
+        hidden_dict["level1"] = th.stack([Variable(th.zeros(batch_size, 1, self.args.agents_hidden_state_size)) for _
+                                        in range(1)])
+        hidden_dict["level2"] = th.stack([Variable(th.zeros(batch_size, 1, self.args.agents_hidden_state_size)) for _
+                                        in range(len(sorted(combinations(list(range(self.n_agents)), 2))))])
+        hidden_dict["level3"] = th.stack([Variable(th.zeros(batch_size, 1, self.args.agents_hidden_state_size)) for _
+                                        in range(self.n_agents)])
+        return hidden_dict, "?*bs*v*t"
 
     def share_memory(self):
         assert False, "TODO"
-        #self.lambda_network_model.share_memory()
         pass
 
     def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
@@ -265,10 +272,6 @@ class XXXMultiagentController():
             for _agent_id in range(self.args.n_agents):
                 th.save(self.agent_models["agent__agent{}".format(_agent_id)].state_dict(),
                         "results/models/{}/{}_agent{}__{}_T.weights".format(token, self.args.learner, _agent_id, T))
-
-        th.save(self.lambda_network_model.state_dict(),
-                        "results/models/{}/{}_lambda_network{}__T.weights".format(token, self.args.learner, T))
-
         pass
 
     pass
