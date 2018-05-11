@@ -159,7 +159,7 @@ class COMALearner(BasicLearner):
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],),
                                                                              dict(name="observations",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             dict(name="actions_level2",
+                                                                             dict(name="actions_level2_agents{}:{}".format(),
                                                                                   rename="past_actions_level2",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],
                                                                                   transforms=[("shift", dict(steps=1)),

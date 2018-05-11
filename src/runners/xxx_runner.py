@@ -1,5 +1,6 @@
 import numpy as np
 from components.scheme import Scheme
+from itertools import combinations
 import torch as th
 from torch.distributions import Normal
 
@@ -26,11 +27,11 @@ class XXXRunner(NStepRunner):
                                         select_agent_ids=range(0, self.n_agents),
                                         dtype=np.int32,
                                         missing=-1,),
-                                   dict(name="actions_level2",
-                                        shape=(1,),
-                                        select_agent_ids=range(0, self.n_agents),
-                                        dtype=np.int32,
-                                        missing=-1, ),
+                                   *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                          shape=(1,),
+                                          select_agent_ids=range(0, self.n_agents),
+                                          dtype=np.int32,
+                                          missing=-1, ) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))]],
                                    dict(name="actions_level3",
                                         shape=(1,),
                                         select_agent_ids=range(0, self.n_agents),

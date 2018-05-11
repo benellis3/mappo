@@ -52,12 +52,11 @@ class XXXMultiagentController():
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],),
                                                                              dict(name="observations",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             dict(name="actions_level2",
-                                                                                  rename="past_actions_level2",
-                                                                                  select_agent_ids=[_agent_id1, _agent_id2],
-                                                                                  transforms=[("shift", dict(steps=1)),
-                                                                                              ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
-                                                                                  switch=self.args.xxx_obs_last_actions_level2),
+                                                                             *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                                                                    rename="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                                                                    transforms=[("shift", dict(steps=1)),
+                                                                                                ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
+                                                                                    switch=self.args.xxx_obs_last_actions_level2) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id])
                                                                             ])
 
@@ -82,7 +81,7 @@ class XXXMultiagentController():
         # level 2
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.schemes["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.agent_scheme_level2_fn(_agent_id1,
-                                                                                                                     _agent_id2).agent_flatten()
+                                                                                                                         _agent_id2).agent_flatten()
         # level 3
         for _agent_id in range(self.n_agents):
             self.schemes["agent_input_level3__agent{}".format(_agent_id)] = self.agent_scheme_level3_fn(_agent_id).agent_flatten()
