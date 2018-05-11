@@ -78,14 +78,14 @@ def _check_inputs_validity(inputs, input_shapes, formats, allow_nonseq=False):
 
     # Check validity of individual input regions
     for _k, _v in inputs.items():
-        assert _v.dim() == 4, \
-            "incorrect input dimensionality for {},(expected: {}, supplied: {}), " \
-            "have you forgotten to add batch dimension or " \
-            "have you erroneously added a sequence dimension?".format(_k,
-                                                                       4,
-                                                                       _v.dim())
-        assert _v.shape[-1] == input_shapes[_k] , \
-            "incorrect input shape (expected: {}, supplied: {}".format(input_shapes[_k], _v[0].shape)
+        # assert _v.dim() == 4, \
+        #     "incorrect input dimensionality for {},(expected: {}, supplied: {}), " \
+        #     "have you forgotten to add batch dimension or " \
+        #     "have you erroneously added a sequence dimension?".format(_k,
+        #                                                                4,
+        #                                                                _v.dim())
+        # assert _v.shape[-1] == input_shapes[_k] , \
+        #     "incorrect input shape (expected: {}, supplied: {}".format(input_shapes[_k], _v[0].shape)
 
         assert (_v.data != _v.data).sum() == 0, "FATAL: np.nan detected in model input {}".format(_k)
         assert abs(_v.data.sum()) != np.inf, "FATAL: +/- np.inf detected in model input {}".format(_k)

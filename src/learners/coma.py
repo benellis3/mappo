@@ -26,18 +26,18 @@ class COMAPolicyLoss(nn.Module):
     def forward(self, policies, advantages, actions, tformat):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
+        policy_mask = (policies == 0.0)
         log_policies = th.log(policies)
+        log_policies = log_policies.masked_fill(policy_mask, 0.0)
+
         _adv = advantages.clone().detach()
+
         _act = actions.clone()
         _act[_act!=_act] = 0.0 # mask NaNs in _act
 
-        assert not (_act!=_act).any(), "_act has nan!"
-        assert not (_act > log_policies.shape[_vdim(tformat)]).any(), "_act too large!: {} vs. {}".format(_act.max(),
-                                                                                                          log_policies.shape)
-        assert not (_act < 0).any(), "_act too small!"
-
         _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
-        _active_logits[actions!=actions] = 0.0 # mask logits for actions that are actually NaNs
+        _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
+        _adv[actions != actions] = 0.0
 
         loss_mean = -(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
         output_tformat = "a*t"
@@ -195,8 +195,6 @@ class COMALearner(BasicLearner):
         # |  repetitions of the optimization procedure sampling from the same batch     |
         # -------------------------------------------------------------------------------
 
-        #if IS_PYCHARM_DEBUG:
-        #    a = batch_history.to_pd() # DEBUG
 
         # Update target if necessary
         if (self.T_critic - self.last_target_update_T_critic) / self.T_target_critic_update_interval > 1.0:
@@ -211,7 +209,7 @@ class COMALearner(BasicLearner):
                                                               to_cuda=self.args.use_cuda,
                                                               to_variable=True,
                                                               bs_ids=None,
-                                                              fill_zero=True)
+                                                              fill_zero=True) # DEBUG: Should be True
 
         actions, actions_tformat = batch_history.get_col(bs=None,
                                                          col="actions",

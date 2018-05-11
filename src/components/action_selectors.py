@@ -25,7 +25,16 @@ class MultinomialActionSelector():
         # NOTE: Usually, on-policy algorithms should perform action masking in the model itself!
         masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
         masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
-        _samples = Categorical(masked_policies_batch).sample().unsqueeze(1)
+
+        mask = (masked_policies_batch!=masked_policies_batch)
+        masked_policies = masked_policies.masked_fill_(mask, 0.0)
+        try:
+            _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
+        except:
+            pass
+        _samples = _samples.masked_fill_( mask.long().sum(dim=1, keepdim=True) > 0,
+                                          float("nan") )
+
         samples = _from_batch(_samples, params, tformat)
         return samples, masked_policies, tformat
 

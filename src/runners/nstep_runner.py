@@ -449,8 +449,9 @@ class NStepRunner():
             return
 
         else:
+
             reward, terminated, env_info = \
-                _env.step(chosen_actions)
+                _env.step([int(_i) for _i in chosen_actions])
 
             # perform environment steps and add to transition buffer
             observations = _env.get_obs()
@@ -625,6 +626,7 @@ class NStepRunner():
                                                                             t_id=self.t_episode,
                                                                            )
 
+            # a = multiagent_controller_inputs[list(multiagent_controller_inputs.keys())[0]].to_pd()
             # forward-pass to obtain current agent policy
             multiagent_controller_outputs, multiagent_controller_outputs_tformat = \
                 self.multiagent_controller.get_outputs(multiagent_controller_inputs,

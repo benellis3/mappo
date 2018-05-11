@@ -48,7 +48,7 @@ class COMAQFunction(nn.Module):
 
 
     def forward(self, inputs, tformat):
-        _check_inputs_validity(inputs, self.input_shapes, tformat, allow_nonseq=True)
+        # _check_inputs_validity(inputs, self.input_shapes, tformat, allow_nonseq=True)
 
         main, params, tformat = _to_batch(inputs.get("main"), tformat)
         x = F.relu(self.fc1(main))
@@ -82,7 +82,7 @@ class COMAAdvantage(nn.Module):
 
 
     def forward(self, inputs, tformat, baseline = True): # DEBUG!!
-        _check_inputs_validity(inputs, self.input_shapes, tformat)
+        # _check_inputs_validity(inputs, self.input_shapes, tformat)
 
         qvalues, params_qv, tformat_qv = _to_batch(inputs.get("qvalues").clone(), tformat)
         agent_action, params_aa, tformat_aa = _to_batch(inputs.get("agent_action"), tformat)
@@ -95,7 +95,12 @@ class COMAAdvantage(nn.Module):
                 qvalues.unsqueeze(2)).squeeze(2)
         else:
             baseline = 0
-        Q = th.gather(qvalues, 1, agent_action.long())
+
+        _aa = agent_action.clone()
+        _aa = _aa.masked_fill(_aa!=_aa, 0.0)
+        Q = th.gather(qvalues, 1, _aa.long())
+        Q = Q.masked_fill(agent_action!=agent_action, float("nan"))
+
         A = Q - baseline
 
         return _from_batch(A, params_qv, tformat_qv), _from_batch(Q, params_qv, tformat_qv), tformat
@@ -155,15 +160,15 @@ class COMACritic(nn.Module):
 
 
     def forward(self, inputs, tformat, baseline=True):
-        _check_inputs_validity(inputs, self.input_shapes, tformat)
+        #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
         qvalues = self.COMAQFunction(inputs={"main":inputs["qfunction"]},
                                      tformat=tformat)
 
         advantage, qvalue, _ = self.COMAAdvantage(inputs={"avail_actions":inputs["avail_actions"],
-                                                         "qvalues":qvalues,
-                                                         "agent_action":inputs["agent_action"],
-                                                         "agent_policy":inputs["agent_policy"]},
+                                                          "qvalues":qvalues,
+                                                          "agent_action":inputs["agent_action"],
+                                                          "agent_policy":inputs["agent_policy"]},
                                                   tformat=tformat,
                                                   baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
@@ -173,6 +178,7 @@ class COMACritic(nn.Module):
 class COMANonRecursiveAgent(NonRecursiveAgent):
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
+        test_mode = kwargs["test_mode"]
 
         avail_actions, params_aa, tformat_aa = _to_batch(inputs["avail_actions"], tformat)
         x, params, tformat = _to_batch(inputs["main"], tformat)
@@ -181,14 +187,17 @@ class COMANonRecursiveAgent(NonRecursiveAgent):
         x = F.softmax(x, dim=1)
 
         # mask policy elements corresponding to unavailable actions
-        x[(avail_actions.detach() == 0.0)] = 0.0
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
-        x = F.softmax(x, dim=1)
+        x = th.exp(x)
+        x = x.masked_fill(1 - avail_actions, 0.0)
+        x = x / x.sum(dim=1, keepdim=True).repeat(1, x.shape[1])
 
         # add softmax exploration (if switched on)
-        if self.args.coma_exploration_mode in ["softmax"]:
-            epsilons = inputs["epsilons"].repeat(x.shape[0], 1)
-            x = epsilons/n_available_actions + x * (1-epsilons)
+        if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
+            epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            epsilons, _, _ = _to_batch(epsilons, tformat)
+            x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+
         x = _from_batch(x, params, tformat)
 
         if loss_fn is not None:
@@ -199,7 +208,12 @@ class COMANonRecursiveAgent(NonRecursiveAgent):
 class COMARecursiveAgent(RecursiveAgent):
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
-        #_check_inputs_validity(inputs, self.input_shapes, tformat)
+        try:
+            _check_inputs_validity(inputs, self.input_shapes, tformat)
+        except Exception as e:
+            a = 5
+            pass
+
         test_mode = kwargs["test_mode"]
 
         _inputs = inputs["main"]
@@ -227,16 +241,15 @@ class COMARecursiveAgent(RecursiveAgent):
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions
-            x[(avail_actions.detach() == 0.0)] = 0.0
             n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
-            x = F.softmax(x, dim=1)
-
+            x = th.exp(x)
+            x = x.masked_fill((1 - avail_actions).byte(), 0.0)
+            x = x / x.sum(dim=1, keepdim=True).repeat(1, x.shape[1])
             # add softmax exploration (if switched on)
             if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
                 epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
                 epsilons, _, _ = _to_batch(epsilons, tformat)
-                x = epsilons / n_available_actions + x * (1 - epsilons)
-
+                x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
