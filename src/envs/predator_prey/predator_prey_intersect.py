@@ -76,12 +76,11 @@ class PredatorPreyCapture(MultiAgentEnv):
 
         # Define the episode and rewards
         self.episode_limit = args.episode_limit
-        self.time_reward = -0.1
-        self.collision_reward = 0.0 #-0.1
-        self.scare_off_reward = 0.0
-        #self.capture_rewards = [20, 1]
-        self.capture_rewards = [50, 1]
-        self.capture_terminal = [True, False, False, False, False]
+        self.time_reward = args.get("reward_time", -0.1)
+        self.collision_reward = args.get("reward_collision", 0.0)
+        self.scare_off_reward = args.get("reward_scare", 0.0)
+        self.capture_rewards = [args.get("reward_capture", 50.0), args.get("reward_almost_capture", 1.0)]
+        self.capture_terminal = [True, False]
 
         # Define the internal state
         self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)

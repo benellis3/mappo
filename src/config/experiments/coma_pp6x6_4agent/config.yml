@@ -7,11 +7,12 @@ coma_epsilon_start: 1.0
 coma_epsilon_time_length: 100000
 defaults: default coma predator_prey
 env_args:
-  n_agents: 4
-  predator_prey_shape:
-    - 6
-    - 6
   agent_obs:
     - 2
     - 2
+  episode_limit: 50
+  predator_prey_shape:
+    - 6
+    - 6
   predator_prey_toroidal: True
+  n_agents: 4
