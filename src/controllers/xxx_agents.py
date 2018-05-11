@@ -173,7 +173,7 @@ class XXXMultiagentController():
                                                   output_type=self.output_type,
                                                   args=self.args)
         if self.args.use_cuda:
-            self.model_level1 = self.model_level1.cuda()
+            self.models["level1"] = self.models["level1"].cuda()
 
         # set up models level 2
         if self.args.share_params:
@@ -182,7 +182,7 @@ class XXXMultiagentController():
                                              output_type=self.output_type,
                                              args=self.args)
             if self.args.use_cuda:
-                self.model_level2 = self.model_level2.cuda()
+                model_level2 = model_level2.cuda()
 
             for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
                 self.models["level2_{}:{}".format(_agent_id1, _agent_id2)] = model_level2

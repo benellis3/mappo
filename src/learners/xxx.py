@@ -238,29 +238,57 @@ class COMALearner(BasicLearner):
 
 
     def create_models(self, transition_scheme):
-
         self.scheme_shapes = _generate_scheme_shapes(transition_scheme=transition_scheme,
                                                      dict_of_schemes=self.schemes)
 
         self.input_shapes = _generate_input_shapes(input_columns=self.input_columns,
                                                    scheme_shapes=self.scheme_shapes)
 
-        # only use one critic model as all agents have same input shapes
-        # if we cannot make this assumption one day, then just create one input shape per agent
-        self.critic = COMACritic(input_shapes=self.input_shapes["critic__agent{}".format(0)], n_actions=self.n_actions, args=self.args)
-        self.target_critic = deepcopy(self.critic)
-        for parameter in self.target_critic.parameters():
-            parameter.requires_grad = False
+        # TODO: Set up critic models
+        self.critic_models = {}
 
+        # set up models level 1
+        self.critic_models["level1"] = self.critic_level1(input_shapes=self.input_shapes["main"],
+                                                  n_actions=self.n_actions,
+                                                  output_type=self.output_type,
+                                                  args=self.args)
         if self.args.use_cuda:
-            self.critic = self.critic.cuda()
-            self.target_critic = self.target_critic.cuda()
+            self.critic_models["level1"] = self.critic_models["level1"].cuda()
+
+        # set up models level 2
+        if self.args.share_params:
+            critic_level2 = self.critic_level2(input_shapes=self.input_shapes["main"],
+                                             n_actions=self.n_actions,
+                                             output_type=self.output_type,
+                                             args=self.args)
+            if self.args.use_cuda:
+                critic_level2 = critic_level2.cuda()
+
+            for _critic_id1, _critic_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
+                self.critic_models["level2_{}:{}".format(_critic_id1, _critic_id2)] = critic_level2
+        else:
+            assert False, "TODO"
+
+        # set up models level 3
+        if self.args.share_params:
+            critic_level3 = self.critic_level3(input_shapes=self.input_shapes["main"],
+                                             n_actions=self.n_actions,
+                                             output_type=self.output_type,
+                                             args=self.args)
+            if self.args.use_cuda:
+                critic_level3 = critic_level3.cuda()
+
+            for _critic_id in range(self.n_agents):
+                self.critic_models["level3_{}".format(_critic_id)] = critic_level3
+        else:
+            assert False, "TODO"
 
         self.agent_parameters = self.multiagent_controller.get_parameters()
         self.agent_optimiser = RMSprop(self.agent_parameters, lr=self.args.lr_agent)
 
         self.critic_parameters = []
-        self.critic_parameters.extend(self.critic.parameters())
+        if self.args.share_params:
+            self.critic_parameters.extend(self.critic.parameters())
         self.critic_optimiser = RMSprop(self.critic_parameters, lr=self.args.lr_critic)
 
         # this is used for joint retrieval of data from all schemes
