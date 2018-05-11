@@ -365,6 +365,7 @@ class COMALearner(BasicLearner):
                        data_inputs=data_inputs,
                        data_inputs_tformat=data_inputs_tformat,
                        agent_optimiser=self.agent_level1_optimiser,
+                       agent_parameters=self.agent_level1_parameters,
                        critic_optimiser=self.critic_level1_optimiser,
                        critic_parameters=self.critic_level1_optimiser,
                        critic=self.critic_level1,
@@ -398,7 +399,8 @@ class COMALearner(BasicLearner):
                        coma_model_inputs_tformat,
                        data_inputs,
                        data_inputs_tformat,
-                       agent_optimiser=self.agent_level1_optimiser,
+                       agent_optimiser=self.agent_level2_optimiser,
+                       agent_parameters=self.agent_level2_parameters,
                        critic_optimiser=self.critic_level2_optimiser,
                        critic_parameters=self.critic_level2_optimiser,
                        critic=self.critic_level2,
@@ -432,7 +434,8 @@ class COMALearner(BasicLearner):
                        coma_model_inputs_tformat,
                        data_inputs,
                        data_inputs_tformat,
-                       agent_optimiser=self.agent_level1_optimiser,
+                       agent_optimiser=self.agent_level3_optimiser,
+                       agent_parameters=self.agent_level3_parameters,
                        critic_optimiser=self.critic_level3_optimiser,
                        critic_parameters=self.critic_level3_optimiser,
                        critic=self.critic_level3,
@@ -452,6 +455,7 @@ class COMALearner(BasicLearner):
                   data_inputs,
                   data_inputs_tformat,
                   agent_optimiser,
+                  agent_parameters,
                   critic_optimiser,
                   critic_parameters,
                   critic,
@@ -590,7 +594,7 @@ class COMALearner(BasicLearner):
         agent_optimiser.zero_grad()
         COMA_loss.backward()
 
-        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
+        policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
         agent_optimiser.step()
 
         # increase episode counter (the fastest one is always)
