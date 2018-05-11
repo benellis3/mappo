@@ -102,6 +102,7 @@ class XXXMultiagentController():
         self.joint_scheme_dict_level2 = _join_dicts(self.schemes_level2)
         self.joint_scheme_dict_level3 = _join_dicts(self.schemes_level3)
 
+        self.joint_scheme_dict = _join_dicts(self.schemes_level1, self.schemes_level2, self.schemes_level3)
         # construct model-specific input regions
 
         # level 1
@@ -256,7 +257,6 @@ class XXXMultiagentController():
         pass
 
     def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
-        assert False, "TODO!"
 
         if self.args.share_agent_params:
             # TODO: Need to do this over 3 levels
@@ -281,6 +281,18 @@ class XXXMultiagentController():
             # top level: aa' ~ Pi_c sample which pair to coordinate
             # second level: pick up correct pair (given aa'), sample u^a, u^a' from the pair coordinator
             # either decode u^a, u^a' from the sampled action, or refer to level
+
+            # --------------------- LEVEL 1
+            inputs_level1, inputs_level1_tformat = _build_model_inputs(self.input_columns_level1,
+                                                         inputs,
+                                                         to_variable=True,
+                                                         inputs_tformat=tformat)
+
+            out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.models["level1"](inputs,
+                                                                                                    hidden_states=hidden_states["level1"],
+                                                                                                    loss_fn=loss_fn,
+                                                                                                    tformat=inputs_level1_tformat,
+                                                                                                    **kwargs)
 
             return #ret, tformat
         else:

@@ -646,8 +646,9 @@ class NStepRunner():
                 hidden_states = self.hidden_states[:, ids_envs_not_terminated_tensor, :,:]
 
             multiagent_controller_outputs, multiagent_controller_outputs_tformat = \
-                self.multiagent_controller.get_outputs(multiagent_controller_inputs,
+                self.multiagent_controller.get_outputs(inputs=multiagent_controller_inputs,
                                                        hidden_states=hidden_states,
+                                                       avail_actions=avail_actions,
                                                        tformat=multiagent_controller_inputs_tformat,
                                                        test_mode=test_mode,
                                                        info=None)
@@ -674,11 +675,19 @@ class NStepRunner():
                                                           test_mode=test_mode)
 
             # TODO: adapt for multiple simultaneous output types!
-            self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                        col=self.multiagent_controller.action_selector.output_type,
-                                        t=self.t_episode,
-                                        agent_ids=list(range(self.n_agents)),
-                                        data=action_selector_outputs)
+            if isinstance(self.multiagent_controller.action_selector.output_type, list):
+                for output_type in self.multiagent_controller.action_selector.output_type:
+                    self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                                col=output_type,
+                                                t=self.t_episode,
+                                                agent_ids=list(range(self.n_agents)),
+                                                data=action_selector_outputs[output_type])
+            else:
+                self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                            col=self.multiagent_controller.action_selector.output_type,
+                                            t=self.t_episode,
+                                            agent_ids=list(range(self.n_agents)),
+                                            data=action_selector_outputs)
 
             # write selected actions to episode_buffer
             self.episode_buffer.set_col(bs=ids_envs_not_terminated,
