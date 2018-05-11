@@ -28,7 +28,7 @@ class XXXRunner(NStepRunner):
                                         dtype=np.int32,
                                         missing=-1,),
                                    *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-                                          shape=(1,),
+                                          shape=(2,),
                                           dtype=np.int32,
                                           missing=-1, ) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
                                    dict(name="actions_level3",
