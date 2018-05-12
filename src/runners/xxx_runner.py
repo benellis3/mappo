@@ -51,7 +51,7 @@ class XXXRunner(NStepRunner):
                                         select_agent_ids=range(0, self.n_agents),
                                         missing=-1),
                                    dict(name="policies_level1",
-                                        shape=(self.n_actions*(self.n_actions-1) / 2,),
+                                        shape=(int(self.n_actions*(self.n_actions-1) / 2),),
                                         dtype=np.float32,
                                         missing=np.nan),
                                    *[dict(name="policies_level2_agents{}:{}".format(_agent_id1, _agent_id2),

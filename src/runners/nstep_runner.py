@@ -638,6 +638,12 @@ class NStepRunner():
                                                                             t_id=self.t_episode,
                                                                            )
 
+            # retrieve avail_actions from episode_buffer
+            avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,
+                                                                              col="avail_actions",
+                                                                              t = self.t_episode,
+                                                                              agent_ids=list(range(self.n_agents)))
+
             # a = multiagent_controller_inputs[list(multiagent_controller_inputs.keys())[0]].to_pd()
             # forward-pass to obtain current agent policy
             if isinstance(self.hidden_states, dict):
@@ -660,12 +666,6 @@ class NStepRunner():
                     self.hidden_states[_k][:, ids_envs_not_terminated_tensor, :, :] = _v
             else:
                 self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = multiagent_controller_outputs["hidden_states"]
-
-            # retrieve avail_actions from episode_buffer
-            avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,
-                                                                              col="avail_actions",
-                                                                              t = self.t_episode,
-                                                                              agent_ids=list(range(self.n_agents)))
 
             selected_actions, action_selector_outputs, selected_actions_format = \
                 self.multiagent_controller.select_actions(inputs=multiagent_controller_outputs,
