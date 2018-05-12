@@ -128,8 +128,8 @@ class PredatorPreyCapture(MultiAgentEnv):
         if self.toroidal:
             positions = positions % self.env_max
         else:
-            positions = np.min(positions, self.env_max - 1)
-            positions = np.max(positions, 0)
+            positions = np.minimum(positions, self.env_max - 1)
+            positions = np.maximum(positions, 0)
         return positions
 
     def _move_actor(self, pos: np.ndarray, action: int, batch: int, collision_mask: np.ndarray, move_type=None):
