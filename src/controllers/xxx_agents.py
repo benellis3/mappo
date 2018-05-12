@@ -30,10 +30,10 @@ class XXXMultiagentController():
         self.model_level3 = mo_REGISTRY[args.xxx_agent_model_level3]
 
         # # Set up action selector
-        # if action_selector is None:
-        #     self.action_selector = as_REGISTRY[args.action_selector](args=self.args)
-        # else:
-        #     self.action_selector = action_selector
+        if action_selector is None:
+            self.action_selector = as_REGISTRY[args.action_selector](args=self.args)
+        else:
+            self.action_selector = action_selector
 
         self.agent_scheme_level1 = Scheme([dict(name="observations",
                                                 select_agent_ids=list(range(self.n_agents))),
@@ -169,8 +169,18 @@ class XXXMultiagentController():
         #                                       avail_actions=avail_actions,
         #                                       tformat=tformat,
         #                                       test_mode=test_mode)
-        assert False, "TODO" # TODO
-        return selected_actions, modified_inputs, selected_actions_format
+        # assert False, "TODO" # TODO
+        #return selected_actions, modified_inputs, selected_actions_format
+
+        selected_actions_dict = {}
+        selected_actions_dict["actions_level1"] = self.actions_level1
+        selected_actions_dict["actions_level2"] = self.actions_level2
+
+        modified_inputs_dict = {}
+        modified_inputs_dict["policies_level1"] = self.policies_level1
+        modified_inputs_dict["policies_level2"] = self.policies_level2
+
+        return selected_actions_dict, modified_inputs_dict, self.selected_actions_format
 
     def create_model(self, transition_scheme):
 
@@ -258,6 +268,9 @@ class XXXMultiagentController():
 
     def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
 
+        avail_actions = kwargs["avail_actions"]
+        test_mode = kwargs["test_mode"]
+
         if self.args.share_agent_params:
             # TODO: Need to do this over 3 levels
             #
@@ -293,6 +306,59 @@ class XXXMultiagentController():
                                                                                                     loss_fn=loss_fn,
                                                                                                     tformat=inputs_level1_tformat,
                                                                                                     **kwargs)
+
+            sampled_pair_ids, modified_inputs, selected_actions_format = self.action_selector.select_action(out_level1,
+                                                                                                            avail_actions=None,
+                                                                                                            tformat=tformat,
+                                                                                                            test_mode=test_mode)
+
+            # sample which pairs should be selected
+            self.actions_level1 = sampled_pair_ids.clone()
+            self.selected_actions_format = selected_actions_format
+            self.policies_level1 = out_level1.clone()
+
+            # --------------------- LEVEL 2
+            assert self.n_agents == 3, "pair selection only implemented for 3 agents yet!!"
+            tmp = (avail_actions * avail_actions)
+            pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+
+            inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
+                                                                       inputs,
+                                                                       to_variable=True,
+                                                                       inputs_tformat=tformat,
+                                                                       avail_actions=pairwise_avail_actions,
+                                                                       sampled_pair_ids=sampled_pair_ids)
+
+            out_level2, hidden_states_level2, losses_level1, tformat_level2 = self.models["level1"](inputs_level2,
+                                                                                                    hidden_states=hidden_states["level2"],
+                                                                                                    loss_fn=loss_fn,
+                                                                                                    tformat=inputs_level2_tformat,
+                                                                                                    **kwargs)
+
+            pair_sampled_actions, \
+            modified_inputs, \
+            selected_actions_format_level2 = self.action_selector.select_action(out_level2,
+                                                                         avail_actions=None,
+                                                                         tformat=tformat,
+                                                                         test_mode=test_mode)
+
+            self.actions_level2 = pair_sampled_actions.clone()
+            self.selected_actions_format_level2 = selected_actions_format
+            self.policies_level2 = out_level2.clone()
+
+            # --------------------- LEVEL 3
+            agent_ids_not_sampled_yet = # TODO
+
+            inputs_level3, inputs_level3_tformat = _build_model_inputs(self.input_columns_level3,
+                                                                       inputs,
+                                                                       to_variable=True,
+                                                                       inputs_tformat=tformat,
+                                                                       #avail_actions=pairwise_avail_actions,
+                                                                       #sampled_pair_ids=sampled_pair_ids,
+                                                                       agent_ids_not_sampled_yet=agent_ids_not_sampled_yet)
+            self.actions_level3 = pair_sampled_actions.clone()
+            self.selected_actions_format_level3 = selected_actions_format
+            self.policies_level3 = out_level3.clone()
 
             return #ret, tformat
         else:
