@@ -566,7 +566,7 @@ class NStepRunner():
         """
 
         """
-        selected_actions_msgs = [actions[:,_id,0,0].tolist() for _id in range(len(ids))]
+        selected_actions_msgs = [actions[:, _id, 0, 0].tolist() for _id in range(len(ids))]
         ret = self._exch_msgs(msgs=selected_actions_msgs, ids=[_b for _b in ids])
         return ret
 
