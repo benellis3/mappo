@@ -238,7 +238,7 @@ class XXXLearner(BasicLearner):
                           for _i in range(_n_agent_pairings(self.n_agents))],
                         dict(name="agent_id", select_agent_ids=[_agent_id1, _agent_id2]),
                         dict(name="past_actions", select_agent_ids=list(range(n_agent_pairs)))])
-            self.input_columns_level1["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
             self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["agent_action"] = Scheme([dict(name="agent_action")])
             self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["agent_policy"] = Scheme([dict(name="agent_policy")])
             self.input_columns_level2["target_critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]
