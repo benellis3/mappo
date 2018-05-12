@@ -217,22 +217,35 @@ class XXXLearner(BasicLearner):
         self.input_columns_level1["critic_level1"] = {}
         #self.input_columns_level1["critic_input_level1"]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
         self.input_columns_level1["critic_level1"]["qfunction"] = Scheme([dict(name="state"),
-                                                                                dict(name="observations", select_agent_ids=list(range(self.n_agents))),
-                                                                                dict(name="past_action_level1")])
+                                                                          dict(name="observations", select_agent_ids=list(range(self.n_agents))),
+                                                                          dict(name="past_action_level1")])
+        self.input_columns_level1["critic_level1"]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
         self.input_columns_level1["critic_level1"]["agent_action"] = Scheme([dict(name="agent_action")])
         self.input_columns_level1["critic_level1"]["agent_policy"] = Scheme([dict(name="agent_policy")])
         self.input_columns_level1["target_critic_level1"] = self.input_columns_level1["critic_level1"]
 
         # level 2
         self.input_columns_level2 = {}
+        n_agent_pairs = len(list(sorted(combinations(list(range(self.n_agents)), 2))))
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
-                Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
-                        dict(name="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-                             switch=self.args.xxx_critic_level2_use_past_actions),
-                        dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
-            self.input_columns_level2["target_critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]
+            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
+            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
+            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["qfunction"] = Scheme([dict(name="other_agents_actions", select_agent_ids=list(range(n_agent_pairs))), # select all agent ids here, as have mask=0 transform on current agent action
+                                                                                                                         dict(name="state"),
+                                                                                                                         dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
+                                                                                                                         dict(name="agent_id", select_agent_ids=[_agent_id1, _agent_id2]),
+                                                                                                                         dict(name="past_actions", select_agent_ids=list(range(n_agent_pairs)))])
+            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["agent_action"] = Scheme([dict(name="agent_action")])
+            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["agent_policy"] = Scheme([dict(name="agent_policy")])
+            self.input_columns_level2["target_critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]
+
+            # self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
+            #     Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
+            #             dict(name="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+            #                  switch=self.args.xxx_critic_level2_use_past_actions),
+            #             dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
+            # self.input_columns_level2["target_critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]
 
         # level 3
         # self.input_columns_level3 = {}

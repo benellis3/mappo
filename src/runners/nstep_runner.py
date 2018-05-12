@@ -550,10 +550,6 @@ class NStepRunner():
         # reset environments
         self.reset_envs()
 
-        if self.test_mode:
-            a = self.transition_buffer.to_pd()
-            pass
-
         # copy initial transition into episode buffer
         self.episode_buffer.insert(self.transition_buffer, t_ids=0, bs_ids=list(range(0, self.batch_size)))
 
@@ -577,10 +573,6 @@ class NStepRunner():
     def run(self, test_mode):
         self.test_mode = test_mode
 
-        if self.test_mode:  # DEBUG
-            a = 5
-            pass
-
         # don't reset at initialization as don't have access to hidden state size then
         self.reset()
 
@@ -602,8 +594,14 @@ class NStepRunner():
                 # flush transition buffer before next step
                 self.transition_buffer.flush()
 
-                # send chosen actions to non-terminated envs - this will fill the transition buffer with a new transition
-                ret = self.step(actions=self.selected_actions,
+                # get selected actions from last step
+                selected_actions, selected_actions_tformat = self.episode_buffer.get_col(col="actions",
+                                                                                         t=self.t_episode-1,
+                                                                                         agent_ids=list(range(self.n_agents))
+                                                                                         )
+
+                ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
+                                                                 if selected_actions.is_cuda else ids_envs_not_terminated_tensor.cpu(), :, :],
                                 ids=ids_envs_not_terminated)
 
                 # retrieve ids of all envs that have not yet terminated.
@@ -705,7 +703,7 @@ class NStepRunner():
                                             data=selected_actions)
 
             # keep a copy of selected actions explicitely in transition_buffer device context
-            self.selected_actions = selected_actions.cuda() if self.transition_buffer.is_cuda else selected_actions.cpu()
+            #self.selected_actions = selected_actions.cuda() if self.transition_buffer.is_cuda else selected_actions.cpu()
 
             #Check for termination conditions
             #Check for runner termination conditions

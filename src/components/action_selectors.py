@@ -27,16 +27,10 @@ class MultinomialActionSelector():
         masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
 
         mask = (masked_policies_batch!=masked_policies_batch)
-        masked_policies = masked_policies.masked_fill_(mask, 0.0)
+        masked_policies_batch.masked_fill_(mask, 0.0)
         _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
         _samples = _samples.masked_fill_( mask.long().sum(dim=1, keepdim=True) > 0,
                                           float("nan") )
-        if th.sum(avail_actions != avail_actions):
-            a = 5
-            pass
-
-        if th.sum(_samples!=_samples) > 0.0:
-            pass
 
         samples = _from_batch(_samples, params, tformat)
         return samples, masked_policies, tformat

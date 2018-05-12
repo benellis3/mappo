@@ -36,6 +36,11 @@ class XXXRunner(NStepRunner):
                                         select_agent_ids=range(0, self.n_agents),
                                         dtype=np.int32,
                                         missing=-1, ),
+                                   dict(name="actions", # contains total agent actions - this is what env.step is based on!
+                                        shape=(1,),
+                                        select_agent_ids=range(0, self.n_agents),
+                                        dtype=np.int32,
+                                        missing=-1, ),
                                    dict(name="avail_actions",
                                         shape=(self.n_actions,),
                                         select_agent_ids=range(0, self.n_agents),
