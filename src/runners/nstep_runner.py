@@ -570,23 +570,16 @@ class NStepRunner():
         """
 
         """
-        # for _id in ids:
-        #     actions = actions_old[:, _id, :, :]
         actions_new = th.zeros([0, 0, 0, 0])
         for _id in range(actions.shape[1]):
             if not th.equal(actions[:, _id, 0, 0], th.Tensor([0, 0, 0, 0, 0])):
                 actions_new = th.cat((actions_new, actions[:, _id, :, :].unsqueeze(1)), 1)
         # print("actions: {}, actions dim: {}, ids: {}".format(actions, actions.shape, ids))
         # print("actions_new: {}, actions_new dim: {}, ids: {}".format(actions_new, actions_new.shape, ids))
-        selected_actions_msgs = [actions[:, _id, 0, 0].tolist() for _id in range(len(ids))]
+        # selected_actions_msgs = [actions[:, _id, 0, 0].tolist() for _id in range(len(ids))]
         # print("selected_actions_msgs: {}".format(selected_actions_msgs))
         selected_actions_msgs_new = [actions_new[:, _id, 0, 0].tolist() for _id in range(len(ids))]
-        # for _id in range(len(selected_actions_msgs)):
-        #     if selected_actions_msgs[_id] != [0, 0, 0, 0, 0]:
-        #         selected_actions_msgs_new.append(selected_actions_msgs[_id])
-        print("selected_actions_msgs_new: {}".format(selected_actions_msgs_new))
-        # if [0, 0, 0, 0, 0] in selected_actions_msgs_new:
-        #     print("break")
+        # print("selected_actions_msgs_new: {}".format(selected_actions_msgs_new))
         ret = self._exch_msgs(msgs=selected_actions_msgs_new, ids=[_b for _b in ids])
         return ret
 
