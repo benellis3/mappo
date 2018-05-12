@@ -362,7 +362,7 @@ def _generate_input_shapes(input_columns, scheme_shapes):
         for _input_column_region_k, _input_column_region_v in _input_column_v.items():
             input_shapes[_input_column_k][_input_column_region_k] = sum([scheme_shapes[_input_column_k][_scheme_list_entry["name"]]
                                                                          for _scheme_list_entry in _input_column_region_v.scheme_list
-                                                                        if _scheme_list_entry.get("switch", True)])
+                                                                         if _scheme_list_entry.get("switch", True)])
 
     return input_shapes
 
@@ -388,6 +388,14 @@ def _one_hot(ndarray_or_tensor, **kwargs):
     if len(nan_mask.shape) > 0:
         y_onehot[nan_mask.repeat(1,1,y_onehot.shape[2])] = 0 # set nans to zero
     return y_onehot
+
+def _one_hot_pairwise(tensor, **kwargs):
+    rng = kwargs.get("range", None)
+    output_size_only=kwargs.get("output_size_only", False)
+    if output_size_only:
+        return 2 * (rng[1] - rng[0] + 1) * tensor
+    action1, action2  = _joint_actions_2_pair(tensor, (rng[1] - rng[0] + 1))
+    return th.cat([_one_hot(action1), _one_hot(action2)], dim=1)
 
 def _mask(tensor, **kwargs):
     output_size_only = kwargs.get("output_size_only", False)
@@ -477,7 +485,8 @@ def _make_logging_str(dic):
 
 TRANSFORMS = {"one_hot": _one_hot,
               "shift": _shift,
-              "mask": _mask,}
+              "mask": _mask,
+              "one_hot_pairwise": _one_hot_pairwise}
               # "t_repeat": _t_repeat}
 
 def _merge_dicts(a, b, path=None, overwrite=True):

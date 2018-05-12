@@ -9,6 +9,7 @@ from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
+from utils.xxx import _n_agent_pair_samples
 
 class XXXMultiagentController():
     """
@@ -37,8 +38,8 @@ class XXXMultiagentController():
 
         self.agent_scheme_level1 = Scheme([dict(name="observations",
                                                 select_agent_ids=list(range(self.n_agents))),
-                                           dict(name="actions_level1",
-                                                rename="past_action_level1",
+                                           dict(name="actions_level1__sample{}".format(0),
+                                                rename="past_actions_level1",
                                                 transforms=[("shift", dict(steps=1)),
                                                             ("one_hot", dict(range=(0, self.n_actions-1)))],
                                                 switch=self.args.xxx_agent_level1_use_past_actions),
@@ -54,11 +55,12 @@ class XXXMultiagentController():
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],),
                                                                              dict(name="observations",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-                                                                                    rename="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-                                                                                    transforms=[("shift", dict(steps=1)),
-                                                                                                ("one_hot", dict(range=(0, self.n_actions-1)))],
-                                                                                    switch=self.args.xxx_agent_level2_use_past_actions) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
+                                                                             dict(name="actions_level2__sample{}".format(0),
+                                                                                  rename="past_actions_level2",
+                                                                                  transforms=[("shift", dict(steps=1)),
+                                                                                              ("one_hot_pairwise", dict(range=(0, self.n_actions-1)))],
+                                                                                  switch=self.args.xxx_agent_level2_use_past_actions),
+                                                                             # TODO: transform to split into two actions (with maybe one-hot encoding each)!
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
@@ -110,7 +112,7 @@ class XXXMultiagentController():
         self.input_columns_level1["agent_input_level1"] = {}
         self.input_columns_level1["agent_input_level1"]["main"] = \
             Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents))),
-                    dict(name="past_action_level1",
+                    dict(name="past_actions_level1",
                          switch=self.args.xxx_agent_level1_use_past_actions),
                     ])
         self.input_columns_level1["agent_input_level1"]["epsilons_central_level1"] = \
@@ -124,7 +126,7 @@ class XXXMultiagentController():
             self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
             self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
-                        dict(name="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                        dict(name="past_actions_level2",
                              switch=self.args.xxx_agent_level2_use_past_actions),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
             self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilons_central_level2"] = \
