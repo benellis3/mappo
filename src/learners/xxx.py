@@ -156,7 +156,7 @@ class XXXLearner(BasicLearner):
                                                    dict(name="state"),
                                                    dict(name="avail_actions",
                                                         select_agent_ids=[_agent_id1]),
-                                                   dict(name="avail_actions".format(1),
+                                                   dict(name="avail_actions",
                                                         select_agent_ids=[_agent_id2])
                                                  ])
 
@@ -236,8 +236,8 @@ class XXXLearner(BasicLearner):
         self.input_columns_level2 = {}
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
             self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["qfunction"] = \
                 Scheme([*[dict(name="other_agent_actions_level2__sample{}".format(_i))
                           for _i in range(_n_agent_pairings(self.n_agents))],
@@ -292,13 +292,15 @@ class XXXLearner(BasicLearner):
 
         # Set up critic models
         self.critic_models = {}
+        self.target_critic_models = {}
 
         # set up models level 1
-        self.critic_models["level1"] = self.critic_level1(input_shapes=self.input_shapes_level1,
-                                                  n_actions=self.n_actions,
-                                                  args=self.args)
+        self.critic_models["level1"] = self.critic_level1(input_shapes=self.input_shapes_level1["critic_level1"],
+                                                          n_actions=self.n_actions,
+                                                          args=self.args)
         if self.args.use_cuda:
             self.critic_models["level1"] = self.critic_models["level1"].cuda()
+        self.target_critic_models["level1"] = deepcopy(self.critic_models["level1"])
 
         # set up models level 2
         if self.args.share_params:
@@ -310,6 +312,7 @@ class XXXLearner(BasicLearner):
 
             for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
                 self.critic_models["level2_{}:{}".format(_agent_id1, _agent_id2)] = critic_level2
+                self.target_critic_models["level2_{}:{}".format(_agent_id1, _agent_id2)] = deepcopy(critic_level2)
         else:
             assert False, "TODO"
 
@@ -323,6 +326,7 @@ class XXXLearner(BasicLearner):
 
             for _agent_id in range(self.n_agents):
                 self.critic_models["level3_{}".format(_agent_id)] = critic_level3
+                self.target_critic_models["level3_{}".format(_agent_id)] = deepcopy(critic_level3)
         else:
             assert False, "TODO"
 

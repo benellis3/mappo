@@ -24,7 +24,7 @@ class XXXQFunctionLevel1(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = self.n_actions*(self.n_actions-1) / 2 # qvals
+        self.output_shapes["qvalues"] = int(self.n_actions*(self.n_actions-1) / 2) # qvals
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
@@ -225,6 +225,7 @@ class XXXCriticLevel1(nn.Module):
 
         # Set up input regions automatically if required (if sensible)
         self.input_shapes = {}
+        self.input_shapes["avail_actions"] = self.n_actions
         self.input_shapes.update(input_shapes)
 
         # Set up output_shapes automatically if required
@@ -238,7 +239,7 @@ class XXXCriticLevel1(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunction = XXXQFunctionLevel2(input_shapes={"main":self.input_shapes["qfunction"]},
+        self.XXXQFunction = XXXQFunctionLevel1(input_shapes={"main":self.input_shapes["qfunction"]},
                                                output_shapes={},
                                                layer_args={"main":self.layer_args["qfunction"]},
                                                n_actions = self.n_actions,
@@ -265,12 +266,13 @@ class XXXCriticLevel1(nn.Module):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
         qvalues = self.XXXQFunction(inputs={"main":inputs["qfunction"]},
-                                     tformat=tformat)
+                                    tformat=tformat)
 
-        advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":inputs["avail_actions"],
-                                                          "qvalues":qvalues,
-                                                          "agent_action":inputs["agent_action"],
-                                                          "agent_policy":inputs["agent_policy"]},
+        advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":qvalues.clone().fill_(1.0),
+                                                         # critic level1 has all actions available forever
+                                                         "qvalues":qvalues,
+                                                         "agent_action":inputs["agent_action"],
+                                                         "agent_policy":inputs["agent_policy"]},
                                                   tformat=tformat,
                                                   baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
