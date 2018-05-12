@@ -15,7 +15,9 @@ from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
 from components.losses import EntropyRegularisationLoss
-from components.transforms import _to_batch, _from_batch, _naninfmean
+from components.transforms import _to_batch, \
+    _from_batch, _naninfmean
+from utils.xxx import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids
 
 from .basic import BasicLearner
 
@@ -96,12 +98,21 @@ class XXXLearner(BasicLearner):
 
         self.critic_level1_scheme = Scheme([dict(name="observations",
                                                  select_agent_ids=list(range(self.n_agents))),
-                                            dict(name="actions_level1",
-                                                 rename="past_action_level1",
+                                            dict(name="actions",
+                                                 rename="past_actions",
+                                                 select_agent_ids=list(range(self.n_agents)),
                                                  transforms=[("shift", dict(steps=1)),
                                                              ("one_hot", dict(range=(0, self.n_actions-1)))],
                                                  switch=self.args.xxx_critic_level1_use_past_actions),
-                                            dict(name="actions_level1",
+                                            *[dict(name="actions_level1__sample{}".format(_i),
+                                                   rename="past_actions_level1__sample{}".format(_i),
+                                                   select_agent_ids=list(range(self.n_agents)),
+                                                   transforms=[("shift", dict(steps=1)),
+                                                               # ("one_hot", dict(range=(0, self.n_actions - 1)))
+                                                               ],
+                                                   switch=self.args.xxx_critic_level2_use_past_actions_level1)
+                                                for _i in range(_n_agent_pairings(self.n_agents))],
+                                            dict(name="actions_level1__sample{}".format(0),
                                                  rename="agent_action",),
                                             dict(name="policies_level1",
                                                  rename="agent_policy"),
@@ -110,38 +121,30 @@ class XXXLearner(BasicLearner):
         self.target_critic_level1_scheme = self.critic_level1_scheme
 
 
-        self.critic_scheme_level2_fn = lambda _agent_id1, _agent_id2: Scheme([dict(name="agent_id",
-                                                                                  rename="agent_ids",
-                                                                                  transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
-                                                                                  select_agent_ids=[_agent_id1, _agent_id2],),
-                                                                             dict(name="observations",
-                                                                                  select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-                                                                                    rename="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-                                                                                    transforms=[("shift", dict(steps=1)),
-                                                                                                ("one_hot", dict(range=(
-                                                                                                0, self.n_actions - 1)))],
-                                                                                    switch=self.args.xxx_critic_level2_use_past_actions)
-                                                                               for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
-                                                                             dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             dict(name="state")
-                                                                            ])
+        self.critic_scheme_level2_fn = \
+            lambda _agent_id1, _agent_id2: Scheme([dict(name="agent_id",
+                                                        rename="agent_ids",
+                                                        transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
+                                                        select_agent_ids=[_agent_id1, _agent_id2],),
+                                                   dict(name="observations",
+                                                        select_agent_ids=[_agent_id1, _agent_id2]),
+                                                   dict(name="actions",
+                                                        rename="past_actions",
+                                                        select_agent_ids=list(range(self.n_agents)),
+                                                        transforms=[("shift", dict(steps=1)),
+                                                                   #("one_hot", dict(range=(0, self.n_actions - 1)))
+                                                                   ],
+                                                      switch=self.args.xxx_critic_level2_use_past_actions),
+                                                   *[dict(name="actions_level2__pairing{}".format(_i),
+                                                        rename="other_actions_level2__pairing{}".format(_i),
+                                                        transforms=[] if _agent_ids_2_pairing_id((_agent_id1, _agent_id2),
+                                                                                                 self.n_agents) != _i else [("mask", dict(fill=0.0))],
+                                                        )
+                                                     for _i in range(_n_agent_pairings(self.n_agents))],
+                                                   dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
+                                                   dict(name="state")
+                                                 ])
 
-        # self.critic_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
-        #                                                              transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
-        #                                                              select_agent_ids=[_agent_id],),
-        #                                                         dict(name="observations",
-        #                                                              select_agent_ids=[_agent_id],
-        #                                                              switch=self.args.xxx_critic_level3_use_obs),
-        #                                                         dict(name="actions_level3",
-        #                                                              rename="past_actions_level3",
-        #                                                              select_agent_ids=[_agent_id],
-        #                                                              transforms=[("shift", dict(steps=1)),
-        #                                                                          ("one_hot", dict(range=(0, self.n_actions-1)))],
-        #                                                              switch=self.args.xxx_critic_level3_use_past_actions),
-        #                                                         dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
-        #                                                         dict(name="state")
-        #                                                        ])
 
         self.critic_level3_scheme_fn = lambda _agent_id: Scheme([dict(name="agent_id",
                                                                       select_agent_ids=[_agent_id],
@@ -151,19 +154,19 @@ class XXXLearner(BasicLearner):
                                                                       rename="agent_observation",
                                                                       select_agent_ids=[_agent_id],
                                                                      ),
-                                                                 dict(name="actions_level3",
+                                                                 dict(name="actions",
                                                                       rename="past_actions",
+                                                                      select_agent_ids=list(range(self.n_agents)),
                                                                       transforms=[("shift", dict(steps=1, fill=0)),
                                                                                   #("one_hot", dict(range=(0, self.n_actions-1)))
                                                                                  ],
-                                                                      select_agent_ids=range(0, self.n_agents),
                                                                     ),
-                                                                 dict(name="actions_level3",
+                                                                 dict(name="actions",
                                                                       rename="other_agents_actions",
-                                                                      select_agent_ids=range(0, self.n_agents), #[_aid for _aid in range(0, self.n_agents) if _i != _aid],
+                                                                      select_agent_ids=list(range(0, self.n_agents)), #[_aid for _aid in range(0, self.n_agents) if _i != _aid],
                                                                       transforms=[("mask", dict(select_agent_ids=[_agent_id], fill=0.0)),
                                                                                 #("one_hot", dict(range=(0, self.n_actions - 1)))
-                                                                               ]),
+                                                                                 ]),
                                                                  dict(name="actions_level3",
                                                                       rename="agent_action",
                                                                       select_agent_ids=[_agent_id], # do NOT one-hot!
@@ -199,26 +202,16 @@ class XXXLearner(BasicLearner):
 
         # construct model-specific input regions
 
-        # self.input_columns = {}
-        # for _agent_id in range(self.n_agents):
-        #     self.input_columns["critic__agent{}".format(_agent_id)] = {}
-        #     self.input_columns["critic__agent{}".format(_agent_id)]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
-        #     self.input_columns["critic__agent{}".format(_agent_id)]["qfunction"] = Scheme([dict(name="other_agents_actions", select_agent_ids=list(range(self.n_agents))), # select all agent ids here, as have mask=0 transform on current agent action
-        #                                                                                    dict(name="state"),
-        #                                                                                    dict(name="agent_observation", select_agent_ids=[_agent_id]),
-        #                                                                                    dict(name="agent_id", select_agent_ids=[_agent_id]),
-        #                                                                                    dict(name="past_actions", select_agent_ids=list(range(self.n_agents)))]).agent_flatten()
-        #     self.input_columns["critic__agent{}".format(_agent_id)]["agent_action"] = Scheme([dict(name="agent_action", select_agent_ids=[_agent_id])]).agent_flatten()
-        #     self.input_columns["critic__agent{}".format(_agent_id)]["agent_policy"] = Scheme([dict(name="agent_policy", select_agent_ids=[_agent_id])]).agent_flatten()
-        #     self.input_columns["target_critic__agent{}".format(_agent_id)] = self.input_columns["critic__agent{}".format(_agent_id)]
-
         # level 1
         self.input_columns_level1 = {}
         self.input_columns_level1["critic_level1"] = {}
         #self.input_columns_level1["critic_input_level1"]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
         self.input_columns_level1["critic_level1"]["qfunction"] = Scheme([dict(name="state"),
-                                                                          dict(name="observations", select_agent_ids=list(range(self.n_agents))),
-                                                                          dict(name="past_action_level1")])
+                                                                          # dict(name="observations", select_agent_ids=list(range(self.n_agents))),
+                                                                          *[dict(name="past_actions_level1__sample{}".format(_i))
+                                                                            for _i in range(_n_agent_pairings(self.n_agents))],
+                                                                          dict(name="past_actions_level1"),
+                                                                          dict(name="past_actions")])
         self.input_columns_level1["critic_level1"]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
         self.input_columns_level1["critic_level1"]["agent_action"] = Scheme([dict(name="agent_action")])
         self.input_columns_level1["critic_level1"]["agent_policy"] = Scheme([dict(name="agent_policy")])
@@ -229,16 +222,19 @@ class XXXLearner(BasicLearner):
         n_agent_pairs = len(list(sorted(combinations(list(range(self.n_agents)), 2))))
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
-            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
-            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
-            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["qfunction"] = Scheme([dict(name="other_agents_actions", select_agent_ids=list(range(n_agent_pairs))), # select all agent ids here, as have mask=0 transform on current agent action
-                                                                                                                         dict(name="state"),
-                                                                                                                         dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                                                                         dict(name="agent_id", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                                                                         dict(name="past_actions", select_agent_ids=list(range(n_agent_pairs)))])
-            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["agent_action"] = Scheme([dict(name="agent_action")])
-            self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]["agent_policy"] = Scheme([dict(name="agent_policy")])
-            self.input_columns_level2["target_critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agent{}:{}".format(_agent_id1, _agent_id2)]
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["qfunction"] = \
+                Scheme([dict(name="other_agents_actions", select_agent_ids=list(range(n_agent_pairs))), # select all agent ids here, as have mask=0 transform on current agent action
+                        dict(name="state"),
+                        # dict(name="past_actions_level2",
+                        #      select_agent_ids=list(range(n_agent_pairs))),
+                        dict(name="agent_id", select_agent_ids=[_agent_id1, _agent_id2]),
+                        dict(name="past_actions", select_agent_ids=list(range(n_agent_pairs)))])
+            self.input_columns_level1["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["agent_action"] = Scheme([dict(name="agent_action")])
+            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["agent_policy"] = Scheme([dict(name="agent_policy")])
+            self.input_columns_level2["target_critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]
 
             # self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
             #     Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
@@ -280,7 +276,7 @@ class XXXLearner(BasicLearner):
     def create_models(self, transition_scheme):
 
         self.scheme_shapes_level1 = _generate_scheme_shapes(transition_scheme=transition_scheme,
-                                                           dict_of_schemes=self.scheme_level1)
+                                                            dict_of_schemes=self.scheme_level1)
 
         self.input_shapes_level1 = _generate_input_shapes(input_columns=self.input_columns_level1,
                                                           scheme_shapes=self.scheme_shapes_level1)

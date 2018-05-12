@@ -7,6 +7,7 @@ from torch.distributions import Normal
 
 from components.epsilon_schedules import FlatThenDecaySchedule
 from runners import REGISTRY as r_REGISTRY
+from utils.xxx import _n_agent_pair_samples, _n_agent_pairings
 
 NStepRunner = r_REGISTRY["nstep"]
 
@@ -23,20 +24,20 @@ class XXXRunner(NStepRunner):
                                         dtype = np.float32,
                                         missing=np.nan,
                                         size=self.env_state_size),
-                                   dict(name="actions_level1",
+                                   *[dict(name="actions_level1__sample{}".format(_i), # stores ids of pairs that are sampled from
                                         shape=(1,),
                                         dtype=np.int32,
-                                        missing=-1,),
-                                   *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                        missing=-1,) for _i in range(_n_agent_pair_samples(self.n_agents))],
+                                   *[dict(name="actions_level2__sample{}".format(_i), # stores joint action for each sampled pair
                                           shape=(1,), # i.e. just one number for a pair of actions!
                                           dtype=np.int32,
-                                          missing=-1, ) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
-                                   dict(name="actions_level3",
+                                          missing=-1,) for _i in range(_n_agent_pair_samples(self.n_agents))],
+                                   dict(name="actions_level3", # stores action for each agent that was chosen individually
                                         shape=(1,),
                                         select_agent_ids=range(0, self.n_agents),
                                         dtype=np.int32,
                                         missing=-1, ),
-                                   dict(name="actions", # contains total agent actions - this is what env.step is based on!
+                                   dict(name="actions", # contains all agent actions - this is what env.step is based on!
                                         shape=(1,),
                                         select_agent_ids=range(0, self.n_agents),
                                         dtype=np.int32,
@@ -55,14 +56,14 @@ class XXXRunner(NStepRunner):
                                         dtype=np.int32,
                                         select_agent_ids=range(0, self.n_agents),
                                         missing=-1),
-                                   dict(name="policies_level1",
-                                        shape=(int(self.n_actions*(self.n_actions-1) / 2),),
+                                   dict(name="policies_level1".format(),
+                                        shape=(_n_agent_pairings(self.n_agents),),
                                         dtype=np.float32,
                                         missing=np.nan),
-                                   *[dict(name="policies_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                   *[dict(name="policies_level2__pairing{}".format(_i),
                                           shape=(self.n_actions*self.n_actions,), # i.e. just one number for a pair of actions!
                                           dtype=np.int32,
-                                          missing=-1, ) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
+                                          missing=-1,) for _i in range(_n_agent_pairings(self.n_agents))],
                                    dict(name="policies_level3",
                                         shape=(self.n_actions,),
                                         select_agent_ids=range(0, self.n_agents),
@@ -107,7 +108,7 @@ class XXXRunner(NStepRunner):
                                         shape=(1,),
                                         dtype=np.float32,
                                         missing=float("nan"))
-                                   ]).agent_flatten()
+                                   ])
         pass
 
     def _add_episode_stats(self, T_env):
