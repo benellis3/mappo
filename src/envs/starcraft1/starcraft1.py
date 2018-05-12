@@ -61,7 +61,7 @@ class SC1(MultiAgentEnv):
         self.port = args.port + self.bs_id
         self.port_in_use = False
         self.debug_inputs = False
-        self.debug_rewards = False
+        self.debug_rewards = True
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
@@ -466,7 +466,7 @@ class SC1(MultiAgentEnv):
                 print("Delta enemy: ", delta_enemy)
                 print("Delta deaths: ", delta_deaths)
                 print("Delta ally: ", - delta_ally)
-                print("Reward: ", delta_enemy + delta_deaths)
+                print("Reward: ", delta_enemy + delta_deaths - delta_ally)
                 print("--------------------------")
 
             reward = delta_enemy + delta_deaths - delta_ally
@@ -882,7 +882,7 @@ class SC1(MultiAgentEnv):
         stats["timeouts"] = self.timeouts
         stats["restarts"] = self.force_restarts
 
-        print("Stats: {}\n".format(stats))
+        # print("Stats: {}\n".format(stats))
         return stats
 
     def _add_deepcopy_support(self):
