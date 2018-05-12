@@ -39,7 +39,18 @@ from .qmix import QMIXMixingNetwork, QMIXMixer
 REGISTRY["qmix_mixing_network"] = QMIXMixingNetwork
 REGISTRY["qmix_mixer"] = VDNMixer
 
-
+from .xxx import XXXCriticLevel1, XXXCriticLevel2, XXXCriticLevel3
+REGISTRY["xxx_critic_level1"] = XXXCriticLevel1
+REGISTRY["xxx_critic_level2"] = XXXCriticLevel2
+REGISTRY["xxx_critic_level3"] = XXXCriticLevel3
+from .xxx import XXXRecurrentAgentLevel1, XXXRecurrentAgentLevel2, XXXRecurrentAgentLevel3
+REGISTRY["xxx_recurrent_agent_level1"] = XXXRecurrentAgentLevel1
+REGISTRY["xxx_recurrent_agent_level2"] = XXXRecurrentAgentLevel2
+REGISTRY["xxx_recurrent_agent_level3"] = XXXRecurrentAgentLevel3
+from .xxx import XXXNonRecurrentAgentLevel1, XXXNonRecurrentAgentLevel2, XXXNonRecurrentAgentLevel3
+REGISTRY["xxx_nonrecurrent_agent_level1"] = XXXNonRecurrentAgentLevel1
+REGISTRY["xxx_nonrecurrent_agent_level2"] = XXXNonRecurrentAgentLevel2
+REGISTRY["xxx_nonrecurrent_agent_level3"] = XXXNonRecurrentAgentLevel3
 
 
 

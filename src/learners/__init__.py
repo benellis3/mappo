@@ -18,3 +18,6 @@ REGISTRY["vdn"] = VDNLearner
 
 from .qmix import QMIXLearner
 REGISTRY["qmix"] = QMIXLearner
+
+from .xxx import XXXLearner
+REGISTRY["xxx"] = XXXLearner

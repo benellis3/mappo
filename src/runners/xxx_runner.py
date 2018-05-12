@@ -1,5 +1,6 @@
 import numpy as np
 from components.scheme import Scheme
+from components.transforms import _seq_mean
 from itertools import combinations
 import torch as th
 from torch.distributions import Normal
@@ -24,11 +25,10 @@ class XXXRunner(NStepRunner):
                                         size=self.env_state_size),
                                    dict(name="actions_level1",
                                         shape=(1,),
-                                        select_agent_ids=range(0, self.n_agents),
                                         dtype=np.int32,
                                         missing=-1,),
                                    *[dict(name="actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-                                          shape=(2,),
+                                          shape=(1,), # i.e. just one number for a pair of actions!
                                           dtype=np.int32,
                                           missing=-1, ) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
                                    dict(name="actions_level3",
@@ -50,16 +50,14 @@ class XXXRunner(NStepRunner):
                                         dtype=np.int32,
                                         select_agent_ids=range(0, self.n_agents),
                                         missing=-1),
-                                   dict(name="policies_level2",
-                                        shape=(self.n_actions,),
-                                        select_agent_ids=range(0, self.n_agents),
+                                   dict(name="policies_level1",
+                                        shape=(int(self.n_actions*(self.n_actions-1) / 2),),
                                         dtype=np.float32,
                                         missing=np.nan),
-                                   dict(name="policies_level2",
-                                        shape=(self.n_actions,),
-                                        select_agent_ids=range(0, self.n_agents),
-                                        dtype=np.float32,
-                                        missing=np.nan),
+                                   *[dict(name="policies_level2_agents{}:{}".format(_agent_id1, _agent_id2),
+                                          shape=(self.n_actions*self.n_actions,), # i.e. just one number for a pair of actions!
+                                          dtype=np.int32,
+                                          missing=-1, ) for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2))],
                                    dict(name="policies_level3",
                                         shape=(self.n_actions,),
                                         select_agent_ids=range(0, self.n_agents),
@@ -111,10 +109,18 @@ class XXXRunner(NStepRunner):
         super()._add_episode_stats(T_env)
 
         test_suffix = "" if not self.test_mode else "_test"
-        #self._add_stat("policy_entropy",
-        #               self.episode_buffer.get_stat("policy_entropy"),
-        #               T_env=T_env,
-        #               suffix=test_suffix)
+        self._add_stat("policy_level1_entropy",
+                      self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level1"),
+                      T_env=T_env,
+                      suffix=test_suffix)
+        self._add_stat("policy_level2_entropy_",
+                      self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level2"),
+                      T_env=T_env,
+                      suffix=test_suffix)
+        self._add_stat("policy_level3_entropy_",
+                      self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level3"),
+                      T_env=T_env,
+                      suffix=test_suffix)
 
         # TODO: Policy entropy across levels! (Use suffix)
         return
@@ -161,14 +167,23 @@ class XXXRunner(NStepRunner):
 
         pass
 
+
+
     def log(self, log_directly=True):
+        stats = self.get_stats()
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
             log_str += ", XXX_epsilon_level1={:g}".format(self.xxx_epsilon_decay_schedule_level1.eval(self.T_env))
             log_str += ", XXX_epsilon_level2={:g}".format(self.xxx_epsilon_decay_schedule_level2.eval(self.T_env))
             log_str += ", XXX_epsilon_level3={:g}".format(self.xxx_epsilon_decay_schedule_level3.eval(self.T_env))
+            log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
+            log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy"]))
+            log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
             self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
         else:
+            log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy_test"]))
+            log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy_test"]))
+            log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy_test"]))
             self.logging_struct.py_logger.info("TEST RUNNER INFO: {}".format(log_str))
         return log_str, log_dict
 

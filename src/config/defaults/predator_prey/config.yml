@@ -1,14 +1,17 @@
 env: pred_prey
 env_args:
-  predator_prey_toroidal: True
-  predator_prey_shape:
-    - 4
-    - 4
-  n_prey: 1
   agent_obs:
     - 1
     - 1
   episode_limit: 50
   n_prey: 1
   n_agents: 4
-
+  predator_prey_toroidal: True
+  predator_prey_shape:
+    - 4
+    - 4
+  reward_almost_capture: 1.0
+  reward_capture: 50
+  reward_collision: 0.0
+  reward_scare: 0.0
+  reward_time: -0.1

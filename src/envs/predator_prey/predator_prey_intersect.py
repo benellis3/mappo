@@ -76,12 +76,11 @@ class PredatorPreyCapture(MultiAgentEnv):
 
         # Define the episode and rewards
         self.episode_limit = args.episode_limit
-        self.time_reward = -0.1
-        self.collision_reward = 0.0 #-0.1
-        self.scare_off_reward = 0.0
-        #self.capture_rewards = [20, 1]
-        self.capture_rewards = [50, 1]
-        self.capture_terminal = [True, False, False, False, False]
+        self.time_reward = getattr(args, "reward_time", -0.1)
+        self.collision_reward = getattr(args, "reward_collision", 0.0)
+        self.scare_off_reward = getattr(args, "reward_scare", 0.0)
+        self.capture_rewards = [getattr(args, "reward_capture", 50.0), getattr(args, "reward_almost_capture", 1.0)]
+        self.capture_terminal = [True, False]
 
         # Define the internal state
         self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)
@@ -259,31 +258,39 @@ class PredatorPreyCapture(MultiAgentEnv):
         else:
             return self.grid[0, :, :, :].reshape(self.state_size)
 
-    def _intersect_targets(self, grid, agent_ids, targets, target_id=0, targets_alive=None):
+    def _is_visible(self, agents, target):
+        """ agents are plural and target is singular"""
+        target = target.reshape(1, 2).repeat(len(agent_ids), 0)
+        # Determine the Manhattan distance of all agents to the target
+        lower = np.minimum(agents, target)
+        higher = np.maximum(agents, target)
+        d = np.abs(np.minimum(higher - lower, lower - higher + self.grid_shape))
+        # Return true if all targets are visible by all agents
+        return np.all(d <= self.agent_obs)
+
+    def _intersect_targets(self, grid, agent_ids, targets, batch=0, target_id=0, targets_alive=None):
         """" Helper for get_obs_intersection(). """
         for a in range(targets.shape[0]):
-            for b in range(self.batch_size):
-                if targets_alive is None or targets_alive[a, b]:
-                    # Determine the Manhattan distance of all agents to the target
-                    x = self.agents[agent_ids, b, :]
-                    y = targets[a, b, :].reshape(1, 2).repeat(len(agent_ids), 0)
-                    lower = np.minimum(x, y)
-                    higher = np.maximum(x, y)
-                    d = np.abs(np.minimum(higher - lower, lower - higher + self.grid_shape))
-                    # If the target is visible to all agents
-                    if np.all(d <= self.agent_obs):
-                        # include the target in all observations (in relative positions)
-                        for o in range(len(agent_ids)):
-                            grid[b, targets[a, b, 0], targets[a, b, 1], target_id] = a + 1
+            if targets_alive is None or targets_alive[a, batch]:
+                # If the target is visible to all agents
+                if self._is_visible(self.agents[agent_ids, batch, :], targets[a, batch, :]):
+                    # include the target in all observations (in relative positions)
+                    for o in range(len(agent_ids)):
+                        grid[batch, targets[a, batch, 0], targets[a, batch, 1], target_id] = a + 1
 
     def get_obs_intersection(self, agent_ids, global_view=False):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
         grid = np.zeros((self.batch_size, self.grid_shape[0], self.grid_shape[0], 2), dtype=float_type)
-        # Every agent sees other intersected agents
-        self._intersect_targets(grid, agent_ids, targets=self.agents, target_id=0)
-        # Every agent sees intersected prey
-        self._intersect_targets(grid, agent_ids, targets=self.prey, target_id=1, targets_alive=self.prey_alive)
+        # If all agent_ids can see each other (otherwise the observation is empty)
+        for b in range(self.batch_size):
+            if all([self._is_visible(self.agents[agent_ids, b, :], self.agents[agent_ids[a], b, :])
+                    for a in range(len(agent_ids))]):
+                # Every agent sees other intersected agents
+                self._intersect_targets(grid, agent_ids, targets=self.agents, batch=b, target_id=0)
+                # Every agent sees intersected prey
+                self._intersect_targets(grid, agent_ids, targets=self.prey, batch=b, target_id=1,
+                                        targets_alive=self.prey_alive)
         if global_view:
             # Return the intersection as a state
             if self.batch_mode:

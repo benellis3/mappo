@@ -6,12 +6,12 @@ import torch.nn.functional as F
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
-class XXXQFunctionLevelI(nn.Module):
+class XXXQFunctionLevel1(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
 
-        super(XXXQFunctionLevelI, self).__init__()
+        super(XXXQFunctionLevel1, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -24,7 +24,7 @@ class XXXQFunctionLevelI(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = self.n_actions # qvals
+        self.output_shapes["qvalues"] = self.n_actions*(self.n_actions-1) / 2 # qvals
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
@@ -56,12 +56,12 @@ class XXXQFunctionLevelI(nn.Module):
         qvalues = self.fc2(x)
         return _from_batch(qvalues, params, tformat)
 
-class XXXQFunctionLevelII(nn.Module):
+class XXXQFunctionLevel2(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
 
-        super(XXXQFunctionLevelII, self).__init__()
+        super(XXXQFunctionLevel2, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -74,7 +74,7 @@ class XXXQFunctionLevelII(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = self.n_actions # qvals
+        self.output_shapes["qvalues"] = self.n_actions*self.n_actions # qvals
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
@@ -106,12 +106,12 @@ class XXXQFunctionLevelII(nn.Module):
         qvalues = self.fc2(x)
         return _from_batch(qvalues, params, tformat)
 
-class XXXQFunctionLevelIII(nn.Module):
+class XXXQFunctionLevel3(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
 
-        super(XXXQFunctionLevelIII, self).__init__()
+        super(XXXQFunctionLevel3, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -208,7 +208,7 @@ class XXXAdvantage(nn.Module):
         return _from_batch(A, params_qv, tformat_qv), _from_batch(Q, params_qv, tformat_qv), tformat
 
 
-class XXXCriticLevelI(nn.Module):
+class XXXCriticLevel1(nn.Module):
 
     """
     Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
@@ -219,7 +219,7 @@ class XXXCriticLevelI(nn.Module):
         This model contains no network layers but only sub-models
         """
 
-        super(XXXCriticLevelI, self).__init__()
+        super(XXXCriticLevel1, self).__init__()
         self.args = args
         self.n_actions = n_actions
 
@@ -238,16 +238,16 @@ class XXXCriticLevelI(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunction = XXXQFunctionLevelII(input_shapes={"main":self.input_shapes["qfunction"]},
-                                                output_shapes={},
-                                                layer_args={"main":self.layer_args["qfunction"]},
-                                                n_actions = self.n_actions,
-                                                args=self.args)
+        self.XXXQFunction = XXXQFunctionLevel2(input_shapes={"main":self.input_shapes["qfunction"]},
+                                               output_shapes={},
+                                               layer_args={"main":self.layer_args["qfunction"]},
+                                               n_actions = self.n_actions,
+                                               args=self.args)
 
         self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
-                                                         "qvalues":self.XXXQFunction.output_shapes["qvalues"],
-                                                         "agent_action":self.input_shapes["agent_action"],
-                                                         "agent_policy":self.input_shapes["agent_policy"]},
+                                                       "qvalues":self.XXXQFunction.output_shapes["qvalues"],
+                                                       "agent_action":self.input_shapes["agent_action"],
+                                                       "agent_policy":self.input_shapes["agent_policy"]},
                                          output_shapes={},
                                          n_actions=self.n_actions,
                                          args=self.args)
@@ -275,7 +275,7 @@ class XXXCriticLevelI(nn.Module):
                                                   baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
 
-class XXXCriticLevelII(nn.Module):
+class XXXCriticLevel2(nn.Module):
 
     """
     Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
@@ -286,7 +286,7 @@ class XXXCriticLevelII(nn.Module):
         This model contains no network layers but only sub-models
         """
 
-        super(XXXCriticLevelII, self).__init__()
+        super(XXXCriticLevel2, self).__init__()
         self.args = args
         self.n_actions = n_actions
 
@@ -305,7 +305,7 @@ class XXXCriticLevelII(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunctionLevelII = XXXQFunctionLevelII(input_shapes={"main":self.input_shapes["qfunction"]},
+        self.XXXQFunctionLevel2 = XXXQFunctionLevel2(input_shapes={"main":self.input_shapes["qfunction"]},
                                                        output_shapes={},
                                                        layer_args={"main":self.layer_args["qfunction"]},
                                                        n_actions = self.n_actions,
@@ -342,7 +342,7 @@ class XXXCriticLevelII(nn.Module):
                                                   baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
 
-class XXXCriticLevelIII(nn.Module):
+class XXXCriticLevel3(nn.Module):
 
     """
     Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
@@ -353,7 +353,7 @@ class XXXCriticLevelIII(nn.Module):
         This model contains no network layers but only sub-models
         """
 
-        super(XXXCriticLevelIII, self).__init__()
+        super(XXXCriticLevel3, self).__init__()
         self.args = args
         self.n_actions = n_actions
 
@@ -372,7 +372,7 @@ class XXXCriticLevelIII(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunction = XXXQFunctionLevelIII(input_shapes={"main":self.input_shapes["qfunction"]},
+        self.XXXQFunction = XXXQFunctionLevel3(input_shapes={"main":self.input_shapes["qfunction"]},
                                            output_shapes={},
                                            layer_args={"main":self.layer_args["qfunction"]},
                                            n_actions = self.n_actions,
@@ -398,7 +398,7 @@ class XXXCriticLevelIII(nn.Module):
     def forward(self, inputs, tformat, baseline=True):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
-        qvalues = self.XXXQFunctionLevelIII(inputs={"main":inputs["qfunction"]},
+        qvalues = self.XXXQFunctionLevel3(inputs={"main":inputs["qfunction"]},
                                      tformat=tformat)
 
         advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":inputs["avail_actions"],
@@ -410,7 +410,7 @@ class XXXCriticLevelIII(nn.Module):
         return {"advantage": advantage, "qvalue": qvalue}, tformat
 
 
-class XXXNonRecurrentAgentLevelI(NonRecurrentAgent):
+class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
@@ -440,7 +440,7 @@ class XXXNonRecurrentAgentLevelI(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevelI(RecurrentAgent):
+class XXXRecurrentAgentLevel1(RecurrentAgent):
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
@@ -503,7 +503,7 @@ class XXXRecurrentAgentLevelI(RecurrentAgent):
                loss, \
                tformat
 
-class XXXNonRecurrentAgentLevelII(NonRecurrentAgent):
+class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
@@ -533,7 +533,7 @@ class XXXNonRecurrentAgentLevelII(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevelII(RecurrentAgent):
+class XXXRecurrentAgentLevel2(RecurrentAgent):
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
@@ -596,7 +596,7 @@ class XXXRecurrentAgentLevelII(RecurrentAgent):
                loss, \
                tformat
 
-class XXXNonRecurrentAgentLevelIII(NonRecurrentAgent):
+class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
@@ -626,7 +626,7 @@ class XXXNonRecurrentAgentLevelIII(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevelIII(RecurrentAgent):
+class XXXRecurrentAgentLevel3(RecurrentAgent):
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
