@@ -584,7 +584,7 @@ class NStepRunner():
         # for _id in range(len(selected_actions_msgs)):
         #     if selected_actions_msgs[_id] != [0, 0, 0, 0, 0]:
         #         selected_actions_msgs_new.append(selected_actions_msgs[_id])
-        print("selected_actions_msgs_new: {}".format(selected_actions_msgs_new))
+        #print("selected_actions_msgs_new: {}".format(selected_actions_msgs_new))
         # if [0, 0, 0, 0, 0] in selected_actions_msgs_new:
         #     print("break")
         ret = self._exch_msgs(msgs=selected_actions_msgs_new, ids=[_b for _b in ids])
