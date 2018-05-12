@@ -17,7 +17,7 @@ from components.transforms import _adim, _bsdim, _tdim, _vdim, \
 from components.losses import EntropyRegularisationLoss
 from components.transforms import _to_batch, \
     _from_batch, _naninfmean
-from utils.xxx import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids
+from utils.xxx import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids, _n_agent_pair_samples
 
 from .basic import BasicLearner
 
@@ -106,12 +106,11 @@ class XXXLearner(BasicLearner):
                                                  switch=self.args.xxx_critic_level1_use_past_actions),
                                             *[dict(name="actions_level1__sample{}".format(_i),
                                                    rename="past_actions_level1__sample{}".format(_i),
-                                                   select_agent_ids=list(range(self.n_agents)),
                                                    transforms=[("shift", dict(steps=1)),
                                                                # ("one_hot", dict(range=(0, self.n_actions - 1)))
                                                                ],
                                                    switch=self.args.xxx_critic_level2_use_past_actions_level1)
-                                                for _i in range(_n_agent_pairings(self.n_agents))],
+                                                for _i in range(_n_agent_pair_samples(self.n_agents))],
                                             dict(name="actions_level1__sample{}".format(0),
                                                  rename="agent_action",),
                                             dict(name="policies_level1",
@@ -216,7 +215,7 @@ class XXXLearner(BasicLearner):
         self.input_columns_level1["critic_level1"]["qfunction"] = Scheme([dict(name="state"),
                                                                           # dict(name="observations", select_agent_ids=list(range(self.n_agents))),
                                                                           *[dict(name="past_actions_level1__sample{}".format(_i))
-                                                                            for _i in range(_n_agent_pairings(self.n_agents))],
+                                                                            for _i in range(_n_agent_pair_samples(self.n_agents))],
                                                                           dict(name="past_actions_level1"),
                                                                           dict(name="past_actions")])
         self.input_columns_level1["critic_level1"]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
