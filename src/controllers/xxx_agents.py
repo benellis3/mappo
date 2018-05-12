@@ -38,11 +38,12 @@ class XXXMultiagentController():
 
         self.agent_scheme_level1 = Scheme([dict(name="observations",
                                                 select_agent_ids=list(range(self.n_agents))),
-                                           dict(name="actions_level1__sample{}".format(0),
-                                                rename="past_actions_level1",
+                                           *[dict(name="actions_level1__sample{}".format(_i),
+                                                rename="past_actions_level1__sample{}".format(_i),
                                                 transforms=[("shift", dict(steps=1)),
                                                             ("one_hot", dict(range=(0, self.n_actions-1)))],
-                                                switch=self.args.xxx_agent_level1_use_past_actions),
+                                                switch=self.args.xxx_agent_level1_use_past_actions)
+                                             for _i in range(_n_agent_pair_samples(self.n_agents))],
                                            dict(name="xxx_epsilons_central_level1",
                                                 scope="episode"),
                                            dict(name="xxx_epsilons_level1")
@@ -80,7 +81,12 @@ class XXXMultiagentController():
                                                                      switch=self.args.xxx_agent_level3_use_past_actions),
                                                                 dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
                                                                 dict(name="xxx_epsilons_central_level3", scope="episode"),
-                                                                dict(name="xxx_epsilons_level3")
+                                                                dict(name="xxx_epsilons_level3"),
+                                                                * [dict(name="actions_level1__sample{}".format(_i),
+                                                                        rename="past_actions_level1__sample{}".format(_i),
+                                                                        transforms=[("one_hot", dict(range=(0, self.n_actions - 1)))],
+                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                   for _i in range(_n_agent_pair_samples(self.n_agents))],
                                                                ])
 
         # Set up schemes
@@ -112,9 +118,10 @@ class XXXMultiagentController():
         self.input_columns_level1["agent_input_level1"] = {}
         self.input_columns_level1["agent_input_level1"]["main"] = \
             Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents))),
-                    dict(name="past_actions_level1",
-                         switch=self.args.xxx_agent_level1_use_past_actions),
-                    ])
+                   *[dict(name="past_actions_level1__sample{}".format(_i),
+                          switch=self.args.xxx_agent_level1_use_past_actions)
+                      for _i in range(_n_agent_pair_samples(self.n_agents))]
+                   ])
         self.input_columns_level1["agent_input_level1"]["epsilons_central_level1"] = \
             Scheme([dict(name="xxx_epsilons_central_level1")])
         self.input_columns_level1["agent_input_level1"]["epsilons_level1"] = \
@@ -143,7 +150,8 @@ class XXXMultiagentController():
                         dict(name="past_actions_level3",
                              select_agent_ids=[_agent_id],
                              switch=self.args.xxx_agent_level3_use_past_actions),
-                        dict(name="agent_id", select_agent_ids=[_agent_id])])
+                        dict(name="agent_id", select_agent_ids=[_agent_id])],
+                        dict(name="actions_level1"))
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_central_level3"] = \
                 Scheme([dict(name="xxx_epsilons_central_level3")])
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_level3"] = \

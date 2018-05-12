@@ -141,6 +141,13 @@ class XXXLearner(BasicLearner):
                                                                                                  self.n_agents) != _i else [("mask", dict(fill=0.0))],
                                                         )
                                                      for _i in range(_n_agent_pairings(self.n_agents))],
+                                                   *[dict(name="actions_level2__pairing{}".format(_i),
+                                                          rename="past_actions_level2__pairing{}".format(_i),
+                                                          transforms=[("shift", dict(steps=1)),
+                                                                     #("one_hot", dict(range=(0, self.n_actions - 1)))
+                                                                     ],
+                                                          )
+                                                     for _i in range(_n_agent_pairings(self.n_agents))],
                                                    dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
                                                    dict(name="state")
                                                  ])
@@ -227,8 +234,8 @@ class XXXLearner(BasicLearner):
             self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["qfunction"] = \
                 Scheme([dict(name="other_agents_actions", select_agent_ids=list(range(n_agent_pairs))), # select all agent ids here, as have mask=0 transform on current agent action
                         dict(name="state"),
-                        # dict(name="past_actions_level2",
-                        #      select_agent_ids=list(range(n_agent_pairs))),
+                        *[dict(name="past_actions_level2__pairing{}".format(_i))
+                          for _i in range(_n_agent_pairings(self.n_agents))],
                         dict(name="agent_id", select_agent_ids=[_agent_id1, _agent_id2]),
                         dict(name="past_actions", select_agent_ids=list(range(n_agent_pairs)))])
             self.input_columns_level1["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])

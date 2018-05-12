@@ -10,6 +10,7 @@ xxx_agent_model_level3: xxx_recurrent_agent_level3
 xxx_agent_level1_use_past_actions: True
 xxx_agent_level2_use_past_actions: True
 xxx_agent_level3_use_past_actions: True
+xxx_agent_level3_use_past_actions_level1: True
 xxx_critic_level1: xxx_critic_level1
 xxx_critic_level2: xxx_critic_level2
 xxx_critic_level3: xxx_critic_level3
@@ -17,6 +18,7 @@ xxx_critic_level1_use_past_actions: True
 xxx_critic_level2_use_past_actions: True
 xxx_critic_level3_use_past_actions: True
 xxx_critic_level3_use_obs: True
+xxx_critic_level2_use_past_actions_level1: True
 xxx_critic_use_sampling: True
 xxx_epsilon_start: 0.5
 xxx_epsilon_finish: 0.05
