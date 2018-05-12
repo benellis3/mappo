@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
+from utils.xxx import _n_agent_pairings
 
 class XXXQFunctionLevel1(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
@@ -74,7 +75,7 @@ class XXXQFunctionLevel2(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = self.n_actions*self.n_actions # qvals
+        self.output_shapes["qvalues"] = 1 + self.n_actions*self.n_actions # qvals
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
@@ -307,13 +308,13 @@ class XXXCriticLevel2(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunctionLevel2 = XXXQFunctionLevel2(input_shapes={"main":self.input_shapes["qfunction"]},
+        self.XXXQFunction = XXXQFunctionLevel2(input_shapes={"main":self.input_shapes["qfunction"]},
                                                        output_shapes={},
                                                        layer_args={"main":self.layer_args["qfunction"]},
                                                        n_actions = self.n_actions,
                                                        args=self.args)
 
-        self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
+        self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":(1 + self.input_shapes["avail_actions_id1"]*self.input_shapes["avail_actions_id2"]),
                                                          "qvalues":self.XXXQFunction.output_shapes["qvalues"],
                                                          "agent_action":self.input_shapes["agent_action"],
                                                          "agent_policy":self.input_shapes["agent_policy"]},
@@ -442,15 +443,81 @@ class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevel1(RecurrentAgent):
+class MLPEncoder(nn.Module):
+    def __init__(self, input_shapes, output_shapes={}, layer_args={}, args=None):
+        super(MLPEncoder, self).__init__()
+        self.args = args
+
+        # Set up input regions automatically if required (if sensible)
+        self.input_shapes = {}
+        assert set(input_shapes.keys()) == {"main"}, \
+            "set of input_shapes does not coincide with model structure!"
+        self.input_shapes.update(input_shapes)
+
+        # Set up layer_args automatically if required
+        self.output_shapes = {}
+        self.output_shapes["fc1"] = 64 # output
+        self.output_shapes.update(output_shapes)
+
+        # Set up layer_args automatically if required
+        self.layer_args = {}
+        self.layer_args["fc1"] = {"in":input_shapes["main"], "out":output_shapes["main"]}
+        self.layer_args.update(layer_args)
+
+        #Set up network layers
+        self.fc1 = nn.Linear(self.input_shapes["main"], self.output_shapes["main"])
+        pass
+
+    def forward(self, inputs, tformat):
+
+        x, n_seq, tformat = _to_batch(inputs["main"], tformat)
+        x = F.relu(self.fc1(x))
+        return _from_batch(x, n_seq, tformat), tformat
+
+
+class XXXRecurrentAgentLevel1(nn.Module):
+
+    def __init__(self, input_shapes, n_agents, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
+        super(XXXRecurrentAgentLevel1, self).__init__()
+
+        self.args = args
+        self.n_agents = n_agents
+        assert output_type is not None, "you have to set an output_type!"
+        # self.output_type=output_type
+
+        # Set up input regions automatically if required (if sensible)
+        self.input_shapes = {}
+        # assert set(input_shapes.keys()) == {"main"}, \
+        #     "set of input_shapes does not coincide with model structure!"
+        self.input_shapes.update(input_shapes)
+
+        # Set up layer_args automatically if required
+        self.output_shapes = {}
+        self.output_shapes["output"] = _n_agent_pairings(self.n_agents) # output
+        if self.output_shapes is not None:
+            self.output_shapes.update(output_shapes)
+
+        # Set up layer_args automatically if required
+        self.layer_args = {}
+        self.layer_args["encoder"] = {"in":self.input_shapes["main"], "out":64}
+        self.layer_args["gru"] = {"in":self.layer_args["encoder"]["out"], "hidden":64}
+        self.layer_args["output"] = {"in":self.layer_args["gru"]["hidden"], "out":self.output_shapes["output"]}
+        self.layer_args.update(layer_args)
+
+        # Set up network layers
+        self.encoder = MLPEncoder(input_shapes=dict(main=self.layer_args["encoder"]["in"]),
+                                    output_shapes=dict(main=self.layer_args["encoder"]["out"]))
+        self.gru = nn.GRUCell(self.layer_args["gru"]["in"], self.layer_args["gru"]["hidden"])
+        self.output = nn.Linear(self.layer_args["output"]["in"], self.layer_args["output"]["out"])
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
 
         test_mode = kwargs["test_mode"]
+        n_agents = kwargs["n_agents"]
 
-        _inputs = inputs["main"]
-        _inputs_aa = inputs["avail_actions"]
+        _inputs = inputs["main"].unsqueeze(0) # as agent dimension is lacking
+        #_inputs_aa = inputs["avail_actions"]
 
         loss = None
         t_dim = _tdim(tformat)
@@ -463,20 +530,20 @@ class XXXRecurrentAgentLevel1(RecurrentAgent):
         for t in range(t_len):
 
             x = _inputs[:, :, slice(t, t + 1), :].contiguous()
-            avail_actions = _inputs_aa[:, :, slice(t, t + 1), :].contiguous()
+            #avail_actions = _inputs_aa[:, :, slice(t, t + 1), :].contiguous()
             x, tformat = self.encoder({"main":x}, tformat)
 
             x, params_x, tformat_x = _to_batch(x, tformat)
-            avail_actions, params_aa, tformat_aa = _to_batch(avail_actions, tformat)
+            #avail_actions, params_aa, tformat_aa = _to_batch(avail_actions, tformat)
             h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
 
             h = self.gru(x, h)
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions
-            n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            #n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
             x = th.exp(x)
-            x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+            #x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
             x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # Alternative variant
@@ -485,10 +552,10 @@ class XXXRecurrentAgentLevel1(RecurrentAgent):
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # add softmax exploration (if switched on)
-            if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-               epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            if self.args.xxx_exploration_mode_level1 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
                epsilons, _, _ = _to_batch(epsilons, tformat)
-               x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+               x =  epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)

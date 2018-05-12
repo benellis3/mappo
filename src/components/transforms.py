@@ -3,6 +3,8 @@ import torch as th
 
 from torch.autograd import Variable
 
+from utils.xxx import _joint_actions_2_action_pair
+
 def _has_gradient(tensor):
     """
     pytorch < 0.4 compatibility
@@ -71,7 +73,7 @@ def _check_inputs_validity(inputs, input_shapes, formats, allow_nonseq=False):
 
     # Check validity of key set supplied
     assert set(inputs.keys()) == set(input_shapes.keys()), \
-        "unexpected set of inputs keys supplied: {}".format(str(inputs.keys()))
+        "unexpected set of inputs keys supplied: {}, {}".format(str(inputs.keys()), str(input_shapes.keys()))
 
     # Check format is known
     assert formats in ["a*bs*t*v"], "unknown format: {}".format(formats)
@@ -394,8 +396,12 @@ def _one_hot_pairwise(tensor, **kwargs):
     output_size_only=kwargs.get("output_size_only", False)
     if output_size_only:
         return 2 * (rng[1] - rng[0] + 1) * tensor
-    action1, action2  = _joint_actions_2_pair(tensor, (rng[1] - rng[0] + 1))
-    return th.cat([_one_hot(action1), _one_hot(action2)], dim=1)
+    # TODO: need to handle delegation action (set all zero)
+    action1, action2  = _joint_actions_2_action_pair(tensor, (rng[1] - rng[0] + 1))
+    one_hot_action1 = _one_hot(action1, range=rng)
+    one_hot_action2 = _one_hot(action2, range=rng)
+    assert tensor.dim() == 3, "wrong tensor dim"
+    return th.cat([one_hot_action1, one_hot_action2], dim=0)
 
 def _mask(tensor, **kwargs):
     output_size_only = kwargs.get("output_size_only", False)

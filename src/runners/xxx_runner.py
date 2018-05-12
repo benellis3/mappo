@@ -61,7 +61,7 @@ class XXXRunner(NStepRunner):
                                         dtype=np.float32,
                                         missing=np.nan),
                                    *[dict(name="policies_level2__pairing{}".format(_i),
-                                          shape=(self.n_actions*self.n_actions,), # i.e. just one number for a pair of actions!
+                                          shape=(1+self.n_actions*self.n_actions,), # i.e. just one number for a pair of actions!
                                           dtype=np.int32,
                                           missing=-1,) for _i in range(_n_agent_pairings(self.n_agents))],
                                    dict(name="policies_level3",
@@ -81,18 +81,18 @@ class XXXRunner(NStepRunner):
                                         shape=(1,),
                                         dtype=np.bool,
                                         missing=False),
-                                   dict(name="xxx_epsilons_level1",
-                                        shape=(1,),
-                                        dtype=np.float32,
-                                        missing=float("nan")),
-                                   dict(name="xxx_epsilons_level2",
-                                        shape=(1,),
-                                        dtype=np.float32,
-                                        missing=float("nan")),
-                                   dict(name="xxx_epsilons_level3",
-                                        shape=(1,),
-                                        dtype=np.float32,
-                                        missing=float("nan")),
+                                   # dict(name="xxx_epsilons_level1",
+                                   #      shape=(1,),
+                                   #      dtype=np.float32,
+                                   #      missing=float("nan")),
+                                   # dict(name="xxx_epsilons_level2",
+                                   #      shape=(1,),
+                                   #      dtype=np.float32,
+                                   #      missing=float("nan")),
+                                   # dict(name="xxx_epsilons_level3",
+                                   #      shape=(1,),
+                                   #      dtype=np.float32,
+                                   #      missing=float("nan")),
                                    dict(name="xxx_epsilons_central_level1",
                                         scope="episode",
                                         shape=(1,),
@@ -161,7 +161,7 @@ class XXXRunner(NStepRunner):
                                         data=epsilons)
 
             if not hasattr(self, "xxx_epsilon_decay_schedule_level3"):
-                 self.xxx_epsilon_decay_schedule = FlatThenDecaySchedule(start=self.args.xxx_epsilon_start_level3,
+                 self.xxx_epsilon_decay_schedule_level3 = FlatThenDecaySchedule(start=self.args.xxx_epsilon_start_level3,
                                                                          finish=self.args.xxx_epsilon_finish_level3,
                                                                          time_length=self.args.xxx_epsilon_time_length_level3,
                                                                          decay=self.args.xxx_epsilon_decay_mode_level3)

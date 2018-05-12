@@ -645,7 +645,7 @@ class NStepRunner():
             # a = multiagent_controller_inputs[list(multiagent_controller_inputs.keys())[0]].to_pd()
             # forward-pass to obtain current agent policy
             if isinstance(self.hidden_states, dict):
-                hidden_states = {_k:_v[:, ids_envs_not_terminated_tensor, :,:] for _k, _v in self.hidden_states.items()}
+                hidden_states = {_k:_v[:, ids_envs_not_terminated_tensor, :, :] for _k, _v in self.hidden_states.items()}
             else:
                 hidden_states = self.hidden_states[:, ids_envs_not_terminated_tensor, :,:]
 

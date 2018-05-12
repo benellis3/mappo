@@ -46,7 +46,7 @@ class XXXMultiagentController():
                                              for _i in range(_n_agent_pair_samples(self.n_agents))],
                                            dict(name="xxx_epsilons_central_level1",
                                                 scope="episode"),
-                                           dict(name="xxx_epsilons_level1")
+                                           #dict(name="xxx_epsilons_level1")
                                            ])
 
 
@@ -65,7 +65,7 @@ class XXXMultiagentController():
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
-                                                                             dict(name="xxx_epsilons_level2")
+                                                                             #dict(name="xxx_epsilons_level2")
                                                                              ])
 
         self.agent_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
@@ -81,7 +81,7 @@ class XXXMultiagentController():
                                                                      switch=self.args.xxx_agent_level3_use_past_actions),
                                                                 dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
                                                                 dict(name="xxx_epsilons_central_level3", scope="episode"),
-                                                                dict(name="xxx_epsilons_level3"),
+                                                                #dict(name="xxx_epsilons_level3"),
                                                                 * [dict(name="actions_level1__sample{}".format(_i),
                                                                         rename="past_actions_level1__sample{}".format(_i),
                                                                         transforms=[("one_hot", dict(range=(0, self.n_actions - 1)))],
@@ -123,9 +123,10 @@ class XXXMultiagentController():
                       for _i in range(_n_agent_pair_samples(self.n_agents))]
                    ])
         self.input_columns_level1["agent_input_level1"]["epsilons_central_level1"] = \
-            Scheme([dict(name="xxx_epsilons_central_level1")])
-        self.input_columns_level1["agent_input_level1"]["epsilons_level1"] = \
-            Scheme([dict(name="xxx_epsilons_level1")])
+            Scheme([dict(name="xxx_epsilons_central_level1",
+                         scope="episode")])
+        #self.input_columns_level1["agent_input_level1"]["epsilons_level1"] = \
+        #    Scheme([dict(name="xxx_epsilons_level1")])
 
         # level 2
         self.input_columns_level2 = {}
@@ -137,9 +138,10 @@ class XXXMultiagentController():
                              switch=self.args.xxx_agent_level2_use_past_actions),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
             self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilons_central_level2"] = \
-                Scheme([dict(name="xxx_epsilons_central_level2")])
-            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilons_level2"] = \
-                Scheme([dict(name="xxx_epsilons_level2")])
+                Scheme([dict(name="xxx_epsilons_central_level2",
+                             scope="episode")])
+            #self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilons_level2"] = \
+            #    Scheme([dict(name="xxx_epsilons_level2")])
 
         # level 3
         self.input_columns_level3 = {}
@@ -153,9 +155,10 @@ class XXXMultiagentController():
                         dict(name="agent_id", select_agent_ids=[_agent_id])],
                         dict(name="actions_level1"))
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_central_level3"] = \
-                Scheme([dict(name="xxx_epsilons_central_level3")])
-            self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_level3"] = \
-                Scheme([dict(name="xxx_epsilons_level3")])
+                Scheme([dict(name="xxx_epsilons_central_level3",
+                             scope="episode")])
+           # self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_level3"] = \
+           #     Scheme([dict(name="xxx_epsilons_level3")])
 
         pass
 
@@ -218,14 +221,14 @@ class XXXMultiagentController():
 
         # set up models level 1
         self.models["level1"] = self.model_level1(input_shapes=self.input_shapes_level1["agent_input_level1"],
-                                                  n_actions=self.n_actions,
+                                                  n_agents=self.n_agents,
                                                   output_type=self.agent_output_type,
                                                   args=self.args)
         if self.args.use_cuda:
             self.models["level1"] = self.models["level1"].cuda()
 
         # set up models level 2
-        if self.args.agents_level2_share_params:
+        if self.args.agent_level2_share_params:
             model_level2 = self.model_level2(input_shapes=self.input_shapes_level2["agent_input_level2__agents0:1"],
                                              n_actions=self.n_actions,
                                              output_type=self.agent_output_type,
@@ -240,7 +243,7 @@ class XXXMultiagentController():
 
         # set up models level 3
         self.models_level3 = {}
-        if self.args.agents_level3_share_params:
+        if self.args.agent_level3_share_params:
             model_level3 = self.model_level3(input_shapes=self.input_shapes_level3["agent_input_level3__agent0"],
                                              n_actions=self.n_actions,
                                              output_type=self.agent_output_type,
@@ -268,6 +271,9 @@ class XXXMultiagentController():
                                         in range(len(sorted(combinations(list(range(self.n_agents)), 2))))])
         hidden_dict["level3"] = th.stack([Variable(th.zeros(batch_size, 1, self.args.agents_hidden_state_size)) for _
                                         in range(self.n_agents)])
+        if self.args.use_cuda:
+            hidden_dict = {_k:_v.cuda() for _k, _v in hidden_dict.items()}
+
         return hidden_dict, "?*bs*v*t"
 
     def share_memory(self):
@@ -305,19 +311,20 @@ class XXXMultiagentController():
 
             # --------------------- LEVEL 1
             inputs_level1, inputs_level1_tformat = _build_model_inputs(self.input_columns_level1,
-                                                         inputs,
-                                                         to_variable=True,
-                                                         inputs_tformat=tformat)
+                                                                       inputs,
+                                                                       to_variable=True,
+                                                                       inputs_tformat=tformat)
 
-            out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.models["level1"](inputs,
+            out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.models["level1"](inputs_level1["agent_input_level1"],
                                                                                                     hidden_states=hidden_states["level1"],
                                                                                                     loss_fn=loss_fn,
                                                                                                     tformat=inputs_level1_tformat,
+                                                                                                    n_agents=self.n_agents,
                                                                                                     **kwargs)
 
-            sampled_pair_ids, modified_inputs_level1, selected_actions_format_level1 = self.action_selector.select_action(out_level1,
+            sampled_pair_ids, modified_inputs_level1, selected_actions_format_level1 = self.action_selector.select_action({"policies":out_level1},
                                                                                                                           avail_actions=None,
-                                                                                                                          tformat=tformat,
+                                                                                                                          tformat=tformat_level1,
                                                                                                                           test_mode=test_mode)
 
             # sample which pairs should be selected
@@ -336,7 +343,7 @@ class XXXMultiagentController():
                                                                        inputs_tformat=tformat,
                                                                        )
 
-            out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level1"](inputs_level2,
+            out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level1"]({"policies":inputs_level2},
                                                                                                     hidden_states=hidden_states["level2"],
                                                                                                     loss_fn=loss_fn,
                                                                                                     tformat=inputs_level2_tformat,
@@ -364,7 +371,7 @@ class XXXMultiagentController():
                                                                        inputs_tformat=tformat,
                                                                        )
 
-            out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level1"](inputs_level3,
+            out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level1"]({"policies":inputs_level3},
                                                                                                     hidden_states=hidden_states["level2"],
                                                                                                     loss_fn=loss_fn,
                                                                                                     tformat=inputs_level3_tformat,

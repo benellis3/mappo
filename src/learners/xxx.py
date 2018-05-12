@@ -93,8 +93,8 @@ class XXXLearner(BasicLearner):
         self.logging_struct = logging_struct
 
         self.critic_level1 = mo_REGISTRY[self.args.xxx_critic_level1]
-        self.critic_level2 = mo_REGISTRY[self.args.xxx_critic_level1]
-        self.critic_level3 = mo_REGISTRY[self.args.xxx_critic_level1]
+        self.critic_level2 = mo_REGISTRY[self.args.xxx_critic_level2]
+        self.critic_level3 = mo_REGISTRY[self.args.xxx_critic_level3]
 
         self.critic_level1_scheme = Scheme([dict(name="observations",
                                                  select_agent_ids=list(range(self.n_agents))),
@@ -303,10 +303,10 @@ class XXXLearner(BasicLearner):
         self.target_critic_models["level1"] = deepcopy(self.critic_models["level1"])
 
         # set up models level 2
-        if self.args.share_params:
-            critic_level2 = self.critic_level2(input_shapes=self.input_shapes_level2,
-                                             n_actions=self.n_actions,
-                                             args=self.args)
+        if self.args.critic_level2_share_params:
+            critic_level2 = self.critic_level2(input_shapes=self.input_shapes_level2["critic_level2__agents0:1"],
+                                               n_actions=self.n_actions,
+                                               args=self.args)
             if self.args.use_cuda:
                 critic_level2 = critic_level2.cuda()
 
@@ -317,10 +317,10 @@ class XXXLearner(BasicLearner):
             assert False, "TODO"
 
         # set up models level 3
-        if self.args.share_params:
-            critic_level3 = self.critic_level3(input_shapes=self.input_shapes_level3,
-                                             n_actions=self.n_actions,
-                                             args=self.args)
+        if self.args.critic_level3_share_params:
+            critic_level3 = self.critic_level3(input_shapes=self.input_shapes_level3["critic_level3__agent0"],
+                                               n_actions=self.n_actions,
+                                               args=self.args)
             if self.args.use_cuda:
                 critic_level3 = critic_level3.cuda()
 
@@ -331,40 +331,40 @@ class XXXLearner(BasicLearner):
             assert False, "TODO"
 
         # set up optimizers
-        if self.args.share_params:
+        if self.args.agent_level1_share_params:
             self.agent_level1_parameters = self.multiagent_controller.get_parameters(level=1)
         else:
             assert False, "TODO"
         self.agent_level1_optimiser = RMSprop(self.agent_level1_parameters, lr=self.args.lr_agent_level1)
 
-        if self.args.share_params:
+        if self.args.agent_level2_share_params:
             self.agent_level2_parameters = self.multiagent_controller.get_parameters(level=1)
         else:
             assert False, "TODO"
         self.agent_level2_optimiser = RMSprop(self.agent_level2_parameters, lr=self.args.lr_agent_level2)
 
-        if self.args.share_params:
+        if self.args.agent_level3_share_params:
             self.agent_level3_parameters = self.multiagent_controller.get_parameters(level=3)
         else:
             assert False, "TODO"
         self.agent_level3_optimiser = RMSprop(self.agent_level3_parameters, lr=self.args.lr_agent_level3)
 
         self.critic_level1_parameters = []
-        if self.args.share_params:
-            self.critic_level1_parameters.extend(self.critic_models["level1_{}".format(0)].parameters())
+        if self.args.critic_level1_share_params:
+            self.critic_level1_parameters.extend(self.critic_models["level1"].parameters())
         else:
             assert False, "TODO"
         self.critic_level1_optimiser = RMSprop(self.critic_level1_parameters, lr=self.args.lr_critic_level1)
 
         self.critic_level2_parameters = []
-        if self.args.share_params:
-            self.critic_level2_parameters.extend(self.critic_models["level2_{}".format(0)].parameters())
+        if self.args.critic_level2_share_params:
+            self.critic_level2_parameters.extend(self.critic_models["level2_0:1"].parameters())
         else:
             assert False, "TODO"
         self.critic_level2_optimiser = RMSprop(self.critic_level2_parameters, lr=self.args.lr_critic_level2)
 
         self.critic_level3_parameters = []
-        if self.args.share_params:
+        if self.args.critic_level3_share_params:
             self.critic_level3_parameters.extend(self.critic_models["level3_{}".format(0)].parameters())
         else:
             assert False, "TODO"
