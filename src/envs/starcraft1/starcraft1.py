@@ -36,7 +36,8 @@ class SC1(MultiAgentEnv):
         self.map_name = args.map_name
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
         self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        self.episode_limit = args.episode_limit
+        # self.episode_limit = args.episode_limit
+        self.episode_limit = 200
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         # self.difficulty = args.difficulty
@@ -311,6 +312,8 @@ class SC1(MultiAgentEnv):
 
         if action == 0:
             # no-op (valid only when dead)
+            if unit.health > 0:
+                print("break")
             assert unit.health == 0, "No-op chosen but the agent's unit is not dead"
             if self.debug_inputs:
                 print("Agent %d: Dead" % a_id)
@@ -680,6 +683,9 @@ class SC1(MultiAgentEnv):
         for agent_id in range(self.n_agents):
             avail_agent = self.get_avail_agent_actions(agent_id)
             avail_actions.append(avail_agent)
+
+        # if [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] in avail_actions:
+        #     print("\nAvailable actions for {}:\n{}".format(self.bs_id, avail_actions))
         return avail_actions
 
     def get_obs_size(self):
@@ -694,7 +700,7 @@ class SC1(MultiAgentEnv):
         return move_feats + enemy_feats + ally_feats
 
     def close(self):
-        print("Closing StarCraftII")
+        print("Closing StarCraftI")
         self.controller.close()
 
     def render(self):
@@ -741,9 +747,6 @@ class SC1(MultiAgentEnv):
 
     def kill_all_units(self):
         # TODO: updated this for SC1
-        # units_alive = [unit.tag for unit in self.agents.values() if unit.health > 0] + [unit.tag for unit in self.enemies.values() if unit.health > 0]
-        # debug_command = [d_pb.DebugCommand(kill_unit = d_pb.DebugKillUnit(tag = units_alive))]
-        # self.controller.debug(sc_pb.RequestDebug(debug = debug_command))
         self.agents = {}
         self.enemies = {}
 
@@ -801,7 +804,7 @@ class SC1(MultiAgentEnv):
             # as usual in the try brackets
 
             # Send actions
-            sent = self.controller.send([])
+            sent = self.controller.send([])  # This appears to always be true--need to find alternative
 
             if sent:
                 self._obs = self.controller.recv()
@@ -878,6 +881,8 @@ class SC1(MultiAgentEnv):
         stats["win_rate"] = self.battles_won / self.battles_game
         stats["timeouts"] = self.timeouts
         stats["restarts"] = self.force_restarts
+
+        print("Stats: {}\n".format(stats))
         return stats
 
     def _add_deepcopy_support(self):
