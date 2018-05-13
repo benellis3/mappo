@@ -34,7 +34,6 @@ def _pairing_id_2_agent_ids__tensor(pairing_id, n_agents):
     ret1 = all_pairings[:,1,:].gather(0, pairing_id.unsqueeze(0).long())
     return ret0, ret1
 
-
 def _agent_ids_2_pairing_id(agent_ids, n_agents):
     agent_ids = tuple(agent_ids)
     all_pairings = _ordered_agent_pairings(n_agents)

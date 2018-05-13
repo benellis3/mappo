@@ -793,8 +793,8 @@ class XXXRecurrentAgentLevel3(RecurrentAgent):
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # add softmax exploration (if switched on)
-            if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-               epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            if self.args.xxx_exploration_mode_level3 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat))
                epsilons, _, _ = _to_batch(epsilons, tformat)
                x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 

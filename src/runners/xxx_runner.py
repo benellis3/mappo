@@ -56,7 +56,7 @@ class XXXRunner(NStepRunner):
                                         dtype=np.int32,
                                         select_agent_ids=range(0, self.n_agents),
                                         missing=-1),
-                                   dict(name="policies_level1".format(),
+                                   dict(name="policies_level1",
                                         shape=(_n_agent_pairings(self.n_agents),),
                                         dtype=np.float32,
                                         missing=np.nan),
@@ -115,18 +115,19 @@ class XXXRunner(NStepRunner):
         super()._add_episode_stats(T_env)
 
         test_suffix = "" if not self.test_mode else "_test"
-        self._add_stat("policy_level1_entropy",
-                      self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level1"),
-                      T_env=T_env,
-                      suffix=test_suffix)
-        self._add_stat("policy_level2_entropy_",
-                      self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level2"),
-                      T_env=T_env,
-                      suffix=test_suffix)
-        self._add_stat("policy_level3_entropy_",
-                      self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level3"),
-                      T_env=T_env,
-                      suffix=test_suffix)
+        # TODO!
+        # self._add_stat("policy_level1_entropy",
+        #               self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level1"),
+        #               T_env=T_env,
+        #               suffix=test_suffix)
+        # self._add_stat("policy_level2_entropy_",
+        #               self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level2"),
+        #               T_env=T_env,
+        #               suffix=test_suffix)
+        # self._add_stat("policy_level3_entropy_",
+        #               self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level3"),
+        #               T_env=T_env,
+        #               suffix=test_suffix)
 
         # TODO: Policy entropy across levels! (Use suffix)
         return

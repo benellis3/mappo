@@ -7,11 +7,11 @@ from components import REGISTRY as co_REGISTRY
 from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, \
-    _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim
+    _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim, _vdim
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
 from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
-    _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor
+    _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings
 
 class XXXMultiagentController():
     """
@@ -26,7 +26,9 @@ class XXXMultiagentController():
         self.n_actions = n_actions
         self.agent_str = args.agent
         assert self.args.agent_output_type in ["policies"], "agent_output_type has to be set to 'policies' for XXX - makes no sense with other methods!"
-        self.agent_output_type = "policies"
+        self.agent_output_type = [] # ["policies_level1"] \
+                                 #+ ["policies_level2__pairings{}".format(_i) for _i in range(_n_agent_pairings(self.n_agents))] \
+                                 # + ["policies_level3__agent{}".format(_i) for _i in range(self.n_agents)]
 
         self.model_level1 = mo_REGISTRY[args.xxx_agent_model_level1]
         self.model_level2 = mo_REGISTRY[args.xxx_agent_model_level2]
@@ -91,6 +93,8 @@ class XXXMultiagentController():
                                                                         transforms=[("one_hot", dict(range=(0, self.n_actions - 1)))],
                                                                         switch=self.args.xxx_agent_level3_use_past_actions_level1)
                                                                    for _i in range(_n_agent_pair_samples(self.n_agents))],
+                                                                dict(name="avail_actions",
+                                                                     select_agent_ids=[_agent_id])
                                                                ])
 
         # Set up schemes
@@ -165,6 +169,9 @@ class XXXMultiagentController():
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_central_level3"] = \
                 Scheme([dict(name="xxx_epsilons_central_level3",
                              scope="episode")])
+            self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["avail_actions"] = \
+                Scheme([dict(name="avail_actions",
+                             select_agent_ids=[_agent_id])])
            # self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_level3"] = \
            #     Scheme([dict(name="xxx_epsilons_level3")])
 
@@ -185,21 +192,17 @@ class XXXMultiagentController():
             return param_list
 
     def select_actions(self, inputs, avail_actions, tformat, info, test_mode=False):
-        #selected_actions, modified_inputs, selected_actions_format = \
-        #    self.action_selector.select_action(inputs,
-        #                                       avail_actions=avail_actions,
-        #                                       tformat=tformat,
-        #                                       test_mode=test_mode)
-        # assert False, "TODO" # TODO
-        #return selected_actions, modified_inputs, selected_actions_format
 
         selected_actions_dict = {}
-        selected_actions_dict["actions_level1"] = self.actions_level1
-        selected_actions_dict["actions_level2"] = self.actions_level2
+        #selected_actions_dict["actions_level1"] = self.actions_level1
+        #selected_actions_dict["actions_level2"] = self.actions_level2
+        #selected_actions_dict["actions_level3"] = self.actions_level3
+        selected_actions_dict["actions"] = self.final_actions
 
         modified_inputs_dict = {}
         modified_inputs_dict["policies_level1"] = self.policies_level1
         modified_inputs_dict["policies_level2"] = self.policies_level2
+        modified_inputs_dict["policies_level3"] = self.policies_level3
 
         return selected_actions_dict, modified_inputs_dict, self.selected_actions_format
 
@@ -294,24 +297,6 @@ class XXXMultiagentController():
         test_mode = kwargs["test_mode"]
 
         if self.args.share_agent_params:
-            # TODO: Need to do this over 3 levels
-            #
-            # inputs, inputs_tformat = _build_model_inputs(self.input_columns,
-            #                                              inputs,
-            #                                              to_variable=True,
-            #                                              inputs_tformat=tformat)
-            #
-            # out, hidden_states, losses, tformat = self.lambda_network_model(inputs,
-            #                                                                 hidden_states=hidden_states,
-            #                                                                 loss_fn=loss_fn,
-            #                                                                 tformat=inputs_tformat,
-            #                                                                 **kwargs)
-            # ret = {"hidden_states": hidden_states,
-            #        "losses": losses,
-            #        "format": tformat}
-            #
-            # out_key = self.agent_output_type
-            # ret[out_key] = out
 
             # top level: aa' ~ Pi_c sample which pair to coordinate
             # second level: pick up correct pair (given aa'), sample u^a, u^a' from the pair coordinator
@@ -371,7 +356,7 @@ class XXXMultiagentController():
             self.policies_level2 = modified_inputs_level2.clone()
 
             # --------------------- LEVEL 3
-            agent_ids_not_sampled_yet = None # TODO
+            # TODO: np.nan in actions1 !!
             actions1, actions2 = _joint_actions_2_action_pair(pair_sampled_actions, self.n_actions)
             pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
 
@@ -394,21 +379,31 @@ class XXXMultiagentController():
                                                                                                       hidden_states=hidden_states["level2"],
                                                                                                       loss_fn=loss_fn,
                                                                                                       tformat=inputs_level3_tformat,
-                                                                                                      agent_ids_not_sampled_yet=agent_ids_not_sampled_yet,
                                                                                                       **kwargs)
 
             individual_actions, \
             modified_inputs_level3, \
             selected_actions_format_level3 = self.action_selector.select_action({"policies":out_level3},
                                                                                 avail_actions=None,
-                                                                                tformat=tformat,
+                                                                                tformat=tformat_level3,
                                                                                 test_mode=test_mode)
+
+            # fill into action matrix all the actions that are not NaN
+            individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
+            action_matrix[action_matrix != action_matrix] = individual_actions_sq
+
+            self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)],
+                                                    individual_actions.shape[_bsdim(tformat_level3)],
+                                                    individual_actions.shape[_vdim(tformat_level3)],
+                                                    1)
 
             self.actions_level3 = pair_sampled_actions.clone()
             self.selected_actions_format_level3 = selected_actions_format_level3
             self.policies_level3 = modified_inputs_level3.clone()
 
-            return #ret, tformat
+            return dict(hidden_states = dict(level1=hidden_states_level1,
+                                             level2=hidden_states_level2,
+                                             level3=hidden_states_level3)), tformat_level3
         else:
             assert False, "Not yet implemented."
 
