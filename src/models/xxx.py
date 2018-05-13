@@ -318,7 +318,7 @@ class XXXCriticLevel2(nn.Module):
         self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":(1 + self.input_shapes["avail_actions_id1"]*self.input_shapes["avail_actions_id2"]),
                                                          "qvalues":self.XXXQFunction.output_shapes["qvalues"],
                                                          "agent_action":self.input_shapes["agent_action"],
-                                                         "agent_policy":self.input_shapes["agent_policy"]},
+                                                         "agent_policy":self.input_shapes["policies_level2"]},
                                          output_shapes={},
                                          n_actions=self.n_actions,
                                          args=self.args)

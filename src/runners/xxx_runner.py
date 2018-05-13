@@ -60,10 +60,11 @@ class XXXRunner(NStepRunner):
                                         shape=(_n_agent_pairings(self.n_agents),),
                                         dtype=np.float32,
                                         missing=np.nan),
-                                   *[dict(name="policies_level2__pairing{}".format(_i),
+                                   *[dict(name="policies_level2__sample{}".format(_i),
                                           shape=(1+self.n_actions*self.n_actions,), # i.e. just one number for a pair of actions!
+                                          #select_agent_ids=range(0, _n_agent_pairings(self.n_agents)),
                                           dtype=np.int32,
-                                          missing=-1,) for _i in range(_n_agent_pairings(self.n_agents))],
+                                          missing=-1,) for _i in range(_n_agent_pair_samples(self.n_agents))],
                                    dict(name="policies_level3",
                                         shape=(self.n_actions,),
                                         select_agent_ids=range(0, self.n_agents),

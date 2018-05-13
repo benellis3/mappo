@@ -344,6 +344,9 @@ def _build_model_inputs(column_dict, inputs, inputs_tformat, to_variable=True, f
 
     return ret_dict, output_tformat
 
+def _agent_flatten(lst):
+
+    pass
 
 def _generate_scheme_shapes(transition_scheme, dict_of_schemes):
     """

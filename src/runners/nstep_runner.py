@@ -674,9 +674,10 @@ class NStepRunner():
             if isinstance(self.multiagent_controller.agent_output_type, list):
                 for output_type in self.multiagent_controller.agent_output_type:
                     self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                                col=output_type,
+                                                col=output_type["name"],
                                                 t=self.t_episode,
-                                                data=action_selector_outputs[output_type])
+                                                agent_ids=output_type.get("select_agent_ids", None),
+                                                data=action_selector_outputs[output_type["name"]])
             else:
                 self.episode_buffer.set_col(bs=ids_envs_not_terminated,
                                             col=self.multiagent_controller.agent_output_type,
@@ -764,6 +765,7 @@ class NStepRunner():
         if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
             self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
 
+        a = self.episode_buffer.to_pd()
         return
 
     def log(self,log_directly = True):
