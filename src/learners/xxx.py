@@ -151,8 +151,7 @@ class XXXLearner(BasicLearner):
                                                         rename="agent_action".format(0),
                                                         ),
                                                    dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                   dict(name="policies_level2__pairing{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                        rename="agent_policy"),
+                                                   *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents))], #select_agent_ids=[_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)])
                                                    dict(name="state"),
                                                    dict(name="avail_actions",
                                                         select_agent_ids=[_agent_id1]),
@@ -233,6 +232,7 @@ class XXXLearner(BasicLearner):
         self.input_columns_level1["target_critic_level1"] = self.input_columns_level1["critic_level1"]
 
         # level 2
+
         self.input_columns_level2 = {}
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = {}
@@ -247,7 +247,7 @@ class XXXLearner(BasicLearner):
                         dict(name="past_actions", select_agent_ids=list(range(self.n_agents)))])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_action"] = Scheme([dict(name="agent_action")])
-            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_policy"] = Scheme([dict(name="agent_policy")])
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["policies_level2"] = Scheme([dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents))])
             self.input_columns_level2["target_critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]
 
 
@@ -423,15 +423,19 @@ class XXXLearner(BasicLearner):
 
     def train_level1(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
-        if (self.T_critic_level1 - self.last_target_update_T_critic_level1) / self.T_target_critic_level1_update_interval > 1.0:
+        if (self.T_critic_level1 - self.last_target_update_T_critic_level1) / self.args.T_target_critic_level1_update_interval > 1.0:
             self.update_target_nets()
             self.last_target_update_T_critic_level1 = self.T_critic_level1
             print("updating target net!")
 
-        actions, actions_tformat = batch_history.get_col(bs=None,
-                                                         col="actions_level1",
-                                                         agent_ids=list(range(0, self.n_agents)),
+        actions_level1 = []
+        for _i in range(_n_agent_pair_samples(self.n_agents)):
+            actions, actions_tformat = batch_history.get_col(bs=None,
+                                                         col="actions_level1__sample{}".format(_i),
+                                                         # agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
+            actions_level1.append(actions)
+
         # do single forward pass in critic
         xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level1,
                                                                            inputs=data_inputs,
@@ -458,7 +462,7 @@ class XXXLearner(BasicLearner):
 
     def train_level2(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
-        if (self.T_critic_level2 - self.last_target_update_T_critic_level2) / self.T_target_critic_level2_update_interval > 1.0:
+        if (self.T_critic_level2 - self.last_target_update_T_critic_level2) / self.args.T_target_critic_level2_update_interval > 1.0:
             self.update_target_nets()
             self.last_target_update_T_critic_level2 = self.T_critic_level2
             print("updating target net!")
@@ -493,7 +497,7 @@ class XXXLearner(BasicLearner):
 
     def train_level3(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
-        if (self.T_critic_level3 - self.last_target_update_T_critic_level3) / self.T_target_critic_level3_update_interval > 1.0:
+        if (self.T_critic_level3 - self.last_target_update_T_critic_level3) / self.args.T_target_critic_level3_update_interval > 1.0:
             self.update_target_nets()
             self.last_target_update_T_critic_level3 = self.T_critic_level3
             print("updating target net!")

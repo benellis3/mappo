@@ -657,10 +657,8 @@ class NStepRunner():
                                                        test_mode=test_mode,
                                                        info=None)
 
-            # if th.sum(multiagent_controller_outputs["policies"].data!=multiagent_controller_outputs["policies"].data) > 0.0:
-            #    pass
             if isinstance(multiagent_controller_outputs["hidden_states"], dict):
-                for _v, _k in multiagent_controller_outputs["hidden_states"].items():
+                for _k, _v in multiagent_controller_outputs["hidden_states"].items():
                     self.hidden_states[_k][:, ids_envs_not_terminated_tensor, :, :] = _v
             else:
                 self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = multiagent_controller_outputs["hidden_states"]
@@ -673,16 +671,16 @@ class NStepRunner():
                                                           test_mode=test_mode)
 
             # TODO: adapt for multiple simultaneous output types!
-            if isinstance(self.multiagent_controller.action_selector.output_type, list):
-                for output_type in self.multiagent_controller.action_selector.output_type:
+            if isinstance(self.multiagent_controller.agent_output_type, list):
+                for output_type in self.multiagent_controller.agent_output_type:
                     self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                                col=output_type,
+                                                col=output_type["name"],
                                                 t=self.t_episode,
-                                                agent_ids=list(range(self.n_agents)),
-                                                data=action_selector_outputs[output_type])
+                                                agent_ids=output_type.get("select_agent_ids", None),
+                                                data=action_selector_outputs[output_type["name"]])
             else:
                 self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                            col=self.multiagent_controller.action_selector.output_type,
+                                            col=self.multiagent_controller.agent_output_type,
                                             t=self.t_episode,
                                             agent_ids=list(range(self.n_agents)),
                                             data=action_selector_outputs)
@@ -767,6 +765,7 @@ class NStepRunner():
         if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
             self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
 
+        a = self.episode_buffer.to_pd()
         return
 
     def log(self,log_directly = True):
