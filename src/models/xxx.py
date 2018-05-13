@@ -1,4 +1,5 @@
 import numpy as np
+from torch.autograd import Variable
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -574,6 +575,7 @@ class XXXRecurrentAgentLevel1(nn.Module):
 
 class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
 
+
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
 
@@ -602,15 +604,64 @@ class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevel2(RecurrentAgent):
+class XXXRecurrentAgentLevel2(nn.Module):
+
+    def __init__(self, input_shapes, n_actions, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
+        super(XXXRecurrentAgentLevel2, self).__init__()
+
+        self.args = args
+        self.n_actions = n_actions
+        assert output_type is not None, "you have to set an output_type!"
+        # self.output_type=output_type
+
+        # Set up input regions automatically if required (if sensible)
+        self.input_shapes = {}
+        # assert set(input_shapes.keys()) == {"main"}, \
+        #     "set of input_shapes does not coincide with model structure!"
+        self.input_shapes.update(input_shapes)
+
+        # Set up layer_args automatically if required
+        self.output_shapes = {}
+        self.output_shapes["output"] = 1 + self.n_actions*self.n_actions # output
+        if self.output_shapes is not None:
+            self.output_shapes.update(output_shapes)
+
+        # Set up layer_args automatically if required
+        self.layer_args = {}
+        self.layer_args["encoder"] = {"in":self.input_shapes["main"], "out":64}
+        self.layer_args["gru"] = {"in":self.layer_args["encoder"]["out"], "hidden":64}
+        self.layer_args["output"] = {"in":self.layer_args["gru"]["hidden"], "out":self.output_shapes["output"]}
+        self.layer_args.update(layer_args)
+
+        # Set up network layers
+        self.encoder = MLPEncoder(input_shapes=dict(main=self.layer_args["encoder"]["in"]),
+                                    output_shapes=dict(main=self.layer_args["encoder"]["out"]))
+        self.gru = nn.GRUCell(self.layer_args["gru"]["in"], self.layer_args["gru"]["hidden"])
+        self.output = nn.Linear(self.layer_args["output"]["in"], self.layer_args["output"]["out"])
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
 
         test_mode = kwargs["test_mode"]
+        sampled_pair_ids = kwargs["sampled_pair_ids"]
 
+        # select pairs that were actually sampled
+        #_inputs = inputs["main"].gather(0, Variable(sampled_pair_ids.long(),
+        #                                            requires_grad=False).repeat(1,1,1,inputs["main"].shape[_vdim(tformat)]))
+        #hidden_states = hidden_states.gather(0, Variable(sampled_pair_ids.long(),
+        #                                            requires_grad=False).repeat(1,1,1,hidden_states.shape[_vdim(tformat)]))
         _inputs = inputs["main"]
-        _inputs_aa = inputs["avail_actions"]
+
+        # compute avail_actions
+        avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs["avail_actions_id1"], tformat)
+        avail_actions2, params_aa2, _ = _to_batch(inputs["avail_actions_id2"], tformat)
+        tmp = (avail_actions1 * avail_actions2)
+        pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+        ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
+        delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0], 1).fill_(1.0), requires_grad=False)
+        other_avails = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
+        pairwise_avail_actions = th.cat([delegation_avails, other_avails], dim=1)
+        pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
 
         loss = None
         t_dim = _tdim(tformat)
@@ -623,7 +674,7 @@ class XXXRecurrentAgentLevel2(RecurrentAgent):
         for t in range(t_len):
 
             x = _inputs[:, :, slice(t, t + 1), :].contiguous()
-            avail_actions = _inputs_aa[:, :, slice(t, t + 1), :].contiguous()
+            avail_actions = pairwise_avail_actions[:, :, slice(t, t + 1), :].contiguous()
             x, tformat = self.encoder({"main":x}, tformat)
 
             x, params_x, tformat_x = _to_batch(x, tformat)
@@ -645,13 +696,17 @@ class XXXRecurrentAgentLevel2(RecurrentAgent):
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # add softmax exploration (if switched on)
-            if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-               epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            if self.args.xxx_exploration_mode_level2 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat))
                epsilons, _, _ = _to_batch(epsilons, tformat)
                x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
+
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
+
+            # select appropriate pairs
+            x = x.gather(0, Variable(sampled_pair_ids.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
 
             h_list.append(h)
             x_list.append(x)

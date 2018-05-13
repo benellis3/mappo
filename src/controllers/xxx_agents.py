@@ -9,7 +9,7 @@ from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
-from utils.xxx import _n_agent_pair_samples
+from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id
 
 class XXXMultiagentController():
     """
@@ -65,6 +65,8 @@ class XXXMultiagentController():
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
+                                                                             dict(name="avail_actions",
+                                                                                  select_agent_ids=[_agent_id1, _agent_id2])
                                                                              #dict(name="xxx_epsilons_level2")
                                                                              ])
 
@@ -98,8 +100,9 @@ class XXXMultiagentController():
         # level 2
         self.schemes_level2 = {}
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-            self.schemes_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.agent_scheme_level2_fn(_agent_id1,
-                                                                                                                         _agent_id2).agent_flatten()
+            self.schemes_level2["agent_input_level2__agent{}"
+                .format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] \
+                = self.agent_scheme_level2_fn(_agent_id1, _agent_id2)
         # level 3
         self.schemes_level3 = {}
         for _agent_id in range(self.n_agents):
@@ -131,16 +134,19 @@ class XXXMultiagentController():
         # level 2
         self.input_columns_level2 = {}
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
-            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
+            self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = {}
+            self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["main"] = \
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
                         dict(name="past_actions_level2",
                              switch=self.args.xxx_agent_level2_use_past_actions),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
-            self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilons_central_level2"] = \
+            self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_central_level2"] = \
                 Scheme([dict(name="xxx_epsilons_central_level2",
                              scope="episode")])
-            #self.input_columns_level2["agent_input_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["epsilons_level2"] = \
+            self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
+            self.input_columns_level2[
+                "agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
+            #self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_level2"] = \
             #    Scheme([dict(name="xxx_epsilons_level2")])
 
         # level 3
@@ -229,7 +235,7 @@ class XXXMultiagentController():
 
         # set up models level 2
         if self.args.agent_level2_share_params:
-            model_level2 = self.model_level2(input_shapes=self.input_shapes_level2["agent_input_level2__agents0:1"],
+            model_level2 = self.model_level2(input_shapes=self.input_shapes_level2["agent_input_level2__agent0"],
                                              n_actions=self.n_actions,
                                              output_type=self.agent_output_type,
                                              args=self.args)
@@ -237,7 +243,7 @@ class XXXMultiagentController():
                 model_level2 = model_level2.cuda()
 
             for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-                self.models["level2_{}:{}".format(_agent_id1, _agent_id2)] = model_level2
+                self.models["level2_{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = model_level2
         else:
             assert False, "TODO"
 
@@ -334,8 +340,8 @@ class XXXMultiagentController():
 
             # --------------------- LEVEL 2
             assert self.n_agents == 3, "pair selection only implemented for 3 agents yet!!"
-            tmp = (avail_actions * avail_actions)
-            pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+            #tmp = (avail_actions * avail_actions)
+            #pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
 
             inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
                                                                        inputs,
@@ -343,19 +349,19 @@ class XXXMultiagentController():
                                                                        inputs_tformat=tformat,
                                                                        )
 
-            out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level1"]({"policies":inputs_level2},
-                                                                                                    hidden_states=hidden_states["level2"],
-                                                                                                    loss_fn=loss_fn,
-                                                                                                    tformat=inputs_level2_tformat,
-                                                                                                    avail_actions=pairwise_avail_actions,
-                                                                                                    sampled_pair_ids=sampled_pair_ids
-                                                                                                    **kwargs)
+            assert self.args.agent_level2_share_params, "not implemented!"
+            out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level2_0"](inputs_level2["agent_input_level2"],
+                                                                                                      hidden_states=hidden_states["level2"],
+                                                                                                      loss_fn=loss_fn,
+                                                                                                      tformat=inputs_level2_tformat,
+                                                                                                      sampled_pair_ids=sampled_pair_ids,
+                                                                                                      **kwargs)
 
             pair_sampled_actions, \
             modified_inputs_level2, \
-            selected_actions_format_level2 = self.action_selector.select_action(out_level2,
+            selected_actions_format_level2 = self.action_selector.select_action({"policies":out_level2},
                                                                          avail_actions=None,
-                                                                         tformat=tformat,
+                                                                         tformat=tformat_level2,
                                                                          test_mode=test_mode)
 
             self.actions_level2 = pair_sampled_actions.clone()
@@ -371,16 +377,16 @@ class XXXMultiagentController():
                                                                        inputs_tformat=tformat,
                                                                        )
 
-            out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level1"]({"policies":inputs_level3},
+            out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3"](inputs_level3["agent_input_level3"],
                                                                                                     hidden_states=hidden_states["level2"],
                                                                                                     loss_fn=loss_fn,
                                                                                                     tformat=inputs_level3_tformat,
-                                                                                                    agent_ids_not_sampled_yet=agent_ids_not_sampled_yet
+                                                                                                    agent_ids_not_sampled_yet=agent_ids_not_sampled_yet,
                                                                                                     **kwargs)
 
             individual_actions, \
             modified_inputs_level3, \
-            selected_actions_format_level3 = self.action_selector.select_action(out_level3,
+            selected_actions_format_level3 = self.action_selector.select_action({"policies":out_level3},
                                                                                 avail_actions=None,
                                                                                 tformat=tformat,
                                                                                 test_mode=test_mode)
