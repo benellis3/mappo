@@ -20,7 +20,7 @@ class IndependentMultiagentController():
         self.n_agents = n_agents
         self.n_actions = n_actions
         self.agent_str = args.agent
-        self.agent_output_type= self.args.agent_output_type
+        self.agent_output_type = self.args.agent_output_type
         self.runner = runner
         self.has_target_network = kwargs.get("has_target_network", True)
 
@@ -44,12 +44,12 @@ class IndependentMultiagentController():
         self.schemes = {}
         # create joint scheme from the agents schemes
         for _i, agent in enumerate(self.agents):
-            self.schemes["agent__agent{}".format(_i)] = agent.scheme["main"] #agent.scheme_fn(_i).agent_flatten()
+            self.schemes["agent__agent{}".format(_i)] = agent.scheme["main"]  # agent.scheme_fn(_i).agent_flatten()
         self.joint_scheme_dict = _join_dicts(self.schemes)
 
         # construct model-specific input regions
         self.input_columns = {}
-        self.input_columns = _join_dicts(*[{"agent__agent{}".format(_agent_id):self.agents[_agent_id].input_columns["main"]}
+        self.input_columns = _join_dicts(*[{"agent__agent{}".format(_agent_id): self.agents[_agent_id].input_columns["main"]}
                                            for _agent_id in range(self.n_agents)])
         pass
 
@@ -141,7 +141,7 @@ class IndependentMultiagentController():
 
             ret = {"hidden_states": hidden_states,
                    "losses": losses,
-                   "format":tformat}
+                   "format": tformat}
 
             out_key = self.agent_output_type
             ret[out_key] = out
