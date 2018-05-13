@@ -25,11 +25,8 @@ class XXXMultiagentController():
         self.n_agents = n_agents
         self.n_actions = n_actions
         self.agent_str = args.agent
-        assert self.args.agent_output_type in ["policies"], "agent_output_type has to be set to 'policies' for XXX - makes no sense with other methods!"
-        self.agent_output_type = [dict(name="policies_level1"),
-                                  #dict(name="policies_level2", select_agent_ids=list(range(_n_agent_pairings(self.n_agents)))),_n_agent_pair_samples(
-                                  *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents))],
-                                  dict(name="policies_level3", select_agent_ids=list(range(self.n_agents)))]
+        self.agent_output_type = "policies"
+
 
         self.model_level1 = mo_REGISTRY[args.xxx_agent_model_level1]
         self.model_level2 = mo_REGISTRY[args.xxx_agent_model_level2]
@@ -194,19 +191,46 @@ class XXXMultiagentController():
 
     def select_actions(self, inputs, avail_actions, tformat, info, test_mode=False):
 
-        selected_actions_dict = {}
-        #selected_actions_dict["actions_level1"] = self.actions_level1
-        #selected_actions_dict["actions_level2"] = self.actions_level2
-        #selected_actions_dict["actions_level3"] = self.actions_level3
-        selected_actions_dict["actions"] = self.final_actions
+        # selected_actions_dict = {}
+        # selected_actions_dict["actions_level1"] = self.actions_level1
+        # for _i in range(_n_agent_pair_samples(self.n_agents)):
+        #     selected_actions_dict["actions_level2__sample{}".format(_i)] = self.actions_level2[_i]
+        # selected_actions_dict["actions_level3"] = self.actions_level3
+        #
+        # selected_actions_dict["actions"] = self.final_actions
+        #
+        # modified_inputs_dict = {}
+        # modified_inputs_dict["policies_level1"] = self.policies_level1
+        # for _i in range(_n_agent_pair_samples(self.n_agents)):
+        #     modified_inputs_dict["policies_level2__sample{}".format(_i)] = self.policies_level2[_i]
+        # modified_inputs_dict["policies_level3"] = self.policies_level3
+        #
+        # return selected_actions_dict, modified_inputs_dict, self.selected_actions_format
 
-        modified_inputs_dict = {}
-        modified_inputs_dict["policies_level1"] = self.policies_level1
+        selected_actions_list = []
         for _i in range(_n_agent_pair_samples(self.n_agents)):
-            modified_inputs_dict["policies_level2__sample{}".format(_i)] = self.policies_level2[_i]
-        modified_inputs_dict["policies_level3"] = self.policies_level3
+            selected_actions_list += [dict(name="actions_level1__sample{}".format(_i),
+                                           data=self.actions_level1[_i])]
+        for _i in range(_n_agent_pair_samples(self.n_agents)):
+            selected_actions_list += [dict(name="actions_level2__sample{}".format(_i),
+                                           data=self.actions_level2[_i])]
+        selected_actions_list += [dict(name="actions_level3",
+                                       select_agent_ids=list(range(self.n_agents)),
+                                       data=self.actions_level3)]
+        selected_actions_list += [dict(name="actions",
+                                       select_agent_ids=list(range(self.n_agents)),
+                                       data=self.final_actions)]
 
-        return selected_actions_dict, modified_inputs_dict, self.selected_actions_format
+        modified_inputs_list = []
+        modified_inputs_list += [dict(name="policies_level1",
+                                      data=self.policies_level1)]
+        for _i in range(_n_agent_pair_samples(self.n_agents)):
+            modified_inputs_list += [dict(name="policies_level2__sample{}".format(_i),
+                                          data=self.policies_level2[_i])]
+        modified_inputs_list += [dict(name="policies_level3",
+                                      select_agent_ids=list(range(self.n_agents)),
+                                      data=self.policies_level3)]
+        return selected_actions_list, modified_inputs_list, self.selected_actions_format
 
     def create_model(self, transition_scheme):
 
@@ -392,6 +416,13 @@ class XXXMultiagentController():
 
             # fill into action matrix all the actions that are not NaN
             individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
+
+            tmp = individual_actions_sq.clone()
+            tmp[action_matrix == action_matrix] = float("nan")
+            self.actions_level3 = tmp.view(individual_actions.shape[_adim(tformat_level3)],
+                                           individual_actions.shape[_bsdim(tformat_level3)],
+                                           individual_actions.shape[_vdim(tformat_level3)],
+                                           1)
             action_matrix[action_matrix != action_matrix] = individual_actions_sq
 
             self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)],
@@ -399,7 +430,7 @@ class XXXMultiagentController():
                                                     individual_actions.shape[_vdim(tformat_level3)],
                                                     1)
 
-            self.actions_level3 = pair_sampled_actions.clone()
+            #self.actions_level3 = individual_actions.clone()
             self.selected_actions_format_level3 = selected_actions_format_level3
             self.policies_level3 = modified_inputs_level3.clone()
 
