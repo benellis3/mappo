@@ -423,14 +423,15 @@ class XXXLearner(BasicLearner):
 
     def train_level1(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
-        if (self.T_critic_level1 - self.last_target_update_T_critic_level1) / self.T_target_critic_level1_update_interval > 1.0:
+        if (self.T_critic_level1 - self.last_target_update_T_critic_level1) / self.args.T_target_critic_level1_update_interval > 1.0:
             self.update_target_nets()
             self.last_target_update_T_critic_level1 = self.T_critic_level1
             print("updating target net!")
 
+        a = batch_history.to_pd()
         actions, actions_tformat = batch_history.get_col(bs=None,
                                                          col="actions_level1",
-                                                         agent_ids=list(range(0, self.n_agents)),
+                                                         # agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
         # do single forward pass in critic
         xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level1,
@@ -458,7 +459,7 @@ class XXXLearner(BasicLearner):
 
     def train_level2(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
-        if (self.T_critic_level2 - self.last_target_update_T_critic_level2) / self.T_target_critic_level2_update_interval > 1.0:
+        if (self.T_critic_level2 - self.last_target_update_T_critic_level2) / self.args.T_target_critic_level2_update_interval > 1.0:
             self.update_target_nets()
             self.last_target_update_T_critic_level2 = self.T_critic_level2
             print("updating target net!")
@@ -493,7 +494,7 @@ class XXXLearner(BasicLearner):
 
     def train_level3(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
-        if (self.T_critic_level3 - self.last_target_update_T_critic_level3) / self.T_target_critic_level3_update_interval > 1.0:
+        if (self.T_critic_level3 - self.last_target_update_T_critic_level3) / self.args.T_target_critic_level3_update_interval > 1.0:
             self.update_target_nets()
             self.last_target_update_T_critic_level3 = self.T_critic_level3
             print("updating target net!")
