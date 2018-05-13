@@ -9,7 +9,7 @@ from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
-from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id
+from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair
 
 class XXXMultiagentController():
     """
@@ -370,6 +370,7 @@ class XXXMultiagentController():
 
             # --------------------- LEVEL 3
             agent_ids_not_sampled_yet = None # TODO
+            actions1, actions2 = _joint_actions_2_action_pair(pair_sampled_actions, self.n_actions)
 
             inputs_level3, inputs_level3_tformat = _build_model_inputs(self.input_columns_level3,
                                                                        inputs,
