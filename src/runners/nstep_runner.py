@@ -600,10 +600,13 @@ class NStepRunner():
                                                                                          agent_ids=list(range(self.n_agents))
                                                                                          )
 
-                ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
+                try: # DEBUG
+                    ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
                                                                  if selected_actions.is_cuda else ids_envs_not_terminated_tensor.cpu(), :, :],
-                                ids=ids_envs_not_terminated)
-
+                                    ids=ids_envs_not_terminated)
+                except Exception as e:
+                    s = self.episode_buffer.to_pd()
+                    pass
                 # retrieve ids of all envs that have not yet terminated.
                 # NOTE: for efficiency reasons, will perform final action selection in terminal state
                 ids_envs_not_terminated = [_b for _b in range(self.batch_size) if not self.envs_terminated[_b]]
@@ -670,14 +673,14 @@ class NStepRunner():
                                                           info=dict(T_env=self.T_env),
                                                           test_mode=test_mode)
 
-            # TODO: adapt for multiple simultaneous output types!
-            if isinstance(self.multiagent_controller.agent_output_type, list):
-                for output_type in self.multiagent_controller.agent_output_type:
+            # TODO: can encapsulate this in some common function
+            if isinstance(action_selector_outputs, list):
+                for _sa in action_selector_outputs:
                     self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                                col=output_type["name"],
+                                                col=_sa["name"],
                                                 t=self.t_episode,
-                                                agent_ids=output_type.get("select_agent_ids", None),
-                                                data=action_selector_outputs[output_type["name"]])
+                                                agent_ids=_sa.get("select_agent_ids", None),
+                                                data=_sa["data"])
             else:
                 self.episode_buffer.set_col(bs=ids_envs_not_terminated,
                                             col=self.multiagent_controller.agent_output_type,
@@ -686,13 +689,13 @@ class NStepRunner():
                                             data=action_selector_outputs)
 
             # write selected actions to episode_buffer
-            if isinstance(selected_actions, dict):
-               for _k, _v in selected_actions.items():
+            if isinstance(selected_actions, list):
+               for _sa in selected_actions:
                    self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                               col=_k,
+                                               col=_sa["name"],
                                                t=self.t_episode,
-                                               agent_ids=list(range(self.n_agents)),
-                                               data=_v)
+                                               agent_ids=_sa.get("select_agent_ids", None),
+                                               data=_sa["data"])
             else:
                 self.episode_buffer.set_col(bs=ids_envs_not_terminated,
                                             col="actions",

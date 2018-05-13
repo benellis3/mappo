@@ -204,10 +204,8 @@ class BatchEpisodeBuffer():
                         self.seq_lens[_bs] = max(self.seq_lens[_bs], t_slice.stop)
                 else:
                     assert t_slice.stop <= self.data._transition.shape[1], "indices out of range!"
-                    try:
-                        assert len(bs) <= _data.shape[0], "too many batch indices supplied!"
-                    except Exception as e:
-                        pass
+                    assert len(bs) <= _data.shape[0], "too many batch indices supplied!"
+
                     for _i, _bs in enumerate(bs): # TODO: This should work with scatter, but will have to see how exactly!
                        self.data._transition[slice(_bs, _bs+1), t_slice, col_slice] = _data[slice(_i,_i+1), :, :]
                        # adapt sequence lengths:
