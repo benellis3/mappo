@@ -6,10 +6,12 @@ from components.action_selectors import REGISTRY as as_REGISTRY
 from components import REGISTRY as co_REGISTRY
 from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
-from components.transforms import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
+from components.transforms import _build_model_inputs, _join_dicts, \
+    _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
-from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair
+from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
+    _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor
 
 class XXXMultiagentController():
     """
@@ -371,6 +373,16 @@ class XXXMultiagentController():
             # --------------------- LEVEL 3
             agent_ids_not_sampled_yet = None # TODO
             actions1, actions2 = _joint_actions_2_action_pair(pair_sampled_actions, self.n_actions)
+            pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
+
+            ttype = th.cuda.FloatTensor if out_level2.is_cuda else th.FloatTensor
+            action_matrix = ttype(self.n_agents,
+                                  out_level2.shape[_bsdim(selected_actions_format_level2)]*
+                                  out_level2.shape[_tdim(selected_actions_format_level2)]).fill_(float("nan"))
+            action_matrix.scatter_(0, pair_id1, actions1.squeeze(0).squeeze(2).view(-1).unsqueeze(0))
+            action_matrix.scatter_(0, pair_id2, actions2.squeeze(0).squeeze(2).view(-1).unsqueeze(0))
+
+            #sampled_pair_ids
 
             inputs_level3, inputs_level3_tformat = _build_model_inputs(self.input_columns_level3,
                                                                        inputs,
@@ -378,12 +390,12 @@ class XXXMultiagentController():
                                                                        inputs_tformat=tformat,
                                                                        )
 
-            out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3"](inputs_level3["agent_input_level3"],
-                                                                                                    hidden_states=hidden_states["level2"],
-                                                                                                    loss_fn=loss_fn,
-                                                                                                    tformat=inputs_level3_tformat,
-                                                                                                    agent_ids_not_sampled_yet=agent_ids_not_sampled_yet,
-                                                                                                    **kwargs)
+            out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3_0"](inputs_level3["agent_input_level3"],
+                                                                                                      hidden_states=hidden_states["level2"],
+                                                                                                      loss_fn=loss_fn,
+                                                                                                      tformat=inputs_level3_tformat,
+                                                                                                      agent_ids_not_sampled_yet=agent_ids_not_sampled_yet,
+                                                                                                      **kwargs)
 
             individual_actions, \
             modified_inputs_level3, \

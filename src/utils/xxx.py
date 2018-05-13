@@ -26,6 +26,15 @@ def _pairing_id_2_agent_ids(pairing_id, n_agents):
     all_pairings = _ordered_agent_pairings(n_agents)
     return all_pairings[pairing_id]
 
+def _pairing_id_2_agent_ids__tensor(pairing_id, n_agents):
+    pairing_list = _ordered_agent_pairings(n_agents)
+    ttype = th.cuda.LongTensor if pairing_id.is_cuda else th.LongTensor
+    all_pairings = ttype(pairing_list).unsqueeze(2).repeat(1,1,pairing_id.shape[0])
+    ret0 = all_pairings[:,0,:].gather(0, pairing_id.unsqueeze(0).long())
+    ret1 = all_pairings[:,1,:].gather(0, pairing_id.unsqueeze(0).long())
+    return ret0, ret1
+
+
 def _agent_ids_2_pairing_id(agent_ids, n_agents):
     agent_ids = tuple(agent_ids)
     all_pairings = _ordered_agent_pairings(n_agents)
