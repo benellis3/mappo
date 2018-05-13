@@ -416,6 +416,13 @@ class XXXMultiagentController():
 
             # fill into action matrix all the actions that are not NaN
             individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
+
+            tmp = individual_actions_sq.clone()
+            tmp[action_matrix == action_matrix] = float("nan")
+            self.actions_level3 = tmp.view(individual_actions.shape[_adim(tformat_level3)],
+                                           individual_actions.shape[_bsdim(tformat_level3)],
+                                           individual_actions.shape[_vdim(tformat_level3)],
+                                           1)
             action_matrix[action_matrix != action_matrix] = individual_actions_sq
 
             self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)],
@@ -423,7 +430,7 @@ class XXXMultiagentController():
                                                     individual_actions.shape[_vdim(tformat_level3)],
                                                     1)
 
-            self.actions_level3 = individual_actions.clone()
+            #self.actions_level3 = individual_actions.clone()
             self.selected_actions_format_level3 = selected_actions_format_level3
             self.policies_level3 = modified_inputs_level3.clone()
 

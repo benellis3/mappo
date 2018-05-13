@@ -10,13 +10,17 @@ def _ordered_agent_pairings(n_agents):
 def _n_agent_pairings(n_agents):
     return int((n_agents * (n_agents-1)) / 2)
 
-def _joint_actions_2_action_pair(joint_action, n_actions):
-    mask = (joint_action == 0.0)
-    joint_action[mask] = 1.0
-    _action1 = th.floor((joint_action-1.0) / n_actions)
-    _action2 = (joint_action-1.0) % n_actions
-    _action1[mask] = float("nan")
-    _action2[mask] = float("nan")
+def _joint_actions_2_action_pair(joint_action, n_actions, use_delegate_action=True):
+    if use_delegate_action:
+        mask = (joint_action == 0.0)
+        joint_action[mask] = 1.0
+        _action1 = th.floor((joint_action-1.0) / n_actions)
+        _action2 = (joint_action-1.0) % n_actions
+        _action1[mask] = float("nan")
+        _action2[mask] = float("nan")
+    else:
+        _action1 = th.floor(joint_action / n_actions)
+        _action2 = (joint_action) % n_actions
     return _action1, _action2
 
 def _action_pair_2_joint_actions(action_pair, n_actions):
