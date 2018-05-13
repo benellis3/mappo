@@ -17,7 +17,7 @@ from components.transforms import _adim, _bsdim, _tdim, _vdim, \
 from components.losses import EntropyRegularisationLoss
 from components.transforms import _to_batch, \
     _from_batch, _naninfmean
-from utils.xxx import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids
+from utils.xxx import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids, _n_agent_pair_samples, _agent_ids_2_pairing_id
 
 from .basic import BasicLearner
 
@@ -93,8 +93,8 @@ class XXXLearner(BasicLearner):
         self.logging_struct = logging_struct
 
         self.critic_level1 = mo_REGISTRY[self.args.xxx_critic_level1]
-        self.critic_level2 = mo_REGISTRY[self.args.xxx_critic_level1]
-        self.critic_level3 = mo_REGISTRY[self.args.xxx_critic_level1]
+        self.critic_level2 = mo_REGISTRY[self.args.xxx_critic_level2]
+        self.critic_level3 = mo_REGISTRY[self.args.xxx_critic_level3]
 
         self.critic_level1_scheme = Scheme([dict(name="observations",
                                                  select_agent_ids=list(range(self.n_agents))),
@@ -106,12 +106,11 @@ class XXXLearner(BasicLearner):
                                                  switch=self.args.xxx_critic_level1_use_past_actions),
                                             *[dict(name="actions_level1__sample{}".format(_i),
                                                    rename="past_actions_level1__sample{}".format(_i),
-                                                   select_agent_ids=list(range(self.n_agents)),
                                                    transforms=[("shift", dict(steps=1)),
                                                                # ("one_hot", dict(range=(0, self.n_actions - 1)))
                                                                ],
                                                    switch=self.args.xxx_critic_level2_use_past_actions_level1)
-                                                for _i in range(_n_agent_pairings(self.n_agents))],
+                                                for _i in range(_n_agent_pair_samples(self.n_agents))],
                                             dict(name="actions_level1__sample{}".format(0),
                                                  rename="agent_action",),
                                             dict(name="policies_level1",
@@ -135,14 +134,30 @@ class XXXLearner(BasicLearner):
                                                                    #("one_hot", dict(range=(0, self.n_actions - 1)))
                                                                    ],
                                                       switch=self.args.xxx_critic_level2_use_past_actions),
-                                                   *[dict(name="actions_level2__pairing{}".format(_i),
-                                                        rename="other_actions_level2__pairing{}".format(_i),
+                                                   *[dict(name="actions_level2__sample{}".format(0), # MIGHT BE PROBLEMATIC
+                                                        rename="other_agent_actions_level2__sample{}".format(_i),
                                                         transforms=[] if _agent_ids_2_pairing_id((_agent_id1, _agent_id2),
                                                                                                  self.n_agents) != _i else [("mask", dict(fill=0.0))],
                                                         )
                                                      for _i in range(_n_agent_pairings(self.n_agents))],
+                                                   dict(name="actions_level2__sample{}".format(0), # NEEDS TO BE SAMPLED IN
+                                                          rename="past_action_level2__sample{}".format(0),
+                                                          transforms=[("shift", dict(steps=1)),
+                                                                     #("one_hot", dict(range=(0, self.n_actions - 1)))
+                                                                     ],
+                                                          ),
+                                                   dict(name="actions_level2__sample{}".format(0),
+                                                        # NEEDS TO BE SAMPLED IN
+                                                        rename="agent_action".format(0),
+                                                        ),
                                                    dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                   dict(name="state")
+                                                   dict(name="policies_level2__pairing{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                                        rename="agent_policy"),
+                                                   dict(name="state"),
+                                                   dict(name="avail_actions",
+                                                        select_agent_ids=[_agent_id1]),
+                                                   dict(name="avail_actions",
+                                                        select_agent_ids=[_agent_id2])
                                                  ])
 
 
@@ -189,8 +204,8 @@ class XXXLearner(BasicLearner):
         self.schemes_level2 = {}
         # level 2
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-            self.schemes_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.critic_scheme_level2_fn(_agent_id1,_agent_id2)
-            self.schemes_level2["target_critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.critic_scheme_level2_fn(_agent_id1,_agent_id2)
+            self.schemes_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.critic_scheme_level2_fn(_agent_id1,_agent_id2)
+            self.schemes_level2["target_critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.critic_scheme_level2_fn(_agent_id1,_agent_id2)
         # level 3
         self.schemes_level3 = {}
         for _agent_id in range(self.n_agents):
@@ -209,9 +224,9 @@ class XXXLearner(BasicLearner):
         self.input_columns_level1["critic_level1"]["qfunction"] = Scheme([dict(name="state"),
                                                                           # dict(name="observations", select_agent_ids=list(range(self.n_agents))),
                                                                           *[dict(name="past_actions_level1__sample{}".format(_i))
-                                                                            for _i in range(_n_agent_pairings(self.n_agents))],
-                                                                          dict(name="past_actions_level1"),
-                                                                          dict(name="past_actions")])
+                                                                            for _i in range(_n_agent_pair_samples(self.n_agents))],
+                                                                          dict(name="past_actions",
+                                                                               select_agent_ids=list(range(self.n_agents)),)])
         self.input_columns_level1["critic_level1"]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
         self.input_columns_level1["critic_level1"]["agent_action"] = Scheme([dict(name="agent_action")])
         self.input_columns_level1["critic_level1"]["agent_policy"] = Scheme([dict(name="agent_policy")])
@@ -219,40 +234,22 @@ class XXXLearner(BasicLearner):
 
         # level 2
         self.input_columns_level2 = {}
-        n_agent_pairs = len(list(sorted(combinations(list(range(self.n_agents)), 2))))
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = {}
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["qfunction"] = \
-                Scheme([dict(name="other_agents_actions", select_agent_ids=list(range(n_agent_pairs))), # select all agent ids here, as have mask=0 transform on current agent action
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = {}
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["qfunction"] = \
+                Scheme([*[dict(name="other_agent_actions_level2__sample{}".format(_i))
+                          for _i in range(_n_agent_pairings(self.n_agents))],
                         dict(name="state"),
-                        # dict(name="past_actions_level2",
-                        #      select_agent_ids=list(range(n_agent_pairs))),
-                        dict(name="agent_id", select_agent_ids=[_agent_id1, _agent_id2]),
-                        dict(name="past_actions", select_agent_ids=list(range(n_agent_pairs)))])
-            self.input_columns_level1["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["agent_action"] = Scheme([dict(name="agent_action")])
-            self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["agent_policy"] = Scheme([dict(name="agent_policy")])
-            self.input_columns_level2["target_critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]
+                        dict(name="past_action_level2__sample{}".format(0)),
+                        dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2]),
+                        dict(name="past_actions", select_agent_ids=list(range(self.n_agents)))])
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_action"] = Scheme([dict(name="agent_action")])
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_policy"] = Scheme([dict(name="agent_policy")])
+            self.input_columns_level2["target_critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]
 
-            # self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]["main"] = \
-            #     Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
-            #             dict(name="past_actions_level2_agents{}:{}".format(_agent_id1, _agent_id2),
-            #                  switch=self.args.xxx_critic_level2_use_past_actions),
-            #             dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
-            # self.input_columns_level2["target_critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)] = self.input_columns_level2["critic_level2__agents{}:{}".format(_agent_id1, _agent_id2)]
-
-        # level 3
-        # self.input_columns_level3 = {}
-        # for _agent_id in range(self.n_agents):
-        #     self.input_columns_level3["critic_input_level3__agent{}".format(_agent_id)] = {}
-        #     self.input_columns_level3["critic_input_level3__agent{}".format(_agent_id)]["main"] = \
-        #         Scheme([dict(name="observations", select_agent_ids=[_agent_id]),
-        #                 dict(name="past_actions_level3",
-        #                      select_agent_ids=[_agent_id],
-        #                      switch=self.args.xxx_critic_level3_use_past_actions),
-        #                 dict(name="agent_id", select_agent_ids=[_agent_id])])
 
         self.input_columns_level3 = {}
         for _agent_id in range(self.n_agents):
@@ -295,75 +292,79 @@ class XXXLearner(BasicLearner):
 
         # Set up critic models
         self.critic_models = {}
+        self.target_critic_models = {}
 
         # set up models level 1
-        self.critic_models["level1"] = self.critic_level1(input_shapes=self.input_shapes_level1,
-                                                  n_actions=self.n_actions,
-                                                  args=self.args)
+        self.critic_models["level1"] = self.critic_level1(input_shapes=self.input_shapes_level1["critic_level1"],
+                                                          n_actions=self.n_actions,
+                                                          args=self.args)
         if self.args.use_cuda:
             self.critic_models["level1"] = self.critic_models["level1"].cuda()
+        self.target_critic_models["level1"] = deepcopy(self.critic_models["level1"])
 
         # set up models level 2
-        if self.args.share_params:
-            critic_level2 = self.critic_level2(input_shapes=self.input_shapes_level2,
-                                             n_actions=self.n_actions,
-                                             args=self.args)
+        if self.args.critic_level2_share_params:
+            critic_level2 = self.critic_level2(input_shapes=self.input_shapes_level2["critic_level2__agent0"],
+                                               n_actions=self.n_actions,
+                                               args=self.args)
             if self.args.use_cuda:
                 critic_level2 = critic_level2.cuda()
 
             for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
                 self.critic_models["level2_{}:{}".format(_agent_id1, _agent_id2)] = critic_level2
+                self.target_critic_models["level2_{}:{}".format(_agent_id1, _agent_id2)] = deepcopy(critic_level2)
         else:
             assert False, "TODO"
 
         # set up models level 3
-        if self.args.share_params:
-            critic_level3 = self.critic_level3(input_shapes=self.input_shapes_level3,
-                                             n_actions=self.n_actions,
-                                             args=self.args)
+        if self.args.critic_level3_share_params:
+            critic_level3 = self.critic_level3(input_shapes=self.input_shapes_level3["critic_level3__agent0"],
+                                               n_actions=self.n_actions,
+                                               args=self.args)
             if self.args.use_cuda:
                 critic_level3 = critic_level3.cuda()
 
             for _agent_id in range(self.n_agents):
                 self.critic_models["level3_{}".format(_agent_id)] = critic_level3
+                self.target_critic_models["level3_{}".format(_agent_id)] = deepcopy(critic_level3)
         else:
             assert False, "TODO"
 
         # set up optimizers
-        if self.args.share_params:
+        if self.args.agent_level1_share_params:
             self.agent_level1_parameters = self.multiagent_controller.get_parameters(level=1)
         else:
             assert False, "TODO"
         self.agent_level1_optimiser = RMSprop(self.agent_level1_parameters, lr=self.args.lr_agent_level1)
 
-        if self.args.share_params:
+        if self.args.agent_level2_share_params:
             self.agent_level2_parameters = self.multiagent_controller.get_parameters(level=1)
         else:
             assert False, "TODO"
         self.agent_level2_optimiser = RMSprop(self.agent_level2_parameters, lr=self.args.lr_agent_level2)
 
-        if self.args.share_params:
+        if self.args.agent_level3_share_params:
             self.agent_level3_parameters = self.multiagent_controller.get_parameters(level=3)
         else:
             assert False, "TODO"
         self.agent_level3_optimiser = RMSprop(self.agent_level3_parameters, lr=self.args.lr_agent_level3)
 
         self.critic_level1_parameters = []
-        if self.args.share_params:
-            self.critic_level1_parameters.extend(self.critic_models["level1_{}".format(0)].parameters())
+        if self.args.critic_level1_share_params:
+            self.critic_level1_parameters.extend(self.critic_models["level1"].parameters())
         else:
             assert False, "TODO"
         self.critic_level1_optimiser = RMSprop(self.critic_level1_parameters, lr=self.args.lr_critic_level1)
 
         self.critic_level2_parameters = []
-        if self.args.share_params:
-            self.critic_level2_parameters.extend(self.critic_models["level2_{}".format(0)].parameters())
+        if self.args.critic_level2_share_params:
+            self.critic_level2_parameters.extend(self.critic_models["level2_0:1"].parameters())
         else:
             assert False, "TODO"
         self.critic_level2_optimiser = RMSprop(self.critic_level2_parameters, lr=self.args.lr_critic_level2)
 
         self.critic_level3_parameters = []
-        if self.args.share_params:
+        if self.args.critic_level3_share_params:
             self.critic_level3_parameters.extend(self.critic_models["level3_{}".format(0)].parameters())
         else:
             assert False, "TODO"
