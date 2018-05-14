@@ -11,12 +11,12 @@ from utils.xxx import _n_agent_pairings
 class XXXQFunctionLevel1(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
-    def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
+    def __init__(self, input_shapes, n_agents, output_shapes={}, layer_args={}, args=None):
 
         super(XXXQFunctionLevel1, self).__init__()
 
         self.args = args
-        self.n_actions = n_actions
+        self.n_agents = n_agents
 
         # Set up input regions automatically if required (if sensible)
         self.input_shapes = {}
@@ -26,7 +26,7 @@ class XXXQFunctionLevel1(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = int(self.n_actions*(self.n_actions-1) / 2) # qvals
+        self.output_shapes["qvalues"] = _n_agent_pairings(self.n_agents) # qvals
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
@@ -194,6 +194,8 @@ class XXXAdvantage(nn.Module):
 
         if baseline:
         # Fuse to XXX advantage
+            a = agent_policy.unsqueeze(1)
+            b = qvalues.unsqueeze(2)
             baseline = th.bmm(
                 agent_policy.unsqueeze(1),
                 qvalues.unsqueeze(2)).squeeze(2)
@@ -216,13 +218,14 @@ class XXXCriticLevel1(nn.Module):
     Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
     """
 
-    def __init__(self, input_shapes, n_actions, output_shapes={}, layer_args={}, args=None):
+    def __init__(self, input_shapes, n_actions, n_agents, output_shapes={}, layer_args={}, args=None):
         """
         This model contains no network layers but only sub-models
         """
 
         super(XXXCriticLevel1, self).__init__()
         self.args = args
+        self.n_agents = n_agents
         self.n_actions = n_actions
 
         # Set up input regions automatically if required (if sensible)
@@ -244,7 +247,7 @@ class XXXCriticLevel1(nn.Module):
         self.XXXQFunction = XXXQFunctionLevel1(input_shapes={"main":self.input_shapes["qfunction"]},
                                                output_shapes={},
                                                layer_args={"main":self.layer_args["qfunction"]},
-                                               n_actions = self.n_actions,
+                                               n_agents = self.n_agents,
                                                args=self.args)
 
         self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
@@ -275,8 +278,8 @@ class XXXCriticLevel1(nn.Module):
                                                          "qvalues":qvalues,
                                                          "agent_action":inputs["agent_action"],
                                                          "agent_policy":inputs["agent_policy"]},
-                                                  tformat=tformat,
-                                                  baseline=baseline)
+                                                 tformat=tformat,
+                                                 baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
 
 class XXXCriticLevel2(nn.Module):
@@ -402,8 +405,8 @@ class XXXCriticLevel3(nn.Module):
     def forward(self, inputs, tformat, baseline=True):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
-        qvalues = self.XXXQFunctionLevel3(inputs={"main":inputs["qfunction"]},
-                                     tformat=tformat)
+        qvalues = self.XXXQFunction(inputs={"main":inputs["qfunction"]},
+                                    tformat=tformat)
 
         advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":inputs["avail_actions"],
                                                           "qvalues":qvalues,
@@ -701,12 +704,12 @@ class XXXRecurrentAgentLevel2(nn.Module):
                epsilons, _, _ = _to_batch(epsilons, tformat)
                x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
-
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
 
             # select appropriate pairs
-            x = x.gather(0, Variable(sampled_pair_ids.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
+            sampled_pair_ids_slice = sampled_pair_ids[:, :, slice(t, t + 1), :].contiguous()
+            x = x.gather(0, Variable(sampled_pair_ids_slice.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
 
             h_list.append(h)
             x_list.append(x)

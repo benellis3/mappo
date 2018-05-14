@@ -637,6 +637,7 @@ class NStepRunner():
                                                                             to_variable=True,
                                                                             bs_ids=ids_envs_not_terminated,
                                                                             t_id=self.t_episode,
+                                                                            fill_zero=True, # TODO: DEBUG!!!
                                                                            )
 
             # retrieve avail_actions from episode_buffer
@@ -651,6 +652,7 @@ class NStepRunner():
                 hidden_states = {_k:_v[:, ids_envs_not_terminated_tensor, :, :] for _k, _v in self.hidden_states.items()}
             else:
                 hidden_states = self.hidden_states[:, ids_envs_not_terminated_tensor, :,:]
+
 
             multiagent_controller_outputs, multiagent_controller_outputs_tformat = \
                 self.multiagent_controller.get_outputs(inputs=multiagent_controller_inputs,
@@ -721,7 +723,7 @@ class NStepRunner():
 
         # calculate episode statistics
         self._add_episode_stats(T_env=self.T_env)
-
+        # a = self.episode_buffer.to_pd()
         return self.episode_buffer
 
     def _add_episode_stats(self, T_env):
@@ -768,7 +770,6 @@ class NStepRunner():
         if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
             self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
 
-        a = self.episode_buffer.to_pd()
         return
 
     def log(self,log_directly = True):

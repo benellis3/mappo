@@ -193,6 +193,24 @@ def _vdim(tformat):
     assert len(aidx) == 1, "invalid tensor format string!"
     return aidx[0]
 
+def _check_nan(input):
+    from torch import nn
+    if isinstance(input, dict):
+        for _k1, _v1 in input.items():
+            for _k2, _v2 in _v1.items():
+                if th.sum(_v2.data!=_v2.data) > 0.0:
+                    assert False, "NaNs in {}:{}".format(_k1, _k2)
+    elif issubclass(type(input), th.Tensor):
+        assert th.sum(input!=input), "NaNs in tensor!"
+    elif issubclass(type(input), nn.Module):
+        for i, p in enumerate(input.parameters()):
+            assert th.sum(p != p), "NaNs in parameter {}!".format(i)
+    #elif isinstance(input, th.nn.parameter):
+    #    for i, p in enumerate(input):
+    #        assert th.sum(p.grad != p.grad), "NaNs in parameter gradient {}!".format(i)
+    return
+
+
 # def _build_model_inputs(list_of_columns, inputs, inputs_tformat, to_variable=True, fill_zero=True, stack=True):
 #     """
 #     Takes in:
@@ -341,7 +359,8 @@ def _build_model_inputs(column_dict, inputs, inputs_tformat, to_variable=True, f
                         ret_dict[_k][_input_region_k] = _vec
                     for _id_key in id_keys:
                         del ret_dict[_k+"__agent{}".format(_id_key)]
-
+    else:
+        output_tformat = "bs*t*v"
     return ret_dict, output_tformat
 
 def _agent_flatten(lst):

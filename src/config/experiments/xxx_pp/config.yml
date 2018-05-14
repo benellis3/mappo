@@ -13,4 +13,5 @@ env_args:
     - 3
   prey_movement: "escape"
   nagent_capture_enabled: True
+lr_critic: 0.0
 use_replay_buffer: False

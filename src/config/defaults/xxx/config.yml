@@ -8,12 +8,12 @@ agent_level3_share_params: True
 critic_level1_share_params: True
 critic_level2_share_params: True
 critic_level3_share_params: True
-lr_agent_level1: True
-lr_agent_level2: True
-lr_agent_level3: True
-lr_critic_level1: True
-lr_critic_level2: True
-lr_critic_level3: True
+lr_agent_level1: 5e-4
+lr_agent_level2: 5e-4
+lr_agent_level3: 5e-4
+lr_critic_level1: 5e-4
+lr_critic_level2: 5e-4
+lr_critic_level3: 5e-4
 xxx_agent_model_level1: xxx_recurrent_agent_level1
 xxx_agent_model_level2: xxx_recurrent_agent_level2
 xxx_agent_model_level3: xxx_recurrent_agent_level3
@@ -53,8 +53,6 @@ xxx_use_entropy_regularizer: False
 xxx_entropy_loss_regularization_factor: 0.000005
 gamma: 0.99
 learner: xxx
-lr_agent: 5e-4
-lr_critic: 5e-4
 multiagent_controller: xxx_mac
 n_critic_learner_reps: 54
 obs_last_action: True
