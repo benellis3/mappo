@@ -445,7 +445,16 @@ class XXXMultiagentController():
                                                individual_actions.shape[_bsdim(tformat_level3)],
                                                individual_actions.shape[_tdim(tformat_level3)],
                                                1)
+
+
                 action_matrix[action_matrix != action_matrix] = individual_actions_sq
+
+                if self.args.debug_mode in ["level3_actions_only"]:
+                    """
+                    DEBUG MODE: LEVEL3 ACTIONS ONLY
+                    Here we just pick actions from level3 - should therefore just correspond to vanilla COMA!
+                    """
+                    action_matrix  = individual_actions_sq
 
                 self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)],
                                                         individual_actions.shape[_bsdim(tformat_level3)],

@@ -13,5 +13,11 @@ env_args:
     - 3
   prey_movement: "escape"
   nagent_capture_enabled: True
+  predator_prey_toroidal: True
+  reward_almost_capture: 1.0
+  reward_capture: 50
+  reward_collision: 0.0
+  reward_scare: 0.0
+  reward_time: -0.1
 lr_critic: 0.0
 use_replay_buffer: False
