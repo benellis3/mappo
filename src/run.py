@@ -34,6 +34,9 @@ def run(_run, _config, _log, pymongo_client):
                                        width=1)
     _log.info("\n\n" + experiment_params + "\n")
 
+    import os
+    _log.info("OS ENVIRON KEYS: {}".format(os.environ))
+
     if _config.get("debug_mode", None) is not None:
         _log.warning("ATTENTION DEBUG MODE: {}".format(_config["debug_mode"]))
 

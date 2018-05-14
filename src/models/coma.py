@@ -187,7 +187,6 @@ class COMANonRecurrentAgent(NonRecurrentAgent):
         x, params, tformat = _to_batch(inputs["main"], tformat)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        x = F.softmax(x, dim=1)
 
         # mask policy elements corresponding to unavailable actions
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)

@@ -3,7 +3,7 @@ import torch as th
 from torch.autograd import Variable
 from torch.distributions import Categorical
 from torch.nn.functional import softmax
-from .transforms import _to_batch, _from_batch, _adim, _vdim, _bsdim
+from .transforms import _to_batch, _from_batch, _adim, _vdim, _bsdim, _check_nan
 
 REGISTRY = {}
 
@@ -31,10 +31,14 @@ class MultinomialActionSelector():
 
         mask = (masked_policies_batch != masked_policies_batch)
         masked_policies_batch.masked_fill_(mask, 0.0)
+        _check_nan(masked_policies_batch)
+        assert th.sum(masked_policies_batch < 0) == 0, "negative value in masked_policies_batch"
         _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
         _samples = _samples.masked_fill_(mask.long().sum(dim=1, keepdim=True) > 0, float("nan"))
 
         samples = _from_batch(_samples, params, tformat)
+        _check_nan(samples)
+
         return samples, masked_policies, tformat
 
 REGISTRY["multinomial"] = MultinomialActionSelector
