@@ -1,1 +1,1 @@
-from .matrix_game import MatrixNormalFormGame
+from .matrix_game import NormalFormMatrixGame

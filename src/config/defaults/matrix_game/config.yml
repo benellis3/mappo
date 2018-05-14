@@ -1,0 +1,6 @@
+env: matrix_game
+env_args:
+  episode_limit: 1
+  n_agents: 2
+  p_common: 0.9
+  p_observation: 0.5

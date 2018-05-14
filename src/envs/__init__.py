@@ -4,6 +4,7 @@ from components.transforms import _join_dicts
 from .predator_prey import PredatorPreyCapture
 #from .predator_prey import PredatorPreyCaptureCython
 from .predator_prey__old import PredatorPreyEnv as PredatorPreyOldEnv
+from .matrix_game import NormalFormMatrixGame
 from .test import IntegrationTestEnv
 
 def env_fn(env, **kwargs): # TODO: this may be a more complex function
@@ -11,15 +12,12 @@ def env_fn(env, **kwargs): # TODO: this may be a more complex function
     return env(**kwargs)
 
 REGISTRY = {}
-REGISTRY["pred_prey__old"] = partial(env_fn,
-                                     env = PredatorPreyOldEnv)
-REGISTRY["pred_prey"] = partial(env_fn,
-                                     env = PredatorPreyCapture)
+REGISTRY["pred_prey__old"] = partial(env_fn, env=PredatorPreyOldEnv)
+REGISTRY["pred_prey"] = partial(env_fn, env=PredatorPreyCapture)
 #REGISTRY["pred_prey_cython"] = partial(env_fn,
 #                                     env = PredatorPreyCaptureCython)
-
-REGISTRY["integration_test"] = partial(env_fn,
-                                       env=IntegrationTestEnv)
+REGISTRY["matrix_game"] = partial(env_fn, env=NormalFormMatrixGame)
+REGISTRY["integration_test"] = partial(env_fn, env=IntegrationTestEnv)
 
 try:
     from .starcraft1 import StarCraft1Env
