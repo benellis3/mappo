@@ -437,7 +437,6 @@ class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
         x, params, tformat = _to_batch(inputs["main"], tformat)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        x = F.softmax(x, dim=1)
 
         # mask policy elements corresponding to unavailable actions
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
@@ -597,7 +596,6 @@ class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
         x, params, tformat = _to_batch(inputs["main"], tformat)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        x = F.softmax(x, dim=1)
 
         # mask policy elements corresponding to unavailable actions
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
@@ -721,7 +719,10 @@ class XXXRecurrentAgentLevel2(nn.Module):
             # select appropriate pairs
             sampled_pair_ids_slice = sampled_pair_ids[:, :, slice(t, t + 1), :].contiguous()
 
-            x  = x.gather(0, Variable(sampled_pair_ids_slice.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
+            try:
+                x = x.gather(0, Variable(sampled_pair_ids_slice.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
+            except Exception as e:
+                pass
 
             h_list.append(h)
             x_list.append(x)
@@ -744,7 +745,6 @@ class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
         x, params, tformat = _to_batch(inputs["main"], tformat)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        x = F.softmax(x, dim=1)
 
         # mask policy elements corresponding to unavailable actions
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
@@ -793,7 +793,11 @@ class XXXRecurrentAgentLevel3(RecurrentAgent):
             avail_actions, params_aa, tformat_aa = _to_batch(avail_actions, tformat)
             h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
 
-            h = self.gru(x, h)
+            try:
+                h = self.gru(x, h)
+            except Exception as e:
+                pass
+
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions

@@ -19,6 +19,10 @@ class XXXRunner(NStepRunner):
                                         select_agent_ids=range(0, self.n_agents),
                                         dtype=np.float32,
                                         missing=np.nan,),
+                                   dict(name="obs_intersection_all",
+                                        ),
+                                   *[dict(name="obs_intersection_pair"),
+                                     for ],
                                    dict(name="state",
                                         shape=(self.env_state_size,),
                                         dtype = np.float32,
@@ -195,3 +199,101 @@ class XXXRunner(NStepRunner):
         return log_str, log_dict
 
     pass
+
+
+    @staticmethod
+    def _loop_worker(envs,
+                     in_queue,
+                     out_queue,
+                     buffer_insert_fn,
+                     subproc_id=None,
+                     msg=None):
+
+        if in_queue is None:
+            id, chosen_actions, output_buffer, column_scheme = msg
+            env_id = id
+        else:
+            id, chosen_actions, output_buffer, column_scheme = in_queue.get() # timeout=1)
+            env_id_offset = len(envs) * subproc_id  # TODO: Adjust for multi-threading!
+            env_id = id - env_id_offset
+
+        _env = envs[env_id]
+
+        if chosen_actions == "SCHEME":
+            env_dict = dict(obs_size=_env.get_obs_size(),
+                            state_size=_env.get_state_size(),
+                            episode_limit=_env.episode_limit,
+                            n_agents = _env.n_agents,
+                            n_actions=_env.get_total_actions())
+
+            # Send results back
+            ret_msg = dict(id=id, payload=env_dict)
+            if out_queue is None:
+                return ret_msg
+            out_queue.put(ret_msg)
+            return
+
+        elif chosen_actions == "RESET":
+            _env.reset() # reset the env!
+
+            # perform environment steps and insert into transition buffer
+            observations = _env.get_obs()
+            state = _env.get_state()
+            avail_actions = _env.get_avail_actions()
+            ret_dict = dict(state=state)  # TODO: Check that env_info actually exists
+            for _i, _obs in enumerate(observations):
+                ret_dict["observations__agent{}".format(_i)] = observations[_i]
+            for _i, _obs in enumerate(observations):
+                ret_dict["avail_actions__agent{}".format(_i)] = avail_actions[_i]
+
+            buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
+
+            # Signal back that queue element was finished processing
+            ret_msg = dict(id=id, payload=dict(msg="RESET DONE"))
+            if out_queue is None:
+                return ret_msg
+            out_queue.put(ret_msg)
+            return
+
+        elif chosen_actions == "STATS":
+            env_stats = _env.get_stats()
+            env_dict = dict(env_stats=env_stats)
+            # Send results back
+            ret_msg = dict(id=id, payload=env_dict)
+            if out_queue is None:
+                return ret_msg
+            out_queue.put(ret_msg)
+            return
+
+        else:
+
+            reward, terminated, env_info = \
+                _env.step([int(_i) for _i in chosen_actions])
+
+            # perform environment steps and add to transition buffer
+            observations = _env.get_obs()
+            state = _env.get_state()
+            avail_actions = _env.get_avail_actions()
+            terminated = terminated
+            truncated = terminated and env_info.get("episode_limit", False)
+            ret_dict = dict(state=state,
+                            reward=reward,
+                            terminated=terminated,
+                            truncated=truncated,
+                            )
+            for _i, _obs in enumerate(observations):
+                ret_dict["observations__agent{}".format(_i)] = observations[_i]
+            for _i, _obs in enumerate(observations):
+                ret_dict["avail_actions__agent{}".format(_i)] = avail_actions[_i]
+
+            buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
+
+            # Signal back that queue element was finished processing
+            ret_msg = dict(id=id, payload=dict(msg="STEP DONE", terminated=terminated))
+            if out_queue is None:
+                return ret_msg
+            else:
+                out_queue.put(ret_msg)
+            return
+
+        return

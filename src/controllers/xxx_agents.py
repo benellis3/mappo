@@ -191,22 +191,6 @@ class XXXMultiagentController():
 
     def select_actions(self, inputs, avail_actions, tformat, info, test_mode=False):
 
-        # selected_actions_dict = {}
-        # selected_actions_dict["actions_level1"] = self.actions_level1
-        # for _i in range(_n_agent_pair_samples(self.n_agents)):
-        #     selected_actions_dict["actions_level2__sample{}".format(_i)] = self.actions_level2[_i]
-        # selected_actions_dict["actions_level3"] = self.actions_level3
-        #
-        # selected_actions_dict["actions"] = self.final_actions
-        #
-        # modified_inputs_dict = {}
-        # modified_inputs_dict["policies_level1"] = self.policies_level1
-        # for _i in range(_n_agent_pair_samples(self.n_agents)):
-        #     modified_inputs_dict["policies_level2__sample{}".format(_i)] = self.policies_level2[_i]
-        # modified_inputs_dict["policies_level3"] = self.policies_level3
-        #
-        # return selected_actions_dict, modified_inputs_dict, self.selected_actions_format
-
         selected_actions_list = []
         for _i in range(_n_agent_pair_samples(self.n_agents)):
             selected_actions_list += [dict(name="actions_level1__sample{}".format(_i),
@@ -238,16 +222,16 @@ class XXXMultiagentController():
                                                             dict_of_schemes=self.schemes_level1)
 
         self.input_shapes_level1 = _generate_input_shapes(input_columns=self.input_columns_level1,
-                                                   scheme_shapes=self.scheme_shapes_level1)
+                                                          scheme_shapes=self.scheme_shapes_level1)
 
         self.scheme_shapes_level2 = _generate_scheme_shapes(transition_scheme=transition_scheme,
-                                                     dict_of_schemes=self.schemes_level2)
+                                                            dict_of_schemes=self.schemes_level2)
 
         self.input_shapes_level2 = _generate_input_shapes(input_columns=self.input_columns_level2,
-                                                   scheme_shapes=self.scheme_shapes_level2)
+                                                          scheme_shapes=self.scheme_shapes_level2)
 
         self.scheme_shapes_level3 = _generate_scheme_shapes(transition_scheme=transition_scheme,
-                                                     dict_of_schemes=self.schemes_level3)
+                                                            dict_of_schemes=self.schemes_level3)
 
         self.input_shapes_level3 = _generate_input_shapes(input_columns=self.input_columns_level3,
                                                           scheme_shapes=self.scheme_shapes_level3)
@@ -351,15 +335,28 @@ class XXXMultiagentController():
                                                                                                                               avail_actions=None,
                                                                                                                               tformat=tformat_level1,
                                                                                                                               test_mode=test_mode)
+                try:
+                    _check_nan(sampled_pair_ids) # DEBUG
+                except Exception as e:
+                    pass
+                if self.args.debug_mode in ["level2_actions_fixed_pair"]:
+                    """
+                    DEBUG MODE: LEVEL2 ACTIONS FIXED PAIR
+                    Here we pick level2 actions from a fixed agent pair (0,1) and the third action from IQL
+                    """
+                    assert self.n_agents == 3, "only makes sense in n_agents=3 scenario"
+                    sampled_pair_ids.fill_(0.0)
+
                 # sample which pairs should be selected
                 self.actions_level1 = sampled_pair_ids.clone()
                 self.selected_actions_format = selected_actions_format_level1
                 self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
 
             elif loss_level == 2 or loss_level == 3:
-                assert self.n_agents == 3, "only implemented for 3 agents!!"
+                assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
                 for _i in  range(_n_agent_pair_samples(self.n_agents)):
-                    sampled_pair_ids, _ = batch_history.get_col(col="actions_level1__sample{}".format(_i))
+                    sampled_pair_ids, _ = batch_history.get_col(col="actions_level1__sample{}".format(_i),)
+                sampled_pair_ids[sampled_pair_ids != sampled_pair_ids] = 0.0
                 sampled_pair_ids = sampled_pair_ids.unsqueeze(0).contiguous()
 
             if loss_level is None or loss_level == 2:
@@ -375,11 +372,12 @@ class XXXMultiagentController():
                 assert self.args.agent_level2_share_params, "not implemented!"
 
                 out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level2_0"](inputs_level2["agent_input_level2"],
-                                                                                                      hidden_states=hidden_states["level2"],
-                                                                                                      loss_fn=loss_fn if loss_level == 2 else None,
-                                                                                                      tformat=inputs_level2_tformat,
-                                                                                                      sampled_pair_ids=sampled_pair_ids,
-                                                                                                      **kwargs)
+                                                                                                          hidden_states=hidden_states["level2"],
+                                                                                                          loss_fn=loss_fn if loss_level == 2 else None,
+                                                                                                          tformat=inputs_level2_tformat,
+                                                                                                          sampled_pair_ids=sampled_pair_ids,
+                                                                                                          **kwargs)
+
                 if loss_level == 2:
                     return dict(losses=losses_level2), tformat_level2
 
@@ -395,9 +393,10 @@ class XXXMultiagentController():
                 self.policies_level2 = modified_inputs_level2.clone()
 
             elif loss_level == 3:
-                assert self.n_agents == 3, "only implemented for 3 agents!!"
+                assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
                 for _i in  range(_n_agent_pair_samples(self.n_agents)):
                     pair_sampled_actions, _ = batch_history.get_col(col="actions_level2__sample{}".format(_i))
+                    pair_sampled_actions[pair_sampled_actions != pair_sampled_actions] = 0.0
                 pair_sampled_actions = pair_sampled_actions.unsqueeze(0).contiguous()
 
             if loss_level == 3 or loss_level is None:
@@ -422,7 +421,7 @@ class XXXMultiagentController():
                                                                            )
 
                 out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3_0"](inputs_level3["agent_input_level3"],
-                                                                                                          hidden_states=hidden_states["level2"],
+                                                                                                          hidden_states=hidden_states["level3"],
                                                                                                           loss_fn=loss_fn if loss_level==3 else None,
                                                                                                           tformat=inputs_level3_tformat,
                                                                                                           **kwargs)
