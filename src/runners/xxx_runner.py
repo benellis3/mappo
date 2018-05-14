@@ -7,7 +7,7 @@ from torch.distributions import Normal
 
 from components.epsilon_schedules import FlatThenDecaySchedule
 from runners import REGISTRY as r_REGISTRY
-from utils.xxx import _n_agent_pair_samples, _n_agent_pairings
+from utils.xxx import _n_agent_pair_samples, _n_agent_pairings, _ordered_agent_pairings
 
 NStepRunner = r_REGISTRY["nstep"]
 
@@ -292,6 +292,11 @@ class XXXRunner(NStepRunner):
                 ret_dict["observations__agent{}".format(_i)] = observations[_i]
             for _i, _obs in enumerate(observations):
                 ret_dict["avail_actions__agent{}".format(_i)] = avail_actions[_i]
+
+            # handle observation intersections
+            ret_dict["obs_intersection_all"] = _env.get_obs_intersection(tuple(range(_env.n_agents)))
+            for _a1, _a2 in _ordered_agent_pairings(_env.n_agents):
+                ret_dict["obs_intersection_pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 

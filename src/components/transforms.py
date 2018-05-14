@@ -118,7 +118,6 @@ def _to_numpy_cpu(item):
     else:
         assert False, "unexpected input type: {}".format(str(item))
 
-
 def _build_input(columns, inputs):
     model_inputs = {}
     for _k, _v in columns.items():
