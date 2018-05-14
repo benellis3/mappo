@@ -3,7 +3,7 @@ import torch as th
 from torch.autograd import Variable
 from torch.distributions import Categorical
 from torch.nn.functional import softmax
-from .transforms import _to_batch, _from_batch, _adim, _vdim, _bsdim
+from .transforms import _to_batch, _from_batch, _adim, _vdim, _bsdim, _check_nan
 
 REGISTRY = {}
 
@@ -23,7 +23,10 @@ class MultinomialActionSelector():
             agent_policies = inputs["policies"].clone()  # might not be necessary
 
         # NOTE: Usually, on-policy algorithms should perform action masking in the model itself!
-        masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
+        if avail_actions is not None:
+            masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
+        else:
+            masked_policies = agent_policies
         masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
 
         mask = (masked_policies_batch != masked_policies_batch)
@@ -34,6 +37,8 @@ class MultinomialActionSelector():
         _samples = _samples.masked_fill_(mask.long().sum(dim=1, keepdim=True) > 0, float("nan"))
 
         samples = _from_batch(_samples, params, tformat)
+        _check_nan(samples)
+
         return samples, masked_policies, tformat
 
 REGISTRY["multinomial"] = MultinomialActionSelector

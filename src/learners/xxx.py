@@ -500,7 +500,7 @@ class XXXLearner(BasicLearner):
             self.last_target_update_T_critic_level2 = self.T_critic_level2
             print("updating target net!")
 
-        assert self.n_agents == 3, "only implemented for 3 agents"
+        assert self.n_agents <= 3, "only implemented for 3 or fewer agents"
         actions, actions_tformat = batch_history.get_col(bs=None,
                                                          col="actions_level2__sample{}".format(0))
         actions = actions.unsqueeze(0)

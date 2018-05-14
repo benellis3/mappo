@@ -355,6 +355,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         else:
             new_pos = self.agents[agent_id, 0, :] + self.actions
             allowed = np.logical_and(new_pos >= 0, new_pos < self.grid_shape).all(axis=1)
+            assert np.any(allowed), "No available action in the environment: this should never happen!"
             return [int(allowed[a]) for a in range(self.n_actions)]
 
     def get_avail_actions(self):
