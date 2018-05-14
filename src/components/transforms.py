@@ -200,7 +200,7 @@ def _check_nan(input):
                 if th.sum(_v2.data!=_v2.data) > 0.0:
                     assert False, "NaNs in {}:{}".format(_k1, _k2)
     elif issubclass(type(input), th.Tensor):
-	assert th.sum(input!=input) == 0, "NaNs in tensor!"
+        assert th.sum(input!=input) == 0, "NaNs in tensor!"
     elif issubclass(type(input), nn.Module):
         for i, p in enumerate(input.parameters()):
             assert th.sum(p != p) == 0, "NaNs in parameter {}!".format(i)
