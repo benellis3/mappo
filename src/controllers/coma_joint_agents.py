@@ -8,7 +8,7 @@ from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
 from models import REGISTRY as m_REGISTRY
-
+from utils.xxx import _n_agent_pair_samples, _joint_actions_2_action_pair
 
 class COMAJointMultiAgentController():
     """
@@ -37,6 +37,12 @@ class COMAJointMultiAgentController():
                                          select_agent_ids=list(range(self.n_agents))),
                                     dict(name="avail_actions",
                                          select_agent_ids=list(range(self.n_agents))),
+                                    dict(name="actions",
+                                         rename="past_actions",
+                                         select_agent_ids=list(range(self.n_agents)),
+                                         transforms=[("shift", dict(steps=1)),
+                                                     ("one_hot", dict(range=(0, self.n_actions - 1)))],
+                                         switch=self.args.use_past_actions),
                                     dict(name="coma_epsilons", rename="epsilons", scope="episode")])
 
         # Set up schemes
@@ -54,8 +60,10 @@ class COMAJointMultiAgentController():
                                                                                     select_agent_ids=[0])])
         self.input_columns["central_agent"]["avail_actions__agent2"] = Scheme([dict(name="avail_actions",
                                                                                     select_agent_ids=[1])])
+        self.input_columns["central_agent"]["past_actions"] = Scheme([dict(name="past_actions",
+                                                                           select_agent_ids=list(range(self.n_agents)),
+                                                                              switch=self.args.use_past_actions)])
         self.input_columns["central_agent"]["epsilons"] = Scheme([dict(name="epsilons", scope="episode")])
-
 
         pass
 
@@ -64,12 +72,23 @@ class COMAJointMultiAgentController():
         return parameters
 
     def select_actions(self, inputs, avail_actions, tformat, info, test_mode=False):
-        selected_actions, modified_inputs, selected_actions_format = \
-            self.action_selector.select_action(inputs,
-                                               avail_actions=avail_actions,
-                                               tformat=tformat,
-                                               test_mode=test_mode)
-        return selected_actions, modified_inputs, selected_actions_format
+
+        selected_actions_list = []
+        for _i in range(_n_agent_pair_samples(self.n_agents)):
+            selected_actions_list += [dict(name="actions__sample{}".format(_i),
+                                           data=self.final_actions[_i])]
+        selected_actions_list += [dict(name="actions", select_agent_ids=list(range(self.n_agents)), data=self.final_actions)]
+
+        modified_inputs_list = []
+        for _i in range(_n_agent_pair_samples(self.n_agents)):
+            modified_inputs_list += [dict(name="policies__sample{}".format(_i),
+                                          data=self.policies[_i])]
+
+        # modified_inputs_list += [
+        #     dict(name="policies", select_agent_ids=list(range(self.n_agents)), data=self.policies)]
+
+        return selected_actions_list, modified_inputs_list, self.selected_actions_format
+
 
     def create_model(self, transition_scheme):
 
@@ -107,6 +126,9 @@ class COMAJointMultiAgentController():
     def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         # assert isinstance(inputs, dict) and \
         #        isinstance(inputs["agent_input__agent0"], BatchEpisodeBuffer), "wrong format (inputs)"
+
+        test_mode = kwargs["test_mode"]
+
         if self.args.share_agent_params:
             inputs, inputs_tformat = _build_model_inputs(self.input_columns,
                                                          inputs,
@@ -118,6 +140,31 @@ class COMAJointMultiAgentController():
                                                                                 loss_fn=loss_fn,
                                                                                 tformat=inputs_tformat,
                                                                                 **kwargs)
+
+            try:
+                joint_sampled_actions, \
+                modified_inputs, \
+                selected_actions_format = self.action_selector.select_action({"policies": out},
+                                                                             avail_actions=None,
+                                                                             tformat=tformat,
+                                                                             test_mode=test_mode)
+            except Exception as e:
+                pass
+
+            out, hidden_states, losses, tformat = self.coma_joint_network_model(inputs,
+                                                                                hidden_states=hidden_states,
+                                                                                loss_fn=loss_fn,
+                                                                                tformat=inputs_tformat,
+                                                                                **kwargs)
+
+            self.actions = joint_sampled_actions.clone()
+
+            actions1, actions2 = _joint_actions_2_action_pair(joint_sampled_actions, self.n_actions, use_delegate_action=False)
+
+            self.final_actions = th.cat((actions1, actions2), 0)
+            self.policies = modified_inputs.clone()
+            self.selected_actions_format = selected_actions_format
+
             ret = {"hidden_states": hidden_states,
                    "losses": losses,
                    "format": tformat}

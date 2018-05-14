@@ -9,7 +9,7 @@ coma_exploration_mode: "softmax"
 coma_use_entropy_regularizer: False
 coma_entropy_loss_regularization_factor: 0.000005
 gamma: 0.99
-learner: coma
+learner: coma_joint
 lr_agent: 5e-4
 lr_critic: 5e-4
 n_critic_learner_reps: 54

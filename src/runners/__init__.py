@@ -15,8 +15,8 @@ REGISTRY["pomace"] = poMACERunner
 from .mcce_runner import MCCERunner
 REGISTRY["mcce"] = MCCERunner
 
-from .coma_runner import COMARunner
-REGISTRY["coma_joint"] = COMARunner
+from .coma_joint_runner import COMAJointRunner
+REGISTRY["coma_joint"] = COMAJointRunner
 
 from .iql_runner import IQLRunner
 REGISTRY["iql"] = IQLRunner

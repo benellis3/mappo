@@ -6,6 +6,176 @@ import numpy as np
 
 from components.transforms import _to_batch, _from_batch, _check_inputs_validity, _tdim, _vdim
 
+
+class COMAJointQFunction(nn.Module):
+    # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
+
+    def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
+
+        super(COMAJointQFunction, self).__init__()
+
+        self.args = args
+        self.n_actions = n_actions
+
+        # Set up input regions automatically if required (if sensible)
+        self.input_shapes = {}
+        assert set(input_shapes.keys()) == {"main"}, \
+            "set of input_shapes does not coincide with model structure!"
+        self.input_shapes.update(input_shapes)
+
+        # Set up output_shapes automatically if required
+        self.output_shapes = {}
+        self.output_shapes["qvalues"] = self.n_actions*self.n_actions # qvals
+        self.output_shapes.update(output_shapes)
+
+        # Set up layer_args automatically if required
+        self.layer_args = {}
+        self.layer_args["fc1"] = {"in":self.input_shapes["main"], "out":64}
+        self.layer_args["fc2"] = {"in":self.layer_args["fc1"]["out"], "out":self.output_shapes["qvalues"]}
+        self.layer_args.update(layer_args)
+
+        # Set up network layers
+        self.fc1 = nn.Linear(self.layer_args["fc1"]["in"], self.layer_args["fc1"]["out"])
+        self.fc2 = nn.Linear(self.layer_args["fc2"]["in"], self.layer_args["fc2"]["out"])
+
+        # DEBUG
+        # self.fc2.weight.data.zero_()
+        # self.fc2.bias.data.zero_()
+
+    def init_hidden(self):
+        """
+        There's no hidden state required for this model.
+        """
+        pass
+
+
+    def forward(self, inputs, tformat):
+        # _check_inputs_validity(inputs, self.input_shapes, tformat, allow_nonseq=True)
+
+        main, params, tformat = _to_batch(inputs.get("main"), tformat)
+        x = F.relu(self.fc1(main))
+        qvalues = self.fc2(x)
+        return _from_batch(qvalues, params, tformat)
+
+
+class COMAJointAdvantage(nn.Module):
+    # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
+
+    def __init__(self, n_actions, input_shapes, output_shapes={}, layer_args={}, args=None):
+        """
+        This model contains no network layers
+        """
+        super(COMAJointAdvantage, self).__init__()
+        self.args = args
+        self.n_actions = n_actions
+
+        # Set up input regions automatically if required (if sensible)
+        self.input_shapes = {}
+        assert set(input_shapes.keys()) == {"qvalues", "agent_action", "agent_policy", "avail_actions"},\
+            "set of input_shapes does not coincide with model structure!"
+        self.input_shapes.update(input_shapes)
+
+        pass
+
+    def init_hidden(self):
+        """
+        There's no hidden state required for this model.
+        """
+        pass
+
+
+    def forward(self, inputs, tformat, baseline = True): # DEBUG!!
+        # _check_inputs_validity(inputs, self.input_shapes, tformat)
+
+        qvalues, params_qv, tformat_qv = _to_batch(inputs.get("qvalues").clone(), tformat)
+        agent_action, params_aa, tformat_aa = _to_batch(inputs.get("agent_action"), tformat)
+        agent_policy, params_ap, tformat_ap = _to_batch(inputs.get("agent_policy"), tformat)
+
+        if baseline:
+        # Fuse to XXX advantage
+            baseline = th.bmm(
+                agent_policy.unsqueeze(1),
+                qvalues.unsqueeze(2)).squeeze(2)
+        else:
+            baseline = 0
+
+        _aa = agent_action.clone()
+        _aa = _aa.masked_fill(_aa!=_aa, 0.0)
+        Q = th.gather(qvalues, 1, _aa.long())
+        Q = Q.masked_fill(agent_action!=agent_action, float("nan"))
+
+        A = Q - baseline
+
+        return _from_batch(A, params_qv, tformat_qv), _from_batch(Q, params_qv, tformat_qv), tformat
+
+class COMAJointCritic(nn.Module):
+
+    """
+    Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
+    """
+
+    def __init__(self, input_shapes, n_actions, output_shapes={}, layer_args={}, args=None):
+        """
+        This model contains no network layers but only sub-models
+        """
+
+        super(COMAJointCritic, self).__init__()
+        self.args = args
+        self.n_actions = n_actions
+
+        # Set up input regions automatically if required (if sensible)
+        self.input_shapes = {}
+        self.input_shapes.update(input_shapes)
+
+        # Set up output_shapes automatically if required
+        self.output_shapes = {}
+        self.output_shapes["advantage"] = 1
+        self.output_shapes["qvalue"] = 1
+        self.output_shapes.update(output_shapes)
+
+        # Set up layer_args automatically if required
+        self.layer_args = {}
+        self.layer_args["qfunction"] = {}
+        self.layer_args.update(layer_args)
+
+        self.COMAJointQFunction = COMAJointQFunction(input_shapes={"main":self.input_shapes["qfunction"]},
+                                                       output_shapes={},
+                                                       layer_args={"main":self.layer_args["qfunction"]},
+                                                       n_actions = self.n_actions,
+                                                       args=self.args)
+
+        self.COMAJointAdvantage = COMAJointAdvantage(input_shapes={"avail_actions":(self.input_shapes["avail_actions_id1"]*self.input_shapes["avail_actions_id2"]),
+                                                         "qvalues":self.COMAJointQFunction.output_shapes["qvalues"],
+                                                         "agent_action":self.input_shapes["agent_action"],
+                                                         "agent_policy":self.input_shapes["joint_policy"]},
+                                         output_shapes={},
+                                         n_actions=self.n_actions,
+                                         args=self.args)
+
+        pass
+
+    def init_hidden(self):
+        """
+        There's no hidden state required for this model.
+        """
+        pass
+
+
+    def forward(self, inputs, tformat, baseline=True):
+        #_check_inputs_validity(inputs, self.input_shapes, tformat)
+
+        qvalues = self.COMAJointQFunction(inputs={"main":inputs["qfunction"]},
+                                     tformat=tformat)
+
+        advantage, qvalue, _ = self.COMAJointAdvantage(inputs={"avail_actions":inputs["avail_actions"],
+                                                          "qvalues":qvalues,
+                                                          "agent_action":inputs["agent_action"],
+                                                          "agent_policy":inputs["joint_policy"]},
+                                                  tformat=tformat,
+                                                  baseline=baseline)
+        return {"advantage": advantage, "qvalue": qvalue}, tformat
+
+
 class COMAJointNonRecurrentMultiAgentNetwork(nn.Module):
     def __init__(self,
                  input_shapes,
@@ -61,7 +231,7 @@ class COMAJointNonRecurrentMultiAgentNetwork(nn.Module):
         state_input = inputs["central_agent"]["state"]
 
         avail_actions1, params_aa1, _ = _to_batch(inputs["central_agent"]["avail_actions__agent1"].unsqueeze(0), tformat)
-        avail_actions2, params_aa2, _ = _to_batch(inputs["central_agent"]["avail_actions__agent1"].unsqueeze(0), tformat)
+        avail_actions2, params_aa2, _ = _to_batch(inputs["central_agent"]["avail_actions__agent2"].unsqueeze(0), tformat)
         tmp = (avail_actions1 * avail_actions2)
         pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
         avail_actions = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
@@ -69,7 +239,7 @@ class COMAJointNonRecurrentMultiAgentNetwork(nn.Module):
         x, params, tformat = _to_batch(th.cat((agent_inputs.unsqueeze(0), state_input.unsqueeze(0)), 3), tformat)  # TODO: right cat dim?
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        x = F.softmax(x, dim=1)
+        # x = F.softmax(x, dim=1)
 
         # mask policy elements corresponding to unavailable actions
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
@@ -81,6 +251,7 @@ class COMAJointNonRecurrentMultiAgentNetwork(nn.Module):
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
             epsilons = inputs["central_agent"]["epsilons"].unsqueeze(0).unsqueeze(_tdim(tformat))
             epsilons, _, _ = _to_batch(epsilons, tformat)
+            epsilons = epsilons.repeat(agent_inputs.shape[1], avail_actions.shape[1])
             x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
         x = _from_batch(x, params, tformat)
