@@ -600,13 +600,10 @@ class NStepRunner():
                                                                                          agent_ids=list(range(self.n_agents))
                                                                                          )
 
-                try: # DEBUG
-                    ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
-                                                                 if selected_actions.is_cuda else ids_envs_not_terminated_tensor.cpu(), :, :],
-                                    ids=ids_envs_not_terminated)
-                except Exception as e:
-                    s = self.episode_buffer.to_pd()
-                    pass
+                ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
+                                                             if selected_actions.is_cuda else ids_envs_not_terminated_tensor.cpu(), :, :],
+                                ids=ids_envs_not_terminated)
+
                 # retrieve ids of all envs that have not yet terminated.
                 # NOTE: for efficiency reasons, will perform final action selection in terminal state
                 ids_envs_not_terminated = [_b for _b in range(self.batch_size) if not self.envs_terminated[_b]]
