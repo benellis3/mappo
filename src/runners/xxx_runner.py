@@ -178,7 +178,6 @@ class XXXRunner(NStepRunner):
 
 
     def log(self, log_directly=True):
-        stats = self.get_stats()
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
             log_str += ", XXX_epsilon_level1={:g}".format(self.xxx_epsilon_decay_schedule_level1.eval(self.T_env))
