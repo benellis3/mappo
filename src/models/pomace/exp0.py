@@ -268,8 +268,6 @@ class poMACEExp0Network(nn.Module):
         if loss_fn is not None:
             loss = loss_fn(x, tformat=tformat)[0]
 
-        \
-
         return dict(pi=x, sigma=sigma), \
                h, \
                loss, \

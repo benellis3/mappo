@@ -167,7 +167,7 @@ class poMACEExp1MultiagentNetwork(nn.Module):
 
         # Set up network layers
         self.encoder = pomaceExp1AgentMLPEncoder(input_shapes=dict(main=self.layer_args["fc1"]["in"]),
-                                             output_shapes=dict(main=self.layer_args["fc1"]["out"]))
+                                                 output_shapes=dict(main=self.layer_args["fc1"]["out"]))
         self.gru = nn.GRUCell(self.layer_args["gru"]["in"], self.layer_args["gru"]["hidden"])
 
         assert self.args.pomace_exp_variant == 1 or self.args.pomace_exp_variant == 2, "No other variants implemented"

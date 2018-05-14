@@ -1,5 +1,5 @@
 defaults: default coma sc1
-batch_size: 30
+batch_size: 1
 coma_critic_use_sampling: True
 coma_critic_sample_size: 1620
 coma_epsilon_start: 0.5
@@ -15,5 +15,5 @@ env_args:
 env_stats_aggregator: sc1
 n_critic_learner_reps: 30
 n_loops_per_thread_or_sub_or_main_process: 1
-n_subprocesses: 30
+n_subprocesses: 1
 target_critic_update_interval: 162000

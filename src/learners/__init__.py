@@ -19,5 +19,8 @@ REGISTRY["vdn"] = VDNLearner
 from .qmix import QMIXLearner
 REGISTRY["qmix"] = QMIXLearner
 
+from .coma_joint import COMAJointLearner
+REGISTRY["coma_joint"] = COMAJointLearner
+
 from .xxx import XXXLearner
 REGISTRY["xxx"] = XXXLearner
