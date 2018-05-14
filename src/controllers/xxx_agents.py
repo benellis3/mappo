@@ -38,9 +38,7 @@ class XXXMultiagentController():
         else:
             self.action_selector = action_selector
 
-        self.agent_scheme_level1 = Scheme([dict(name="observations",
-                                                select_agent_ids=list(range(self.n_agents))),
-                                           *[dict(name="actions_level1__sample{}".format(_i),
+        self.agent_scheme_level1 = Scheme([*[dict(name="actions_level1__sample{}".format(_i),
                                                 rename="past_actions_level1__sample{}".format(_i),
                                                 transforms=[("shift", dict(steps=1)),
                                                             ("one_hot", dict(range=(0, self.n_actions-1)))],
@@ -49,6 +47,10 @@ class XXXMultiagentController():
                                            dict(name="xxx_epsilons_central_level1",
                                                 scope="episode"),
                                            #dict(name="xxx_epsilons_level1")
+                                           dict(name="observations",
+                                                select_agent_ids=list(range(self.n_agents)))
+                                           if not self.args.xxx_use_obs_intersections else
+                                           dict(name="obs_intersection_all")
                                            ])
 
 
@@ -68,9 +70,11 @@ class XXXMultiagentController():
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
                                                                              dict(name="avail_actions",
-                                                                                  select_agent_ids=[_agent_id1, _agent_id2])
-                                                                             #dict(name="xxx_epsilons_level2")
-                                                                             ])
+                                                                                  select_agent_ids=[_agent_id1, _agent_id2]),
+                                                                             dict(name="observations",
+                                                                                   select_agent_ids=[_agent_id1, _agent_id2])
+                                                                                if not self.args.xxx_use_obs_intersections else
+                                                                             dict(name="obs_intersections_pair{}".format(_agent_id1, _agent_id2))])
 
         self.agent_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
                                                                      transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
@@ -93,7 +97,8 @@ class XXXMultiagentController():
                                                                    for _i in range(_n_agent_pair_samples(self.n_agents))],
                                                                 dict(name="avail_actions",
                                                                      select_agent_ids=[_agent_id])
-                                                               ])
+                                                               ]
+                                                               )
 
         # Set up schemes
         self.schemes = {}
@@ -140,7 +145,9 @@ class XXXMultiagentController():
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = {}
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["main"] = \
-                Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2]),
+                Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])
+                        if not self.args.xxx_use_obs_intersections else
+                        dict(name="obs_intersections_pair{}".format(_agent_id1, _agent_id2)),
                         dict(name="past_actions_level2",
                              switch=self.args.xxx_agent_level2_use_past_actions),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])

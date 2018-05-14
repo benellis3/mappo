@@ -4,8 +4,8 @@ env_args:
     - 1
     - 1
   episode_limit: 50
-  intersection_global_view: False
-  intersection_id_coded: False
+  intersection_global_view: True
+  intersection_id_coded: True
   n_prey: 1
   n_agents: 4
   predator_prey_toroidal: True

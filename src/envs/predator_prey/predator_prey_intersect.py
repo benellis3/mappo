@@ -151,7 +151,7 @@ class PredatorPreyCapture(MultiAgentEnv):
 
     def _is_visible(self, agents, target):
         """ agents are plural and target is singular. """
-        target = target.reshape(1, 2).repeat(len(agent_ids), 0)
+        target = target.reshape(1, 2).repeat(agents.shape[0], 0)
         # Determine the Manhattan distance of all agents to the target
         if self.toroidal:
             # Account for the environment wrapping around in a toroidal fashion

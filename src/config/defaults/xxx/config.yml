@@ -50,6 +50,7 @@ xxx_exploration_mode_level1: "softmax"
 xxx_exploration_mode_level2: "softmax"
 xxx_exploration_mode_level3: "softmax"
 xxx_use_entropy_regularizer: False
+xxx_use_obs_intersections: False
 xxx_entropy_loss_regularization_factor: 0.000005
 gamma: 0.99
 learner: xxx
