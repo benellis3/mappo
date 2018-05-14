@@ -18,9 +18,10 @@ ${cmd} run -d --rm \
     --security-opt="apparmor=unconfined" --cap-add=SYS_PTRACE \
     --net host \
     --user $(id -u) \
+    -e CUDA_LAUNCH_BLOCKING=1 \
     -v $SCRIPT_PATH:/pymarl \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v `pwd`/mongodb:/data/db \
     -e DISPLAY=unix$DISPLAY \
     -t pymarl \
-    \bin\bash `CUDA_LAUNCH_BLOCKING=1 ${@:1}`
+    ${@:1}
