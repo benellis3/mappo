@@ -111,8 +111,9 @@ class XXXLearner(BasicLearner):
                                                                ],
                                                    switch=self.args.xxx_critic_level2_use_past_actions_level1)
                                                 for _i in range(_n_agent_pair_samples(self.n_agents))],
-                                            dict(name="actions_level1__sample{}".format(0),
-                                                 rename="agent_action",),
+                                            *[dict(name="actions_level1__sample{}".format(_i),
+                                                   rename="agent_actions__sample{}".format(_i))
+                                              for _i in range(_n_agent_pair_samples(self.n_agents))],
                                             dict(name="policies_level1",
                                                  rename="agent_policy"),
                                             dict(name="state")
@@ -212,11 +213,15 @@ class XXXLearner(BasicLearner):
             self.schemes_level3["target_critic_level3__agent{}".format(_agent_id)] = self.critic_level3_scheme_fn(_agent_id)
 
         # create joint scheme from the critics schemes
-        self.joint_scheme_dict = _join_dicts(self.scheme_level1, self.schemes_level2, self.schemes_level3)
+        self.joint_scheme_dict = _join_dicts(self.scheme_level1,
+                                             self.schemes_level2,
+                                             self.schemes_level3,
+                                             self.multiagent_controller.joint_scheme_dict)
 
         # construct model-specific input regions
 
         # level 1
+        assert self.n_agents <=4, "NOT IMPLEMENTED FOR >= 4 agents!"
         self.input_columns_level1 = {}
         self.input_columns_level1["critic_level1"] = {}
         #self.input_columns_level1["critic_input_level1"]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
@@ -227,7 +232,8 @@ class XXXLearner(BasicLearner):
                                                                           dict(name="past_actions",
                                                                                select_agent_ids=list(range(self.n_agents)),)])
         self.input_columns_level1["critic_level1"]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
-        self.input_columns_level1["critic_level1"]["agent_action"] = Scheme([dict(name="agent_action")])
+        self.input_columns_level1["critic_level1"]["agent_action"] = Scheme([dict(name="agent_actions__sample{}".format(_i))
+                                                                                  for _i in range(1)],) # TODO: Expand for more than 4 agents!!
         self.input_columns_level1["critic_level1"]["agent_policy"] = Scheme([dict(name="agent_policy")])
         self.input_columns_level1["target_critic_level1"] = self.input_columns_level1["critic_level1"]
 
@@ -266,7 +272,7 @@ class XXXLearner(BasicLearner):
 
         self.last_target_update_T_critic_level1 = 0
         self.last_target_update_T_critic_level2 = 0
-        self.last_target_update_T_critic_level2 = 0
+        self.last_target_update_T_critic_level3 = 0
         pass
 
 
@@ -296,6 +302,7 @@ class XXXLearner(BasicLearner):
 
         # set up models level 1
         self.critic_models["level1"] = self.critic_level1(input_shapes=self.input_shapes_level1["critic_level1"],
+                                                          n_agents=self.n_agents,
                                                           n_actions=self.n_actions,
                                                           args=self.args)
         if self.args.use_cuda:
@@ -398,49 +405,74 @@ class XXXLearner(BasicLearner):
         # Retrieve and view all data that can be retrieved from batch_history in a single step (caching efficient)
 
         # create one single batch_history view suitable for all
-        data_inputs_level1, data_inputs_tformat_level1 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level1,
-                                                                            to_cuda=self.args.use_cuda,
-                                                                            to_variable=True,
-                                                                            bs_ids=None,
-                                                                            fill_zero=True) # DEBUG: Should be True
+        # data_inputs_level1, data_inputs_tformat_level1 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level1,
+        #                                                                     to_cuda=self.args.use_cuda,
+        #                                                                     to_variable=True,
+        #                                                                     bs_ids=None,
+        #                                                                     fill_zero=True) # DEBUG: Should be True
+        #
+        # data_inputs_level2, data_inputs_tformat_level2 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level2,
+        #                                                                     to_cuda=self.args.use_cuda,
+        #                                                                     to_variable=True,
+        #                                                                     bs_ids=None,
+        #                                                                     fill_zero=True) # DEBUG: Should be True
+        #
+        # data_inputs_level3, data_inputs_tformat_level3 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level3,
+        #                                                                     to_cuda=self.args.use_cuda,
+        #                                                                     to_variable=True,
+        #                                                                     bs_ids=None,
+        #                                                                     fill_zero=True) # DEBUG: Should be True
 
-        data_inputs_level2, data_inputs_tformat_level2 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level2,
-                                                                              to_cuda=self.args.use_cuda,
-                                                                              to_variable=True,
-                                                                              bs_ids=None,
-                                                                              fill_zero=True) # DEBUG: Should be True
+        data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=self.joint_scheme_dict,
+                                                              to_cuda=self.args.use_cuda,
+                                                              to_variable=True,
+                                                              bs_ids=None,
+                                                              fill_zero=True) # DEBUG: Should be True
 
-        data_inputs_level3, data_inputs_tformat_level3 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level3,
-                                                                              to_cuda=self.args.use_cuda,
-                                                                              to_variable=True,
-                                                                              bs_ids=None,
-                                                                              fill_zero=True) # DEBUG: Should be True
-
-        self.train_level1(batch_history, data_inputs_level1, data_inputs_tformat_level1, T_env)
-        self.train_level2(batch_history, data_inputs_level2, data_inputs_tformat_level2, T_env)
-        self.train_level3(batch_history, data_inputs_level3, data_inputs_tformat_level3, T_env)
+        #a = {_k:_v.to_pd() for _k, _v in data_inputs.items()}
+        #b = batch_history.to_pd()
+        self.train_level1(batch_history, data_inputs, data_inputs_tformat, T_env)
+        self.train_level2(batch_history, data_inputs, data_inputs_tformat, T_env)
+        self.train_level3(batch_history, data_inputs, data_inputs_tformat, T_env)
         pass
 
     def train_level1(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic_level1 - self.last_target_update_T_critic_level1) / self.args.T_target_critic_level1_update_interval > 1.0:
-            self.update_target_nets()
+            self.update_target_nets(level=1)
             self.last_target_update_T_critic_level1 = self.T_critic_level1
             print("updating target net!")
 
-        actions_level1 = []
-        for _i in range(_n_agent_pair_samples(self.n_agents)):
-            actions, actions_tformat = batch_history.get_col(bs=None,
-                                                         col="actions_level1__sample{}".format(_i),
+        # actions_level1 = []
+        # for _i in range(_n_agent_pair_samples(self.n_agents)):
+        #     actions, actions_tformat = batch_history.get_col(bs=None,
+        #                                                      col="actions_level1__sample{}".format(_i),
+        #                                                      # agent_ids=list(range(0, self.n_agents)),
+        #                                                      stack=True)
+        #     actions_level1.append(actions)
+
+        assert self.n_agents <= 4, "not implemented for >= 4 agents!"
+        actions, actions_tformat = batch_history.get_col(bs=None,
+                                                         col="actions_level1__sample{}".format(0),
                                                          # agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
-            actions_level1.append(actions)
+        actions_level1 = actions.unsqueeze(0)
+        #th.stack(actions_level1)
+
 
         # do single forward pass in critic
         xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level1,
-                                                                           inputs=data_inputs,
-                                                                           inputs_tformat=data_inputs_tformat,
-                                                                           to_variable=True)
+                                                                         inputs=data_inputs,
+                                                                         inputs_tformat=data_inputs_tformat,
+                                                                         to_variable=True,
+                                                                         stack=False)
+        # pimp up to agent dimension 1
+        xxx_model_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in xxx_model_inputs.items()}
+        xxx_model_inputs_tformat = "a*bs*t*v"
+
+        #data_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in data_inputs.items()}
+        #data_inputs_tformat = "a*bs*t*v"
+
         self._optimize(batch_history=batch_history,
                        xxx_model_inputs=xxx_model_inputs,
                        xxx_model_inputs_tformat=xxx_model_inputs_tformat,
@@ -449,33 +481,37 @@ class XXXLearner(BasicLearner):
                        agent_optimiser=self.agent_level1_optimiser,
                        agent_parameters=self.agent_level1_parameters,
                        critic_optimiser=self.critic_level1_optimiser,
-                       critic_parameters=self.critic_level1_optimiser,
-                       critic=self.critic_level1,
-                       target_critic=self.target_critic_level1,
+                       critic_parameters=self.critic_level1_parameters,
+                       critic=self.critic_models["level1"],
+                       target_critic=self.target_critic_models["level1"],
                        xxx_critic_use_sampling=self.args.xxx_critic_level1_use_sampling,
+                       xxx_critic_sample_size=self.args.xxx_critic_level1_sample_size,
                        T_critic_str="T_critic_level1",
                        T_policy_str="T_policy_level1",
                        T_env=T_env,
                        level=1,
-                       actions=actions)
+                       actions=actions_level1)
         pass
 
     def train_level2(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic_level2 - self.last_target_update_T_critic_level2) / self.args.T_target_critic_level2_update_interval > 1.0:
-            self.update_target_nets()
+            self.update_target_nets(level=2)
             self.last_target_update_T_critic_level2 = self.T_critic_level2
             print("updating target net!")
 
+        assert self.n_agents == 3, "only implemented for 3 agents"
         actions, actions_tformat = batch_history.get_col(bs=None,
-                                                         col="actions_level2",
-                                                         agent_ids=list(range(0, self.n_agents)),
-                                                         stack=True)
+                                                         col="actions_level2__sample{}".format(0))
+        actions = actions.unsqueeze(0)
+
         # do single forward pass in critic
         xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level2,
-                                                                           inputs=data_inputs,
-                                                                           inputs_tformat=data_inputs_tformat,
-                                                                           to_variable=True)
+                                                                         inputs=data_inputs,
+                                                                         inputs_tformat=data_inputs_tformat,
+                                                                         to_variable=True)
+
+
         self._optimize(batch_history,
                        xxx_model_inputs,
                        xxx_model_inputs_tformat,
@@ -484,10 +520,11 @@ class XXXLearner(BasicLearner):
                        agent_optimiser=self.agent_level2_optimiser,
                        agent_parameters=self.agent_level2_parameters,
                        critic_optimiser=self.critic_level2_optimiser,
-                       critic_parameters=self.critic_level2_optimiser,
-                       critic=self.critic_level2,
-                       target_critic=self.target_critic_level2,
+                       critic_parameters=self.critic_level2_parameters,
+                       critic=self.critic_models["level2_0:1"],
+                       target_critic=self.target_critic_models["level2_0:1"],
                        xxx_critic_use_sampling=self.args.xxx_critic_level2_use_sampling,
+                       xxx_critic_sample_size=self.args.xxx_critic_level2_sample_size,
                        T_critic_str="T_critic_level2",
                        T_policy_str="T_policy_level2",
                        T_env=T_env,
@@ -498,7 +535,7 @@ class XXXLearner(BasicLearner):
     def train_level3(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic_level3 - self.last_target_update_T_critic_level3) / self.args.T_target_critic_level3_update_interval > 1.0:
-            self.update_target_nets()
+            self.update_target_nets(level=3)
             self.last_target_update_T_critic_level3 = self.T_critic_level3
             print("updating target net!")
 
@@ -508,9 +545,10 @@ class XXXLearner(BasicLearner):
                                                          stack=True)
         # do single forward pass in critic
         xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level3,
-                                                                           inputs=data_inputs,
-                                                                           inputs_tformat=data_inputs_tformat,
-                                                                           to_variable=True)
+                                                                         inputs=data_inputs,
+                                                                         inputs_tformat=data_inputs_tformat,
+                                                                         to_variable=True)
+
         self._optimize(batch_history,
                        xxx_model_inputs,
                        xxx_model_inputs_tformat,
@@ -519,10 +557,11 @@ class XXXLearner(BasicLearner):
                        agent_optimiser=self.agent_level3_optimiser,
                        agent_parameters=self.agent_level3_parameters,
                        critic_optimiser=self.critic_level3_optimiser,
-                       critic_parameters=self.critic_level3_optimiser,
-                       critic=self.critic_level3,
-                       target_critic=self.target_critic_level3,
+                       critic_parameters=self.critic_level3_parameters,
+                       critic=self.critic_models["level3_0"],
+                       target_critic=self.target_critic_models["level3_0"],
                        xxx_critic_use_sampling=self.args.xxx_critic_level3_use_sampling,
+                       xxx_critic_sample_size=self.args.xxx_critic_level3_sample_size,
                        T_critic_str="T_critic_level3",
                        T_policy_str="T_policy_level3",
                        T_env=T_env,
@@ -543,6 +582,7 @@ class XXXLearner(BasicLearner):
                   critic,
                   target_critic,
                   xxx_critic_use_sampling,
+                  xxx_critic_sample_size,
                   T_critic_str,
                   T_policy_str,
                   T_env,
@@ -556,8 +596,9 @@ class XXXLearner(BasicLearner):
         critic_grad_norm_arr = []
 
         def _optimize_critic(**kwargs):
-            inputs_critic= kwargs["xxx_model_inputs"]["critic"]
-            inputs_target_critic=kwargs["xxx_model_inputs"]["target_critic"]
+            level = kwargs["level"]
+            inputs_critic= kwargs["xxx_model_inputs"]["critic_level{}".format(level)]
+            inputs_target_critic=kwargs["xxx_model_inputs"]["target_critic_level{}".format(level)]
             inputs_critic_tformat=kwargs["tformat"]
             inputs_target_critic_tformat = kwargs["tformat"]
 
@@ -567,6 +608,7 @@ class XXXLearner(BasicLearner):
                                                                                        tformat=xxx_model_inputs_tformat)
 
 
+
             target_critic_td_targets, \
             target_critic_td_targets_tformat = batch_history.get_stat("td_lambda_targets",
                                                                        bs_ids=None,
@@ -574,6 +616,7 @@ class XXXLearner(BasicLearner):
                                                                        gamma=self.args.gamma,
                                                                        value_function_values=output_target_critic["qvalue"].detach(),
                                                                        to_variable=True,
+                                                                       n_agents=output_target_critic["qvalue"].shape[_adim(output_target_critic_tformat)],
                                                                        to_cuda=self.args.use_cuda)
 
             # sample!!
@@ -581,7 +624,7 @@ class XXXLearner(BasicLearner):
                 critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
                 sample_ids = randint(critic_shape[_bsdim(inputs_target_critic_tformat)] \
                                         * critic_shape[_tdim(inputs_target_critic_tformat)],
-                                     size = self.args.xxx_critic_sample_size)
+                                     size = xxx_critic_sample_size)
                 sampled_ids_tensor = th.from_numpy(sample_ids).long().cuda() if inputs_critic[list(inputs_critic.keys())[0]].is_cuda else th.from_numpy(sample_ids).long()
                 _inputs_critic = {}
                 for _k, _v in inputs_critic.items():
@@ -618,8 +661,7 @@ class XXXLearner(BasicLearner):
             critic_optimiser.zero_grad()
             critic_loss.backward()
 
-            critic_grad_norm = th.nn.utils.clip_grad_norm(critic_parameters,
-                                                          50)
+            critic_grad_norm = th.nn.utils.clip_grad_norm(critic_parameters, 50)
             critic_optimiser.step()
 
             # Calculate critic statistics and update
@@ -643,10 +685,11 @@ class XXXLearner(BasicLearner):
         for _i in range(self.n_critic_learner_reps):
             _ = _optimize_critic(xxx_model_inputs=xxx_model_inputs,
                                  tformat=xxx_model_inputs_tformat,
-                                 actions=actions)
+                                 actions=actions,
+                                 level=level)
 
         # get advantages
-        output_critic, output_critic_tformat = critic.forward(xxx_model_inputs["critic"],
+        output_critic, output_critic_tformat = critic.forward(xxx_model_inputs["critic_level{}".format(level)],
                                                               tformat=xxx_model_inputs_tformat)
         advantages = output_critic["advantage"]
 
@@ -662,8 +705,11 @@ class XXXLearner(BasicLearner):
         agent_controller_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
                                                                                  hidden_states=hidden_states,
                                                                                  loss_fn=policy_loss_function,
+                                                                                 loss_level=level,
                                                                                  tformat=data_inputs_tformat,
-                                                                                 test_mode=False)
+                                                                                 avail_actions=None,
+                                                                                 test_mode=False,
+                                                                                 batch_history=batch_history)
         XXX_loss = agent_controller_output["losses"]
         XXX_loss = XXX_loss.mean()
 
@@ -678,6 +724,9 @@ class XXXLearner(BasicLearner):
 
         policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
         agent_optimiser.step()
+
+        #for p in self.agent_level1_parameters:
+        #    print('===========\ngradient:\n----------\n{}'.format(p.grad))
 
         # increase episode counter (the fastest one is always)
         setattr(self, T_policy_str, getattr(self, T_policy_str) + len(batch_history) * batch_history._n_t)
@@ -696,14 +745,15 @@ class XXXLearner(BasicLearner):
 
         pass
 
-    def update_target_nets(self):
-        if self.args.share_params:
+    def update_target_nets(self, level):
+        if self.args.critic_level1_share_params and level==1:
             # self.target_critic.load_state_dict(self.critic.state_dict())
             self.critic_models["level1"].load_state_dict(self.critic_models["level1"].state_dict())
+        if self.args.critic_level2_share_params and level==2:
             self.critic_models["level2_0:1"].load_state_dict(self.critic_models["level2_0:1"].state_dict())
+        if self.args.critic_level2_share_params and level==3:
             self.critic_models["level3_{}".format(0)].load_state_dict(self.critic_models["level3_{}".format(0)].state_dict())
-        else:
-            assert False, "TODO1"
+        pass
 
     def get_stats(self):
         if hasattr(self, "_stats"):
@@ -722,17 +772,17 @@ class XXXLearner(BasicLearner):
         logging_dict = {}
         logging_str = ""
         for _i in range(1,4):
-            logging_dict.update({"advantage_mean_{}".format(_i): _seq_mean(stats["advantage_mean_{}".format(_i)]),
-                                 "critic_grad_norm_{}".format(_i): _seq_mean(stats["critic_grad_norm_{}".format(_i)]),
-                                 "critic_loss_{}".format(_i):_seq_mean(stats["critic_loss_{}".format(_i)]),
-                                 "policy_grad_norm_{}".format(_i): _seq_mean(stats["policy_grad_norm_{}".format(_i)]),
-                                 "policy_loss_{}".format(_i): _seq_mean(stats["policy_loss_{}".format(_i)]),
-                                 "target_critic_mean_{}".format(_i): _seq_mean(stats["target_critic_mean_{}".format(_i)]),
-                                 "T_critic_{}".format(_i): getattr(self, "T_critic_{}".format(_i)),
-                                 "T_policy_{}".format(_i): getattr(self, "T_policy_{}".format(_i))}
+            logging_dict.update({"advantage_mean_level{}".format(_i): _seq_mean(stats["advantage_mean_level{}".format(_i)]),
+                                 "critic_grad_norm_level{}".format(_i): _seq_mean(stats["critic_grad_norm_level{}".format(_i)]),
+                                 "critic_loss_level{}".format(_i):_seq_mean(stats["critic_loss_level{}".format(_i)]),
+                                 "policy_grad_norm_level{}".format(_i): _seq_mean(stats["policy_grad_norm_level{}".format(_i)]),
+                                 "policy_loss_level{}".format(_i): _seq_mean(stats["policy_loss_level{}".format(_i)]),
+                                 "target_critic_mean_level{}".format(_i): _seq_mean(stats["target_critic_mean_level{}".format(_i)]),
+                                 "T_critic_level{}".format(_i): getattr(self, "T_critic_level{}".format(_i)),
+                                 "T_policy_level{}".format(_i): getattr(self, "T_policy_level{}".format(_i))}
                                 )
-            logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format()],
-                                                                                  _i, logging_dict["T_critic_level{}".format()])
+            logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format(_i)],
+                                                                                  _i, logging_dict["T_critic_level{}".format(_i)])
 
         logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_policy_level1",
                                                                           "T_critic_level1",
