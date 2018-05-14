@@ -148,6 +148,7 @@ class COMAJointMultiAgentController():
             #                                                              tformat=tformat,
             #                                                              test_mode=test_mode)
 
+            # TODO: Need to take this out, only put this in for debugging
             try:
                 joint_sampled_actions, \
                 modified_inputs, \
