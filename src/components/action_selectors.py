@@ -23,7 +23,10 @@ class MultinomialActionSelector():
             agent_policies = inputs["policies"].clone()  # might not be necessary
 
         # NOTE: Usually, on-policy algorithms should perform action masking in the model itself!
-        masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
+        if avail_actions is not None:
+            masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
+        else:
+            masked_policies = agent_policies
         masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
 
         mask = (masked_policies_batch != masked_policies_batch)
