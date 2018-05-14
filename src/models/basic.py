@@ -6,14 +6,13 @@ import torch as th
 from components.transforms import _to_batch, _from_batch, _check_inputs_validity, _tdim, _vdim
 
 class DQN(nn.Module):
-
     def __init__(self, input_shapes, n_actions, output_type=None, output_shapes=None, layer_args=None, args=None):
         super(DQN, self).__init__()
         self.args = args
         self.n_actions = n_actions
 
         assert output_type is not None, "you have to set an output_type!"
-        self.output_type=output_type
+        self.output_type = output_type
 
         # Set up input regions automatically if required (if sensible)
         self.input_shapes = {}
@@ -23,14 +22,14 @@ class DQN(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["fc2"] = self.n_actions # output
+        self.output_shapes["fc2"] = self.n_actions  # output
         if output_shapes is not None:
             self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
         self.layer_args = {}
-        self.layer_args["fc1"] = {"in":self.input_shapes["main"], "out":64}
-        self.layer_args["fc2"] = {"in":self.layer_args["fc1"]["out"], "out":self.output_shapes["fc2"]}
+        self.layer_args["fc1"] = {"in": self.input_shapes["main"], "out":64}
+        self.layer_args["fc2"] = {"in": self.layer_args["fc1"]["out"], "out": self.output_shapes["fc2"]}
         if layer_args is not None:
             self.layer_args.update(layer_args)
 
@@ -65,7 +64,7 @@ class DQN(nn.Module):
         if loss_fn is not None:
             losses, _ = loss_fn(x, tformat=tformat)
 
-        return x, hidden_states, losses, tformat # output, hidden state, losses
+        return x, hidden_states, losses, tformat  # output, hidden state, losses
 
 
 

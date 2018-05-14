@@ -181,6 +181,8 @@ class COMANonRecurrentAgent(NonRecurrentAgent):
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
 
+        losses = None
+
         avail_actions, params_aa, tformat_aa = _to_batch(inputs["avail_actions"], tformat)
         x, params, tformat = _to_batch(inputs["main"], tformat)
         x = F.relu(self.fc1(x))

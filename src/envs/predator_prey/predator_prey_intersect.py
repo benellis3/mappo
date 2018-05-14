@@ -57,6 +57,7 @@ class PredatorPreyCapture(MultiAgentEnv):
 
         # Define the environment grid
         self.intersection_id_coded = getattr(args, "intersection_id_coded", False)
+        self.intersection_global_view = getattr(args, "intersection_global_view", False)
         self.toroidal = args.predator_prey_toroidal
         shape = args.predator_prey_shape
         self.x_max, self.y_max = shape
@@ -308,7 +309,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         else:
             return self.grid[0, :, :, :].reshape(self.state_size)
 
-    def get_obs_intersection(self, agent_ids, global_view=False):
+    def get_obs_intersection(self, agent_ids):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
         grid = np.zeros((self.batch_size, self.grid_shape[0], self.grid_shape[0], 2), dtype=float_type)
@@ -325,7 +326,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         if not self.intersection_id_coded:
             grid = (grid != 0.0).astype(np.float32)
         # The intersection grid is constructed, now we have to generate the observations from it
-        if global_view:
+        if self.intersection_global_view:
             # Return the intersection as a state
             if self.batch_mode:
                 return grid.reshape((self.batch_size, self.state_size))
@@ -348,11 +349,13 @@ class PredatorPreyCapture(MultiAgentEnv):
         return self.n_actions
 
     def get_avail_agent_actions(self, agent_id):
+        """ Currently runs only with batch_size==1. """
         if self.toroidal:
             return [1 for _ in range(self.n_actions)]
         else:
             new_pos = self.agents[agent_id, 0, :] + self.actions
             allowed = np.logical_and(new_pos >= 0, new_pos < self.grid_shape).all(axis=1)
+            assert np.any(allowed), "No available action in the environment: this should never happen!"
             return [int(allowed[a]) for a in range(self.n_actions)]
 
     def get_avail_actions(self):
@@ -397,6 +400,8 @@ if __name__ == "__main__":
         'move_amount': 2,
         'step_mul': 8,  # lets you skip observations and actions
         'difficulty': "3",
+        'intersection_global_view': False,
+        'intersection_id_coded': False,
         'reward_only_positive': True,
         'reward_negative_scale': 0.5,
         'reward_death_value': 10,
@@ -450,7 +455,7 @@ if __name__ == "__main__":
             obs.append(np.expand_dims(env.get_obs_agent(i), axis=1))
         print(np.concatenate(obs, axis=1))
 
-    if True:
+    if False:
         print("STATE:\n")
         env.print_agents()
         print()
@@ -464,4 +469,5 @@ if __name__ == "__main__":
             print(iobs[a, :, :, 0].reshape(obs_shape) - iobs[a, :, :, 1].reshape(obs_shape), "\n")
 
     if True:
+        env.print_agents()
         print(env.get_avail_actions())
