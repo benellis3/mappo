@@ -28,6 +28,8 @@ class MultinomialActionSelector():
 
         mask = (masked_policies_batch != masked_policies_batch)
         masked_policies_batch.masked_fill_(mask, 0.0)
+        _check_nan(masked_policies_batch)
+        assert th.sum(masked_policies_batch < 0) == 0, "negative value in masked_policies_batch"
         _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
         _samples = _samples.masked_fill_(mask.long().sum(dim=1, keepdim=True) > 0, float("nan"))
 
