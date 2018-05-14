@@ -141,6 +141,13 @@ class COMAJointMultiAgentController():
                                                                                 tformat=inputs_tformat,
                                                                                 **kwargs)
 
+            # joint_sampled_actions, \
+            # modified_inputs, \
+            # selected_actions_format = self.action_selector.select_action({"policies": out},
+            #                                                              avail_actions=None,
+            #                                                              tformat=tformat,
+            #                                                              test_mode=test_mode)
+
             try:
                 joint_sampled_actions, \
                 modified_inputs, \

@@ -19,7 +19,7 @@ td_lambda: 0.8
 use_replay_buffer: False
 multiagent_controller: coma_joint_mac
 coma_joint_lambda_size: 32
-coma_joint_epsilon_start: 1.0
+coma_joint_epsilon_start: 0.99
 coma_joint_epsilon_finish: 0.05
 coma_joint_epsilon_time_length: 100000
 coma_joint_epsilon_size: 32

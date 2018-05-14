@@ -239,7 +239,6 @@ class COMAJointNonRecurrentMultiAgentNetwork(nn.Module):
         x, params, tformat = _to_batch(th.cat((agent_inputs.unsqueeze(0), state_input.unsqueeze(0)), 3), tformat)  # TODO: right cat dim?
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        # x = F.softmax(x, dim=1)
 
         # mask policy elements corresponding to unavailable actions
         n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
