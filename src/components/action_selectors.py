@@ -26,11 +26,10 @@ class MultinomialActionSelector():
         masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
         masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
 
-        mask = (masked_policies_batch!=masked_policies_batch)
-        masked_policies_batch = masked_policies_batch.masked_fill_(mask, 0.0)
+        mask = (masked_policies_batch != masked_policies_batch)
+        masked_policies_batch.masked_fill_(mask, 0.0)
         _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
-        _samples = _samples.masked_fill_(mask.long().sum(dim=1, keepdim=True) > 0,
-                                         float("nan"))
+        _samples = _samples.masked_fill_(mask.long().sum(dim=1, keepdim=True) > 0, float("nan"))
 
         samples = _from_batch(_samples, params, tformat)
         return samples, masked_policies, tformat

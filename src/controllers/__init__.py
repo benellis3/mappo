@@ -6,6 +6,7 @@ from .coma_agents import COMAMultiAgentController, COMAAgentController
 from .iac_agents import IACMultiAgentController, IACAgentController
 from .pomace_agents import poMACEMultiagentController
 from .mcce_agents import MCCEMultiagentController
+from .coma_joint_agents import COMAJointMultiAgentController
 
 REGISTRY["basic_ac"] = BasicAgentController
 REGISTRY["coma_recursive_ac"] = COMAAgentController
@@ -15,6 +16,7 @@ REGISTRY["coma_mac"] = COMAMultiAgentController
 REGISTRY["iac_mac"] = IACMultiAgentController
 REGISTRY["pomace_mac"] = poMACEMultiagentController
 REGISTRY["mcce_mac"] = MCCEMultiagentController
+REGISTRY["coma_joint_mac"] = COMAJointMultiAgentController
 
 from .vdn_agents import VDNMultiagentController
 REGISTRY["vdn_mac"] = VDNMultiagentController

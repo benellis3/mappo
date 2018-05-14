@@ -31,6 +31,10 @@ REGISTRY["mcce_policy_coordination_nn"] = MCCECoordinationNetwork
 REGISTRY["mcce_policy_decentralized_policy_nn"] = MCCEDecentralizedPolicyNetwork
 REGISTRY["mcce_policy_multiagent_nn"] = MCCEMultiAgentNetwork
 
+from .coma_joint import COMAJointNonRecurrentMultiAgentNetwork
+# REGISTRY["coma_joint_recurrent_nn"] = COMAJointRecurrentMultiAgentNetwork
+REGISTRY["coma_joint_non-recurrent_multiagent_nn"] = COMAJointNonRecurrentMultiAgentNetwork
+
 from .vdn import VDNMixingNetwork, VDNMixer
 REGISTRY["vdn_mixing_network"] = VDNMixingNetwork
 REGISTRY["vdn_mixer"] = VDNMixer
