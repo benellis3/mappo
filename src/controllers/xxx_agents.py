@@ -360,7 +360,7 @@ class XXXMultiagentController():
                 assert self.n_agents == 3, "only implemented for 3 agents!!"
                 for _i in  range(_n_agent_pair_samples(self.n_agents)):
                     sampled_pair_ids, _ = batch_history.get_col(col="actions_level1__sample{}".format(_i))
-                sampled_pair_ids = sampled_pair_ids.contiguous()
+                sampled_pair_ids = sampled_pair_ids.unsqueeze(0).contiguous()
 
             if loss_level is None or loss_level == 2:
                 # --------------------- LEVEL 2
@@ -398,7 +398,7 @@ class XXXMultiagentController():
                 assert self.n_agents == 3, "only implemented for 3 agents!!"
                 for _i in  range(_n_agent_pair_samples(self.n_agents)):
                     pair_sampled_actions, _ = batch_history.get_col(col="actions_level2__sample{}".format(_i))
-                pair_sampled_actions = pair_sampled_actions.contiguous()
+                pair_sampled_actions = pair_sampled_actions.unsqueeze(0).contiguous()
 
             if loss_level == 3 or loss_level is None:
                 # --------------------- LEVEL 3
@@ -411,6 +411,7 @@ class XXXMultiagentController():
                 action_matrix = ttype(self.n_agents,
                                       pair_sampled_actions.shape[_bsdim(tformat)]*
                                       pair_sampled_actions.shape[_tdim(tformat)]).fill_(float("nan"))
+
                 action_matrix.scatter_(0, pair_id1, actions1.squeeze(0).squeeze(2).view(-1).unsqueeze(0))
                 action_matrix.scatter_(0, pair_id2, actions2.squeeze(0).squeeze(2).view(-1).unsqueeze(0))
 

@@ -341,10 +341,21 @@ class XXXCriticLevel2(nn.Module):
         qvalues = self.XXXQFunction(inputs={"main":inputs["qfunction"]},
                                      tformat=tformat)
 
-        advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":inputs["avail_actions"],
+        #
+        avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs["avail_actions_id1"], tformat)
+        avail_actions2, params_aa2, _ = _to_batch(inputs["avail_actions_id2"], tformat)
+        tmp = (avail_actions1 * avail_actions2)
+        pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+        ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
+        delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0], 1).fill_(1.0), requires_grad=False)
+        other_avails = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
+        pairwise_avail_actions = th.cat([delegation_avails, other_avails], dim=1)
+        pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
+
+        advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":pairwise_avail_actions,
                                                           "qvalues":qvalues,
                                                           "agent_action":inputs["agent_action"],
-                                                          "agent_policy":inputs["agent_policy"]},
+                                                          "agent_policy":inputs["policies_level2"]},
                                                   tformat=tformat,
                                                   baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat

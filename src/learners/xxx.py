@@ -432,14 +432,14 @@ class XXXLearner(BasicLearner):
         #a = {_k:_v.to_pd() for _k, _v in data_inputs.items()}
         #b = batch_history.to_pd()
         self.train_level1(batch_history, data_inputs, data_inputs_tformat, T_env)
-        #self.train_level2(batch_history, data_inputs, data_inputs_tformat, T_env)
+        self.train_level2(batch_history, data_inputs, data_inputs_tformat, T_env)
         self.train_level3(batch_history, data_inputs, data_inputs_tformat, T_env)
         pass
 
     def train_level1(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic_level1 - self.last_target_update_T_critic_level1) / self.args.T_target_critic_level1_update_interval > 1.0:
-            self.update_target_nets()
+            self.update_target_nets(level=1)
             self.last_target_update_T_critic_level1 = self.T_critic_level1
             print("updating target net!")
 
@@ -496,19 +496,22 @@ class XXXLearner(BasicLearner):
     def train_level2(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic_level2 - self.last_target_update_T_critic_level2) / self.args.T_target_critic_level2_update_interval > 1.0:
-            self.update_target_nets()
+            self.update_target_nets(level=2)
             self.last_target_update_T_critic_level2 = self.T_critic_level2
             print("updating target net!")
 
+        assert self.n_agents == 3, "only implemented for 3 agents"
         actions, actions_tformat = batch_history.get_col(bs=None,
-                                                         col="actions_level2",
-                                                         agent_ids=list(range(0, self.n_agents)),
-                                                         stack=True)
+                                                         col="actions_level2__sample{}".format(0))
+        actions = actions.unsqueeze(0)
+
         # do single forward pass in critic
         xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level2,
                                                                          inputs=data_inputs,
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True)
+
+
         self._optimize(batch_history,
                        xxx_model_inputs,
                        xxx_model_inputs_tformat,
@@ -518,8 +521,8 @@ class XXXLearner(BasicLearner):
                        agent_parameters=self.agent_level2_parameters,
                        critic_optimiser=self.critic_level2_optimiser,
                        critic_parameters=self.critic_level2_parameters,
-                       critic=self.critic_level2,
-                       target_critic=self.target_critic_level2,
+                       critic=self.critic_models["level2_0:1"],
+                       target_critic=self.target_critic_models["level2_0:1"],
                        xxx_critic_use_sampling=self.args.xxx_critic_level2_use_sampling,
                        xxx_critic_sample_size=self.args.xxx_critic_level2_sample_size,
                        T_critic_str="T_critic_level2",
@@ -532,7 +535,7 @@ class XXXLearner(BasicLearner):
     def train_level3(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic_level3 - self.last_target_update_T_critic_level3) / self.args.T_target_critic_level3_update_interval > 1.0:
-            self.update_target_nets()
+            self.update_target_nets(level=3)
             self.last_target_update_T_critic_level3 = self.T_critic_level3
             print("updating target net!")
 
@@ -742,14 +745,15 @@ class XXXLearner(BasicLearner):
 
         pass
 
-    def update_target_nets(self):
-        if self.args.share_params:
+    def update_target_nets(self, level):
+        if self.args.critic_level1_share_params and level==1:
             # self.target_critic.load_state_dict(self.critic.state_dict())
             self.critic_models["level1"].load_state_dict(self.critic_models["level1"].state_dict())
+        if self.args.critic_level2_share_params and level==2:
             self.critic_models["level2_0:1"].load_state_dict(self.critic_models["level2_0:1"].state_dict())
+        if self.args.critic_level2_share_params and level==3:
             self.critic_models["level3_{}".format(0)].load_state_dict(self.critic_models["level3_{}".format(0)].state_dict())
-        else:
-            assert False, "TODO1"
+        pass
 
     def get_stats(self):
         if hasattr(self, "_stats"):
@@ -768,17 +772,17 @@ class XXXLearner(BasicLearner):
         logging_dict = {}
         logging_str = ""
         for _i in range(1,4):
-            logging_dict.update({"advantage_mean_{}".format(_i): _seq_mean(stats["advantage_mean_{}".format(_i)]),
-                                 "critic_grad_norm_{}".format(_i): _seq_mean(stats["critic_grad_norm_{}".format(_i)]),
-                                 "critic_loss_{}".format(_i):_seq_mean(stats["critic_loss_{}".format(_i)]),
-                                 "policy_grad_norm_{}".format(_i): _seq_mean(stats["policy_grad_norm_{}".format(_i)]),
-                                 "policy_loss_{}".format(_i): _seq_mean(stats["policy_loss_{}".format(_i)]),
-                                 "target_critic_mean_{}".format(_i): _seq_mean(stats["target_critic_mean_{}".format(_i)]),
-                                 "T_critic_{}".format(_i): getattr(self, "T_critic_{}".format(_i)),
-                                 "T_policy_{}".format(_i): getattr(self, "T_policy_{}".format(_i))}
+            logging_dict.update({"advantage_mean_level{}".format(_i): _seq_mean(stats["advantage_mean_level{}".format(_i)]),
+                                 "critic_grad_norm_level{}".format(_i): _seq_mean(stats["critic_grad_norm_level{}".format(_i)]),
+                                 "critic_loss_level{}".format(_i):_seq_mean(stats["critic_loss_level{}".format(_i)]),
+                                 "policy_grad_norm_level{}".format(_i): _seq_mean(stats["policy_grad_norm_level{}".format(_i)]),
+                                 "policy_loss_level{}".format(_i): _seq_mean(stats["policy_loss_level{}".format(_i)]),
+                                 "target_critic_mean_level{}".format(_i): _seq_mean(stats["target_critic_mean_level{}".format(_i)]),
+                                 "T_critic_level{}".format(_i): getattr(self, "T_critic_level{}".format(_i)),
+                                 "T_policy_level{}".format(_i): getattr(self, "T_policy_level{}".format(_i))}
                                 )
-            logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format()],
-                                                                                  _i, logging_dict["T_critic_level{}".format()])
+            logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format(_i)],
+                                                                                  _i, logging_dict["T_critic_level{}".format(_i)])
 
         logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_policy_level1",
                                                                           "T_critic_level1",
