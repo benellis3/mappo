@@ -34,6 +34,9 @@ def run(_run, _config, _log, pymongo_client):
                                        width=1)
     _log.info("\n\n" + experiment_params + "\n")
 
+    if _config.get("debug_mode", None) is not None:
+        _log.warning("ATTENTION DEBUG MODE: {}".format(_config["debug_mode"]))
+
     # ----- configure logging
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))

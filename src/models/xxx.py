@@ -720,7 +720,8 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
             # select appropriate pairs
             sampled_pair_ids_slice = sampled_pair_ids[:, :, slice(t, t + 1), :].contiguous()
-            x = x.gather(0, Variable(sampled_pair_ids_slice.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
+
+            x  = x.gather(0, Variable(sampled_pair_ids_slice.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
 
             h_list.append(h)
             x_list.append(x)
