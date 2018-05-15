@@ -272,7 +272,7 @@ class NStepRunner():
         thread_worker_fn = kwargs["thread_worker_fn"]
         loop_worker_fn = kwargs["loop_worker_fn"]
         buffer_insert_fn = kwargs["buffer_insert_fn"]
-        args = kwargs["args"]
+        args = kwargs.get("args", None)
 
         if isinstance(envs_fn, CloudpickleWrapper):
             envs_fn = envs_fn.x
