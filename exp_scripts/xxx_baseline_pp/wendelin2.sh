@@ -13,6 +13,6 @@ N_UPPER=`expr $N_GPUS - 1`
 for i in $(seq 1 $N_REPEAT); do
   GPU_ID=`shuf -i0-${N_UPPER} -n1`
   echo "Starting repeat number $i on GPU $GPU_ID"
-  NV_GPU=${GPU_ID} ../.././docker.sh python3 /pymarl/src/main.py --exp_name="xxx_pp" with env_args.n_agents=3 "env_args.agent_obs=[1,1]" "env_args.predator_prey_shape=[4,4]" env_args.predator_prey_toroidal=False xxx_independent_logit_bias=True name=${TAG}__xxx_debug_level3only_pp_${TIMESTAMP}__repeat${i} use_tensorboard=False &
+  NV_GPU=${GPU_ID} ../.././docker.sh python3 /pymarl/src/main.py --exp_name="xxx_pp4x4_2agent" name=${TAG}__xxx_pp4x4_2agent_${TIMESTAMP}__repeat${i} use_tensorboard=False &
   sleep 10s
 done
