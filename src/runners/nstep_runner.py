@@ -446,7 +446,6 @@ class NStepRunner():
             return
 
         else:
-
             reward, terminated, env_info = \
                 _env.step([int(_i) for _i in chosen_actions])
 
