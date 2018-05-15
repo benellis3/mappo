@@ -681,7 +681,7 @@ class SC2(MultiAgentEnv):
         else:
             return True
 
-    def get_obs_intersection(self, agent_ids, get_aa = False):
+    def get_obs_intersection(self, agent_ids):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
         nf_al = 4
