@@ -1,0 +1,35 @@
+batch_size: 32
+xxx_critic_level1_use_sampling: True
+xxx_critic_level1_sample_size: 1620
+xxx_critic_level2_use_sampling: True
+xxx_critic_level2_sample_size: 1620
+xxx_critic_level3_use_sampling: True
+xxx_critic_level3_sample_size: 1620
+xxx_epsilon_start_level1: 0.5
+xxx_epsilon_start_level2: 0.5
+xxx_epsilon_start_level3: 0.5
+xxx_epsilon_finish_level1: 0.0
+xxx_epsilon_finish_level2: 0.0
+xxx_epsilon_finish_level3: 0.0
+xxx_epsilon_time_length_level1: 10000
+xxx_epsilon_time_length_level2: 10000
+xxx_epsilon_time_length_level3: 10000
+xxx_epsilon_decay_mode_level1: "linear"
+xxx_epsilon_decay_mode_level2: "linear"
+xxx_epsilon_decay_mode_level3: "linear"
+defaults: default xxx predator_prey
+env_args:
+  agent_obs:
+    - 1
+    - 1
+  episode_limit: 50
+  predator_prey_shape:
+    - 3
+    - 3
+  predator_prey_toroidal: False
+  n_agents: 3
+reward_almost_capture: 0.0
+reward_capture: 50
+reward_collision: 0.0
+reward_scare: 0.0
+reward_time: -0.1

@@ -598,10 +598,16 @@ class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
         x = self.fc2(x)
 
         # mask policy elements corresponding to unavailable actions
-        n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+        # n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+        # x = th.exp(x)
+        # x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+        # x = th.div(x, x.sum(dim=1, keepdim=True))
+        n_available_actions = avail_actions.sum(dim=1, keepdim=True)
         x = th.exp(x)
-        x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-        x = th.div(x, x.sum(dim=1, keepdim=True))
+        x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+        x_sum = x.sum(dim=1, keepdim=True)
+        x_sum = x_sum.masked_fill(x_sum <= np.sqrt(float(np.finfo(np.float32).tiny)) * avail_actions.shape[1], 1.0)
+        x = th.div(x, x_sum)
 
         # add softmax exploration (if switched on)
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
@@ -656,6 +662,7 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
         test_mode = kwargs["test_mode"]
         sampled_pair_ids = kwargs["sampled_pair_ids"]
+        pairwise_avail_actions = kwargs["pairwise_avail_actions"]
 
         # select pairs that were actually sampled
         #_inputs = inputs["main"].gather(0, Variable(sampled_pair_ids.long(),
@@ -664,16 +671,16 @@ class XXXRecurrentAgentLevel2(nn.Module):
         #                                            requires_grad=False).repeat(1,1,1,hidden_states.shape[_vdim(tformat)]))
         _inputs = inputs["main"]
 
-        # compute avail_actions
-        avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs["avail_actions_id1"], tformat)
-        avail_actions2, params_aa2, _ = _to_batch(inputs["avail_actions_id2"], tformat)
-        tmp = (avail_actions1 * avail_actions2)
-        pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
-        ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
-        delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0], 1).fill_(1.0), requires_grad=False)
-        other_avails = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
-        pairwise_avail_actions = th.cat([delegation_avails, other_avails], dim=1)
-        pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
+        # # compute avail_actions
+        # avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs["avail_actions_id1"], tformat)
+        # avail_actions2, params_aa2, _ = _to_batch(inputs["avail_actions_id2"], tformat)
+        # tmp = (avail_actions1 * avail_actions2)
+        # pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+        # ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
+        # delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0], 1).fill_(1.0), requires_grad=False)
+        # other_avails = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
+        # pairwise_avail_actions = th.cat([delegation_avails, other_avails], dim=1)
+        # pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
 
         loss = None
         t_dim = _tdim(tformat)
@@ -686,7 +693,7 @@ class XXXRecurrentAgentLevel2(nn.Module):
         for t in range(t_len):
 
             x = _inputs[:, :, slice(t, t + 1), :].contiguous()
-            avail_actions = pairwise_avail_actions[:, :, slice(t, t + 1), :].contiguous()
+            avail_actions = pairwise_avail_actions[:, :, slice(t, t + 1), :].contiguous().detach()
             x, tformat = self.encoder({"main":x}, tformat)
 
             x, params_x, tformat_x = _to_batch(x, tformat)
@@ -696,29 +703,36 @@ class XXXRecurrentAgentLevel2(nn.Module):
             h = self.gru(x, h)
             x = self.output(h)
 
-            if self.args.xxx_independent_logit_bias:
-                """
-                Add a bias to the delegation action
-                """
-                x[:,0] = x[:,0] + 2.0
+            # if self.args.xxx_independent_logit_bias:
+            #     """
+            #     Add a bias to the delegation action
+            #     """
+            #     x[:,0] = x[:,0] + 2.0
 
 
             # mask policy elements corresponding to unavailable actions
-            n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            n_available_actions = avail_actions.sum(dim=1, keepdim=True)
             x = th.exp(x)
-            x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-            x = th.div(x, x.sum(dim=1, keepdim=True))
+            x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+            x_sum = x.sum(dim=1, keepdim=True)
+            x_sum = x_sum.masked_fill(x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1], 1.0)
+            x = th.div(x, x_sum)
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
             #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
+
+
             # add softmax exploration (if switched on)
             if self.args.xxx_exploration_mode_level2 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat))
                epsilons, _, _ = _to_batch(epsilons, tformat)
-               x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+               x = th.cat([epsilons * self.args.xxx_delegation_probability_bias,
+                           avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (1 - self.args.xxx_delegation_probability_bias)], dim=1) \
+                           + x * (1 - epsilons)
+
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
@@ -797,18 +811,20 @@ class XXXRecurrentAgentLevel3(RecurrentAgent):
             avail_actions, params_aa, tformat_aa = _to_batch(avail_actions, tformat)
             h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
 
-            try:
-                h = self.gru(x, h)
-            except Exception as e:
-                pass
-
+            h = self.gru(x, h)
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions
-            n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            # n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            # x = th.exp(x)
+            # x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+            # x = th.div(x, x.sum(dim=1, keepdim=True))
+            n_available_actions = avail_actions.sum(dim=1, keepdim=True)
             x = th.exp(x)
-            x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-            x = th.div(x, x.sum(dim=1, keepdim=True))
+            x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+            x_sum = x.sum(dim=1, keepdim=True)
+            x_sum = x_sum.masked_fill(x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1], 1.0)
+            x = th.div(x, x_sum)
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
