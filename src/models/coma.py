@@ -203,7 +203,7 @@ class COMANonRecurrentAgent(NonRecurrentAgent):
         x = th.div(x, x_sum)
 
         # throw debug warning if second masking was necessary
-        if th.sum(second_mask) > 0:
+        if th.sum(second_mask.data) > 0:
             if self.args.debug_verbose:
                 print('Warning in COMANonRecurrentAgent.forward(): some sum during the softmax has been 0!')
 
@@ -266,7 +266,7 @@ class COMARecurrentAgent(RecurrentAgent):
             x = th.div(x, x_sum)
 
             # throw debug warning if second masking was necessary
-            if th.sum(second_mask) > 0:
+            if th.sum(second_mask.data) > 0:
                 if self.args.debug_verbose:
                     print('Warning in COMARecurrentAgent.forward(): some sum during the softmax has been 0!')
 
