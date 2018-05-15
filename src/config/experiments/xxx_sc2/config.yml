@@ -3,7 +3,7 @@ env_stats_aggregator: sc2
 n_critic_learner_reps: 30
 n_loops_per_thread_or_sub_or_main_process: 1
 n_subprocesses: 2
-defaults: default xxx predator_prey
+defaults: default xxx sc2
 xxx_critic_level1_use_sampling: True
 xxx_critic_level1_sample_size: 1620
 xxx_critic_level2_use_sampling: True
