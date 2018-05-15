@@ -12,7 +12,7 @@ xxx_critic_level3_use_sampling: True
 xxx_critic_level3_sample_size: 1620
 xxx_use_obs_intersections: True
 env_args:
-  map_name: 5m_5m
+  map_name: 3m_3m
 lr_critic: 0.0
 target_critic_update_interval: 162000
 test_interval: 48600
