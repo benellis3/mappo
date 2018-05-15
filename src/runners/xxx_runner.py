@@ -214,6 +214,7 @@ class XXXRunner(NStepRunner):
                      out_queue,
                      buffer_insert_fn,
                      subproc_id=None,
+                     args=None,
                      msg=None):
 
         if in_queue is None:

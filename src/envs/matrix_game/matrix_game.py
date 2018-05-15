@@ -45,7 +45,6 @@ class NormalFormMatrixGame(MultiAgentEnv):
         self.state = self._get_state()
         self.obs = self._get_obs()
 
-
     # ---------- INTERACTION METHODS -----------------------------------------------------------------------------------
 
     def reset(self):
@@ -71,7 +70,7 @@ class NormalFormMatrixGame(MultiAgentEnv):
         if self.common_knowledge == 1:
             observations = np.repeat(self.matrix_id, 2)
         else:
-            observations = np.ones(self.n_agents) * 2  # -1: unobserved
+            observations = np.ones(self.n_agents) * 2
 
             for a in range(self.n_agents):
                 if np.random.random() < self.p_observation:

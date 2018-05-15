@@ -189,10 +189,23 @@ class COMANonRecurrentAgent(NonRecurrentAgent):
         x = self.fc2(x)
 
         # mask policy elements corresponding to unavailable actions
-        n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+        #n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+        #x = th.exp(x)
+        #x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+        #x = th.div(x, x.sum(dim=1, keepdim=True))
+
+        n_available_actions = avail_actions.sum(dim=1, keepdim=True)
         x = th.exp(x)
-        x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-        x = th.div(x, x.sum(dim=1, keepdim=True))
+        x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+        x_sum = x.sum(dim=1, keepdim=True)
+        second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny)) * avail_actions.shape[1])
+        x_sum = x_sum.masked_fill(second_mask, 1.0)
+        x = th.div(x, x_sum)
+
+        # throw debug warning if second masking was necessary
+        if th.sum(second_mask.data) > 0:
+            if self.args.debug_verbose:
+                print('Warning in COMANonRecurrentAgent.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
@@ -239,10 +252,23 @@ class COMARecurrentAgent(RecurrentAgent):
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions
-            n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            #n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            #x = th.exp(x)
+            #x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+            #x = th.div(x, x.sum(dim=1, keepdim=True))
+
+            n_available_actions = avail_actions.sum(dim=1, keepdim=True)
             x = th.exp(x)
-            x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-            x = th.div(x, x.sum(dim=1, keepdim=True))
+            x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+            x_sum = x.sum(dim=1, keepdim=True)
+            second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1])
+            x_sum = x_sum.masked_fill(second_mask, 1.0)
+            x = th.div(x, x_sum)
+
+            # throw debug warning if second masking was necessary
+            if th.sum(second_mask.data) > 0:
+                if self.args.debug_verbose:
+                    print('Warning in COMARecurrentAgent.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()

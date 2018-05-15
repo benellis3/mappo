@@ -241,14 +241,15 @@ class NStepRunner():
                                                                                                                         n_items_per_subproc*(_i+1)),
                                                                                                    )),
                                                        loop_worker_fn=CloudpickleWrapper(partial(self._loop_worker,
-                                                                                                   subproc_id=_i)),
+                                                                                                   subproc_id=_i,
+                                                                                                   args=self.args)),
                                                        ),)) for _i, in_queue in zip(range(self.n_subprocesses), self.in_queues)]
             for p in self.subprocesses:
                 p.daemon = True
                 p.start()
 
         elif self.n_threads_per_subprocess_or_main_process > 0:
-            self._subprocess_worker(0, envs_fn, self.in_queues, self.out_queue, self.T_queue)
+            self._subprocess_worker(0, envs_fn, self.in_queues, self.out_queue, self.T_queue, args=self.args)
         else:
             # create the environments straight here and add to self
             self.envs = [envs_fn(bs_id=_i) for _i in range(self.batch_size)]
@@ -271,6 +272,7 @@ class NStepRunner():
         thread_worker_fn = kwargs["thread_worker_fn"]
         loop_worker_fn = kwargs["loop_worker_fn"]
         buffer_insert_fn = kwargs["buffer_insert_fn"]
+        args = kwargs["args"]
 
         if isinstance(envs_fn, CloudpickleWrapper):
             envs_fn = envs_fn.x
@@ -292,7 +294,7 @@ class NStepRunner():
                                                                           n_threads_per_subprocess_or_main_process=n_threads_per_subprocess_or_main_process,
                                                                           n_subprocesses=n_subprocesses,
                                                                           n_loops_per_thread_or_sub_or_main_process=n_loops_per_thread_or_sub_or_main_process,
-                                                                          loop_worker_fn=loop_worker_fn,
+                                                                          loop_worker_fn=partial(loop_worker_fn, args=args),
                                                                           buffer_insert_fn=buffer_insert_fn))))
                 workers[-1].setDaemon(True)
                 workers[-1].start()
@@ -387,6 +389,7 @@ class NStepRunner():
                      out_queue,
                      buffer_insert_fn,
                      subproc_id=None,
+                     args=None,
                      msg=None):
 
         if in_queue is None:
@@ -486,6 +489,7 @@ class NStepRunner():
                                          out_queue=None,
                                          buffer_insert_fn=partial(self.buffer_insert,
                                                                   subproc_id_set=[id],),
+                                         args=self.args,
                                          msg=msg))
             # column_scheme=self.transition_buffer.columns._transition if hasattr(self, "transition_buffer") else None,),
         return res
