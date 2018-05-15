@@ -22,16 +22,24 @@ class MultinomialActionSelector():
         else:
             agent_policies = inputs["policies"].clone()  # might not be necessary
 
-        # NOTE: Usually, on-policy algorithms should perform action masking in the model itself!
         if avail_actions is not None:
+            """
+            NOTE: MULTINOMIAL ACTION SELECTION  is usually performed by on-policy algorithms.
+            ON-POLICY mean that avail_actions have to be handled strictly within the model, and need to form part
+            of the backward pass.
+            However, sometimes, numerical instabilities require to use non-zero masking (i.e. using tiny values) of the
+            unavailable actions in the model - else the backward might erratically return NaNs.
+            In this case, non-available actions may be hard-set to 0 in the action selector. The off-policy shift that
+            this creates can usually be assumed to be extremely tiny.
+            """
             masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
         else:
             masked_policies = agent_policies
         masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
 
+        _check_nan(masked_policies_batch)
         mask = (masked_policies_batch != masked_policies_batch)
         masked_policies_batch.masked_fill_(mask, 0.0)
-        _check_nan(masked_policies_batch)
         assert th.sum(masked_policies_batch < 0) == 0, "negative value in masked_policies_batch"
         _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
         _samples = _samples.masked_fill_(mask.long().sum(dim=1, keepdim=True) > 0, float("nan"))

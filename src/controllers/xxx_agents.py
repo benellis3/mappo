@@ -7,7 +7,8 @@ from components import REGISTRY as co_REGISTRY
 from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, \
-    _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim, _vdim, _agent_flatten, _check_nan
+    _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim, _vdim, _agent_flatten, _check_nan, \
+    _to_batch, _from_batch
 
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
@@ -373,11 +374,23 @@ class XXXMultiagentController():
 
                 assert self.args.agent_level2_share_params, "not implemented!"
 
+                # create pairwise avail actions
+                avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id1"], inputs_level2_tformat)
+                avail_actions2, params_aa2, _ = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id2"], inputs_level2_tformat)
+                tmp = (avail_actions1  * avail_actions2)
+                pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+                ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
+                delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0], 1).fill_(1.0), requires_grad=False)
+                other_avails = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
+                pairwise_avail_actions = th.cat([delegation_avails, other_avails], dim=1)
+                pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
+
                 out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level2_0"](inputs_level2["agent_input_level2"],
                                                                                                           hidden_states=hidden_states["level2"],
                                                                                                           loss_fn=loss_fn if loss_level == 2 else None,
                                                                                                           tformat=inputs_level2_tformat,
                                                                                                           sampled_pair_ids=sampled_pair_ids,
+                                                                                                          pairwise_avail_actions=pairwise_avail_actions,
                                                                                                           **kwargs)
 
                 if loss_level == 2:
@@ -386,7 +399,7 @@ class XXXMultiagentController():
                 pair_sampled_actions, \
                 modified_inputs_level2, \
                 selected_actions_format_level2 = self.action_selector.select_action({"policies":out_level2},
-                                                                                    avail_actions=None,
+                                                                                    avail_actions=pairwise_avail_actions.data,
                                                                                     tformat=tformat_level2,
                                                                                     test_mode=test_mode)
 
@@ -431,10 +444,13 @@ class XXXMultiagentController():
                 if loss_level == 3:
                     return dict(losses=losses_level3), tformat_level3
 
+                # extract available actions
+                avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"]
+
                 individual_actions, \
                 modified_inputs_level3, \
                 selected_actions_format_level3 = self.action_selector.select_action({"policies":out_level3},
-                                                                                    avail_actions=None,
+                                                                                    avail_actions=avail_actions_level3.data,
                                                                                     tformat=tformat_level3,
                                                                                     test_mode=test_mode)
 
