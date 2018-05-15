@@ -1,0 +1,17 @@
+batch_size: 32
+xxx_critic_level1_use_sampling: True
+xxx_critic_level1_sample_size: 1620
+xxx_critic_level2_use_sampling: True
+xxx_critic_level2_sample_size: 1620
+xxx_critic_level3_use_sampling: True
+xxx_critic_level3_sample_size: 1620
+defaults: default xxx matrix_game
+env_args:
+  episode_limit: 1
+  n_agents: 2
+  p_common: 0
+  p_observation: 0.5
+  state_size: 2
+  obs_size: 2
+lr_critic: 0.0
+use_replay_buffer: False
