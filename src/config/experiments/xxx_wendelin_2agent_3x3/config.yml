@@ -1,3 +1,4 @@
+defaults: default xxx predator_prey
 batch_size: 32
 xxx_critic_level1_use_sampling: True
 xxx_critic_level1_sample_size: 1620
@@ -5,7 +6,18 @@ xxx_critic_level2_use_sampling: True
 xxx_critic_level2_sample_size: 1620
 xxx_critic_level3_use_sampling: True
 xxx_critic_level3_sample_size: 1620
-defaults: default xxx predator_prey
+xxx_epsilon_start_level1: 0.5
+xxx_epsilon_start_level2: 0.5
+xxx_epsilon_start_level3: 0.5
+xxx_epsilon_finish_level1: 0.0
+xxx_epsilon_finish_level2: 0.0
+xxx_epsilon_finish_level3: 0.0
+xxx_epsilon_time_length_level1: 10000
+xxx_epsilon_time_length_level2: 10000
+xxx_epsilon_time_length_level3: 10000
+xxx_epsilon_decay_mode_level1: "linear"
+xxx_epsilon_decay_mode_level2: "linear"
+xxx_epsilon_decay_mode_level3: "linear"
 env_args:
   agent_obs:
     - 1
