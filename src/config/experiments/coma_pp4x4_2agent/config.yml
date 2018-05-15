@@ -12,8 +12,8 @@ env_args:
     - 1
   episode_limit: 50
   predator_prey_shape:
-    - 3
-    - 3
+    - 4
+    - 4
   predator_prey_toroidal: False
   n_agents: 2
 reward_almost_capture: 0.0
