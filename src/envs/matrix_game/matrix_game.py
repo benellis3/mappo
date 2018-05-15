@@ -55,43 +55,66 @@ class NormalFormMatrixGame(MultiAgentEnv):
 
         self.n_actions = len(self.payoff_values[0])
 
-        self.reset()
-
     # ---------- INTERACTION METHODS -----------------------------------------------------------------------------------
 
     def reset(self):
         """ Returns initial observations and states"""
 
+        # print("Resetting...")
+
         self.steps = 0
 
-        return self.get_obs(), self.get_state()
+        self.p_common_threshold = np.random.random()
+        self.p_observation_threshold = np.random.random()
+        self.matrix_id = np.random.randint(0, 2)
+
+        self.get_state()
+
+        return None
 
     def step(self, actions):
         """ Returns reward, terminated, info """
 
-        self.reward = self.payoff_values[self.matrix_id-1][actions[0], actions[1]]
+        self.reward = self.payoff_values[self.matrix_id][actions[0], actions[1]]
 
         info = {}
         info["episode_limit"] = True
-        terminated = [True for _ in range(self.batch_size)]
+        terminated = True
+        print("reward: {}".format(self.reward))
 
         return self.reward.astype(np.float64), terminated, info
 
     def get_obs(self):
         """ Returns all agent observations in a list """
-        agents_obs = [self.get_obs_agent(a) for a in range(self.n_agents)]
-        return agents_obs
+        # agents_obs = [self.get_obs_agent(a) for a in range(self.n_agents)]
+
+        if self.common_knowledge == 1:
+            observations = np.repeat(self.matrix_id, 2)
+        else:
+            observations = np.ones(self.n_agents) * 2  # -1: unobserved
+
+            for a in range(self.n_agents):
+                if self.p_observation_threshold < self.p_observation:
+                    observations[a] += self.matrix_id + 1
+
+        # print("observation agents: {}".format(observations))
+
+        return observations.astype(np.float64)
+
+        # return agents_obs
 
     def get_obs_agent(self, agent_id):
         """ Returns observation for agent_id """
         if self.common_knowledge == 1:
             observations = np.repeat(self.matrix_id, 2)
         else:
-            observations = np.ones(self.n_agents) * 3  # -1: unobserved
+            observations = np.ones(self.n_agents) * 2  # -1: unobserved
 
             for a in range(self.n_agents):
-                if np.random.random() < self.p_observation:
-                    observations[a] += self.matrix_id
+                if p_observation_threshold < self.p_observation:
+                    observations[a] += self.matrix_id + 1
+
+        # print("observation agent {}: {}".format(agent_id, observations[agent_id]))
 
         return observations[agent_id].astype(np.float64)
 
@@ -100,12 +123,12 @@ class NormalFormMatrixGame(MultiAgentEnv):
         return self.obs_size
 
     def get_state(self):
-        if np.random.random() < self.p_common:
+        if self.p_common_threshold < self.p_common:
             self.common_knowledge = 1
         else:
             self.common_knowledge = 0
-        #     print(common_knowledge)
-        self.matrix_id = np.random.randint(1, 3)
+
+        # print("state: {}".format(np.array([self.matrix_id, self.common_knowledge])))
 
         return np.array([self.matrix_id, self.common_knowledge], dtype=np.float32)
 
