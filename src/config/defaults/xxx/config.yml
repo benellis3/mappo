@@ -52,6 +52,7 @@ xxx_exploration_mode_level3: "softmax"
 xxx_use_entropy_regularizer: False
 xxx_use_obs_intersections: True
 xxx_entropy_loss_regularization_factor: 0.000005
+xxx_independent_logit_bias: False
 gamma: 0.99
 learner: xxx
 multiagent_controller: xxx_mac
