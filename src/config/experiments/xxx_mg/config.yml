@@ -13,5 +13,9 @@ env_args:
   p_observation: 0.5
   state_size: 2
   obs_size: 2
+  intersection_global_view: True
+  intersection_id_coded: True
+  get_obs_intersection: True
 lr_critic: 0.0
 use_replay_buffer: False
+xxx_use_obs_intersections: False
