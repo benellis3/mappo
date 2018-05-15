@@ -1,10 +1,10 @@
-batch_size: 2
+batch_size: 64
 coma_critic_use_sampling: True
 coma_critic_sample_size: 1620
 coma_epsilon_decay_mode: linear
 coma_epsilon_finish: 0.01
-coma_epsilon_start: 1.0
-coma_epsilon_time_length: 100000
+coma_epsilon_start: 0.5
+coma_epsilon_time_length: 1000000
 defaults: default coma matrix_game
 env_args:
   p_common: 0.9

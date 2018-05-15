@@ -42,13 +42,18 @@ class NormalFormMatrixGame(MultiAgentEnv):
 
         self.n_actions = len(self.payoff_values[0])
 
+        self.state = self._get_state()
+        self.obs = self._get_obs()
+
 
     # ---------- INTERACTION METHODS -----------------------------------------------------------------------------------
 
     def reset(self):
         """ Returns initial observations and states"""
         self.steps = 0
-        return self.get_obs(), self.get_state()
+        self.state = self._get_state()
+        self.obs = self._get_obs()
+        return self.obs, self.state
 
     def step(self, actions):
         """ Returns reward, terminated, info """
@@ -61,13 +66,8 @@ class NormalFormMatrixGame(MultiAgentEnv):
 
         return reward, terminated, info
 
-    def get_obs(self):
+    def _get_obs(self):
         """ Returns all agent observations in a list """
-        agents_obs = [self.get_obs_agent(i) for i in range(self.n_agents)]
-        return agents_obs
-
-    def get_obs_agent(self, agent_id):
-        """ Returns observation for agent_id """
         if self.common_knowledge == 1:
             observations = np.repeat(self.matrix_id, 2)
         else:
@@ -76,14 +76,20 @@ class NormalFormMatrixGame(MultiAgentEnv):
             for a in range(self.n_agents):
                 if np.random.random() < self.p_observation:
                     observations[a] += self.matrix_id + 1
+        return observations.astype(np.float64)
 
-        return observations[agent_id].astype(np.float64)
+    def get_obs(self):
+        return self.obs
+
+    def get_obs_agent(self, agent_id):
+        """ Returns observation for agent_id """
+        raise NotImplementedError
 
     def get_obs_size(self):
         """ Returns the shape of the observation """
         return 2
 
-    def get_state(self):
+    def _get_state(self):
         if np.random.random() < self.p_common:
             self.common_knowledge = 1
         else:
@@ -91,6 +97,9 @@ class NormalFormMatrixGame(MultiAgentEnv):
         self.matrix_id = np.random.randint(0, 2)
 
         return np.array([self.matrix_id, self.common_knowledge], dtype=np.float32)
+
+    def get_state(self):
+        return self.state
 
     def get_state_size(self):
         """ Returns the shape of the state"""
