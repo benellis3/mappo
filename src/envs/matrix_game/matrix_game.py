@@ -61,7 +61,7 @@ class NormalFormMatrixGame(MultiAgentEnv):
         info = {}
         self.steps += 1
         terminated = True
-        info["episode_limit"] = True
+        info["episode_limit"] = False
 
         return reward, terminated, info
 
@@ -86,7 +86,7 @@ class NormalFormMatrixGame(MultiAgentEnv):
 
     def get_obs_size(self):
         """ Returns the shape of the observation """
-        return 2
+        return 1
 
     def _get_state(self):
         if np.random.random() < self.p_common:
