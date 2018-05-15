@@ -32,7 +32,12 @@ class MultinomialActionSelector():
             In this case, non-available actions may be hard-set to 0 in the action selector. The off-policy shift that
             this creates can usually be assumed to be extremely tiny.
             """
-            masked_policies = agent_policies * avail_actions / th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
+            _sum = th.sum(agent_policies * avail_actions, dim=_vdim(tformat), keepdim=True)
+            _sum_mask = (_sum == 0.0)
+            _sum.masked_fill_(_sum_mask, 1.0)
+            masked_policies = agent_policies * avail_actions / _sum
+            # if no action is available, choose an action uniformly anyway...
+            masked_policies.masked_fill_(_sum_mask.repeat(1,1,1, avail_actions.shape[_vdim(tformat)]), 1.0 / avail_actions.shape[_vdim(tformat)])
         else:
             masked_policies = agent_policies
         masked_policies_batch, params, tformat = _to_batch(masked_policies, tformat)
