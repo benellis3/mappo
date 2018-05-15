@@ -1,0 +1,21 @@
+batch_size: 2
+env_stats_aggregator: sc2
+n_critic_learner_reps: 30
+n_loops_per_thread_or_sub_or_main_process: 1
+n_subprocesses: 2
+defaults: default xxx predator_prey
+xxx_critic_level1_use_sampling: True
+xxx_critic_level1_sample_size: 1620
+xxx_critic_level2_use_sampling: True
+xxx_critic_level2_sample_size: 1620
+xxx_critic_level3_use_sampling: True
+xxx_critic_level3_sample_size: 1620
+xxx_use_obs_intersections: True
+env_args:
+  map_name: 5m_5m
+lr_critic: 0.0
+target_critic_update_interval: 162000
+test_interval: 48600
+test_nepisode: 30
+use_replay_buffer: False
+
