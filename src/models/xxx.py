@@ -427,36 +427,6 @@ class XXXCriticLevel3(nn.Module):
                                                   baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
 
-
-class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
-
-    def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
-        test_mode = kwargs["test_mode"]
-
-        avail_actions, params_aa, tformat_aa = _to_batch(inputs["avail_actions"], tformat)
-        x, params, tformat = _to_batch(inputs["main"], tformat)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-
-        # mask policy elements corresponding to unavailable actions
-        n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
-        x = th.exp(x)
-        x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-        x = th.div(x, x.sum(dim=1, keepdim=True))
-
-        # add softmax exploration (if switched on)
-        if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-            epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-            epsilons, _, _ = _to_batch(epsilons, tformat)
-            x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
-
-        x = _from_batch(x, params, tformat)
-
-        if loss_fn is not None:
-            losses, _ = loss_fn(x, tformat=tformat)
-
-        return x, hidden_states, losses, tformat
-
 class MLPEncoder(nn.Module):
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, args=None):
         super(MLPEncoder, self).__init__()
@@ -488,6 +458,41 @@ class MLPEncoder(nn.Module):
         x = F.relu(self.fc1(x))
         return _from_batch(x, n_seq, tformat), tformat
 
+
+class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
+
+    def forward(self, inputs, n_agents, tformat, loss_fn=None, hidden_states=None, **kwargs):
+        test_mode = kwargs["test_mode"]
+
+        avail_actions, params_aa, tformat_aa = _to_batch(inputs["avail_actions"], tformat)
+        x, params, tformat = _to_batch(inputs["main"], tformat)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+
+        # mask policy elements corresponding to unavailable actions
+        x = th.exp(x)
+        x_sum = x.sum(dim=1, keepdim=True)
+        second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny)) * x.shape[1])
+        x_sum = x_sum.masked_fill(second_mask, 1.0)
+        x = th.div(x, x_sum)
+
+        # throw debug warning if second masking was necessary
+        if th.sum(second_mask) > 0:
+            if self.args.debug_verbose:
+                print('Warning in XXXNonRecurrentAgentLevel1.forward(): some sum during the softmax has been 0!')
+
+        # add softmax exploration (if switched on)
+        if self.args.xxx_exploration_mode_level1 in ["softmax"] and not test_mode:
+            epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
+            epsilons, _, _ = _to_batch(epsilons, tformat)
+            x = epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
+
+        x = _from_batch(x, params, tformat)
+
+        if loss_fn is not None:
+            losses, _ = loss_fn(x, tformat=tformat)
+
+        return x, hidden_states, losses, tformat
 
 class XXXRecurrentAgentLevel1(nn.Module):
 
@@ -557,8 +562,15 @@ class XXXRecurrentAgentLevel1(nn.Module):
             # mask policy elements corresponding to unavailable actions
             #n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
             x = th.exp(x)
-            #x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-            x = th.div(x, x.sum(dim=1, keepdim=True))
+            x_sum = x.sum(dim=1, keepdim=True)
+            second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*x.shape[1])
+            x_sum = x_sum.masked_fill(second_mask, 1.0)
+            x = th.div(x, x_sum)
+
+            # throw debug warning if second masking was necessary
+            if th.sum(second_mask.data) > 0:
+                if self.args.debug_verbose:
+                    print('Warning in XXXRecurrentAgentLevel1.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
@@ -606,8 +618,14 @@ class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
         x = th.exp(x)
         x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
         x_sum = x.sum(dim=1, keepdim=True)
-        x_sum = x_sum.masked_fill(x_sum <= np.sqrt(float(np.finfo(np.float32).tiny)) * avail_actions.shape[1], 1.0)
+        second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny)) * avail_actions.shape[1])
+        x_sum = x_sum.masked_fill(second_mask, 1.0)
         x = th.div(x, x_sum)
+
+        # throw debug warning if second masking was necessary
+        if th.sum(second_mask) > 0:
+            if self.args.debug_verbose:
+                print('Warning in XXXNonRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
@@ -715,8 +733,14 @@ class XXXRecurrentAgentLevel2(nn.Module):
             x = th.exp(x)
             x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
             x_sum = x.sum(dim=1, keepdim=True)
-            x_sum = x_sum.masked_fill(x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1], 1.0)
+            second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1])
+            x_sum = x_sum.masked_fill(second_mask, 1.0)
             x = th.div(x, x_sum)
+
+            # throw debug warning if second masking was necessary
+            if th.sum(second_mask.data) > 0:
+                if self.args.debug_verbose:
+                    print('Warning in XXXRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
@@ -765,10 +789,18 @@ class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
         x = self.fc2(x)
 
         # mask policy elements corresponding to unavailable actions
-        n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+        n_available_actions = avail_actions.sum(dim=1, keepdim=True)
         x = th.exp(x)
-        x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-        x = th.div(x, x.sum(dim=1, keepdim=True))
+        x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+        x_sum = x.sum(dim=1, keepdim=True)
+        second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny)) * avail_actions.shape[1])
+        x_sum = x_sum.masked_fill(second_mask, 1.0)
+        x = th.div(x, x_sum)
+
+        # throw debug warning if second masking was necessary
+        if th.sum(second_mask.data) > 0:
+            if self.args.debug_verbose:
+                print('Warning in XXXNonRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
@@ -823,8 +855,14 @@ class XXXRecurrentAgentLevel3(RecurrentAgent):
             x = th.exp(x)
             x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
             x_sum = x.sum(dim=1, keepdim=True)
-            x_sum = x_sum.masked_fill(x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1], 1.0)
+            second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1])
+            x_sum = x_sum.masked_fill(second_mask, 1.0)
             x = th.div(x, x_sum)
+
+            # throw debug warning if second masking was necessary
+            if th.sum(second_mask.data) > 0:
+                if self.args.debug_verbose:
+                    print('Warning in XXXRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()

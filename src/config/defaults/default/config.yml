@@ -1,6 +1,7 @@
 agents_encoder_size: 64
 agents_hidden_state_size: 64
 debug_mode:
+debug_verbose: False
 mongodb_profile: gandalf_pymarl
 n_loops_per_thread_or_sub_or_main_process: 0
 n_threads_per_subprocess_or_main_process: 0
