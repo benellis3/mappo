@@ -156,7 +156,8 @@ class XXXMultiagentController():
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
             self.input_columns_level2[
                 "agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
-            self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["obs_intersection_pair"] = Scheme([dict(name="obs_intersection_pair{}".format(_agent_id1, _agent_id2),
+            if self.args.xxx_use_obs_intersections:
+                self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["obs_intersection_pair"] = Scheme([dict(name="obs_intersection_pair{}".format(_agent_id1, _agent_id2),
                                                                                                                                                                                  switch=self.args.xxx_use_obs_intersections)])
             #self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_level2"] = \
             #    Scheme([dict(name="xxx_epsilons_level2")])
@@ -388,7 +389,7 @@ class XXXMultiagentController():
                 # If not so, then those actions have to be chosen from the independent sampler.
                 ########################################################################################################
 
-                if self.args.env in ["pred_prey"]:
+                if self.args.env in ["pred_prey", "matrix_game"]:
                     pairwise_avail_actions = th.bmm(avail_actions1.unsqueeze(2), avail_actions2.unsqueeze(1))
                 elif self.args.env in ["sc1", "sc2"]:
                     tmp = (avail_actions1  * avail_actions2)
@@ -455,16 +456,16 @@ class XXXMultiagentController():
                                                                            inputs_tformat=tformat,
                                                                            )
 
-                avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"]#.gather(_adim(inputs_level3_tformat), Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)]))
-                avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"]#.gather(_adim(inputs_level3_tformat), Variable(pair_id2).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)]))
+                avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"][0,:,:,:]#.gather(_adim(inputs_level3_tformat), Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)]))
+                avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"][0,:,:,:]#.gather(_adim(inputs_level3_tformat), Variable(pair_id2).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)]))
 
                 # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
                 actions1_masked = actions1.clone()
-                actions1_mask = (actions1!=actions1)
-                actions1_masked.masked_fill_(actions1!=actions1, 0.0)
-                actions2_masked = actions1.clone()
+                actions1_mask = (actions1 != actions1)
+                actions1_masked.masked_fill_(actions1_mask, 0.0)
+                actions2_masked = actions2.clone()
                 actions2_mask = (actions2 != actions2)
-                actions2_masked.masked_fill_(actions2!=actions2, 0.0)
+                actions2_masked.masked_fill_(actions2_mask, 0.0)
                 actions1[avail_actions1.gather(_vdim(inputs_level3_tformat), Variable(actions1_masked.long())).data == 0.0] = float("nan")
                 actions2[avail_actions2.gather(_vdim(inputs_level3_tformat), Variable(actions2_masked.long())).data == 0.0] = float("nan")
                 actions1[actions1_mask] = float("nan")
