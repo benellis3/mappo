@@ -672,7 +672,7 @@ class SC2(MultiAgentEnv):
 
         return state
 
-    def get_intersect(self, coordinates,e_unit, sight_range ):
+    def get_intersect(self, coordinates, e_unit, sight_range ):
         e_x = e_unit.pos.x
         e_y = e_unit.pos.y
         distances = np.sum((coordinates - np.array([e_x, e_y] ))**2, 1)**0.5
@@ -839,6 +839,20 @@ class SC2(MultiAgentEnv):
         ally_feats = (self.n_agents - 1) * nf_al
 
         return move_feats + enemy_feats + ally_feats
+
+    def get_obs_intersect_size(self):
+
+        nf_al = 4
+        nf_en = 4
+
+        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
+            nf_al += 2
+            nf_en += 2
+
+        enemy_feats = self.n_enemies *  nf_en
+        ally_feats = (self.n_agents) * nf_al
+
+        return  enemy_feats + ally_feats
 
     def close(self):
         print("Closing StarCraftII")
