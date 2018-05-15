@@ -694,22 +694,22 @@ class SC2(MultiAgentEnv):
 
         # move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
-        ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
+        ally_feats = np.zeros((self.n_agents, nf_al), dtype=np.float32)
         state = np.concatenate((enemy_feats.flatten(),
                                     ally_feats.flatten()))
         state = state.astype(dtype=np.float32)
 
-        coordinates = np.zeros( [len(agent_ids), 2 ])
-        for i, a_id in agent_ids:
-            if not (self.agents[a_id].health > 0 ):
+        coordinates = np.zeros([len(agent_ids), 2])
+        for i, a_id in enumerate(agent_ids):
+            if not (self.agents[a_id].health > 0):
                 return state
             else:
                 coordinates[i] = [self.agents[a_id].pos.x, self.agents[a_id].pos.y]
         # Calculate pairwise distances
-        distances = ((coordinates[:, 0] - coordinates[:, 0].T)**2 + (coordinates[:, 1] - coordinates[:, 1].T)**2)**0.5
+        distances = ((coordinates[:, 0:1] - coordinates[:, 0:1].T)**2 + (coordinates[:, 1:2] - coordinates[:, 1:2].T)**2)**0.5
         sight_range = self.unit_sight_range(agent_ids[0])
         # Check that max pairwise distance is less than sight_range.
-        if max(distances) > sight_range:
+        if np.max(distances) > sight_range:
             return state
 
         x = np.mean(coordinates, 0)[0]
