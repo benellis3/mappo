@@ -156,6 +156,8 @@ class XXXMultiagentController():
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
             self.input_columns_level2[
                 "agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
+            self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["obs_intersection_pair"] = Scheme([dict(name="obs_intersection_pair{}".format(_agent_id1, _agent_id2),
+                                                                                                                                                                                 switch=self.args.xxx_use_obs_intersections)])
             #self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_level2"] = \
             #    Scheme([dict(name="xxx_epsilons_level2")])
 
@@ -377,12 +379,37 @@ class XXXMultiagentController():
                 # create pairwise avail actions
                 avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id1"], inputs_level2_tformat)
                 avail_actions2, params_aa2, _ = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id2"], inputs_level2_tformat)
-                tmp = (avail_actions1  * avail_actions2)
-                pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+
+                ########## HOW TO DETERMINE AVAILABLE ACTIONS ##########################################################
+                # One cannot a priori say anything about the other agent's available actions based
+                # on the common knowledge. This would need to be learnt. We are therefore hard-coding it for
+                #
+                # In the last step, we then check whether the actions sent to the individual agents are legal.
+                # If not so, then those actions have to be chosen from the independent sampler.
+                ########################################################################################################
+
+                if self.args.env in ["pred_prey"]:
+                    pairwise_avail_actions = th.bmm(avail_actions1.unsqueeze(2), avail_actions2.unsqueeze(1))
+                elif self.args.env in ["sc1", "sc2"]:
+                    tmp = (avail_actions1  * avail_actions2)
+                    pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
+                else:
+                    assert False, "pairwise_avail_actions not determined for this environment!"
+
                 ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
                 delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0], 1).fill_(1.0), requires_grad=False)
-                other_avails = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
-                pairwise_avail_actions = th.cat([delegation_avails, other_avails], dim=1)
+                pairwise_avail_actions = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
+
+
+                if self.args.xxx_use_obs_intersections:
+                    # if there is no observation intersection, pair-wise can choose any conceivable action
+                    # (if this results in invalid actions, then those will be picked in a decentralized fashion)
+                    obs_intersections, i_params, i_format = _to_batch(inputs_level2["agent_input_level2"]["obs_intersection_pair"], tformat=inputs_level2_tformat)
+                    obs_intersections_mask = (obs_intersections.sum(dim=1, keepdim=True) == 0)
+                    tmp = obs_intersections_mask.repeat(1, pairwise_avail_actions.shape[1])
+                    pairwise_avail_actions[tmp.data] = 1.0
+
+                pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=1)
                 pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
 
                 out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level2_0"](inputs_level2["agent_input_level2"],
