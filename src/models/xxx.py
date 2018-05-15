@@ -729,8 +729,8 @@ class XXXRecurrentAgentLevel2(nn.Module):
             if self.args.xxx_exploration_mode_level2 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat))
                epsilons, _, _ = _to_batch(epsilons, tformat)
-               x = th.cat([avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (1 - self.args.xxx_delegation_probability_bias),
-                           epsilons * self.args.xxx_delegation_probability_bias], dim=1) \
+               x = th.cat([epsilons * self.args.xxx_delegation_probability_bias,
+                           avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (1 - self.args.xxx_delegation_probability_bias)], dim=1) \
                            + x * (1 - epsilons)
 
 
