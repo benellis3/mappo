@@ -809,10 +809,16 @@ class XXXRecurrentAgentLevel3(RecurrentAgent):
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions
-            n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            # n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+            # x = th.exp(x)
+            # x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
+            # x = th.div(x, x.sum(dim=1, keepdim=True))
+            n_available_actions = avail_actions.sum(dim=1, keepdim=True)
             x = th.exp(x)
-            x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-            x = th.div(x, x.sum(dim=1, keepdim=True))
+            x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+            x_sum = x.sum(dim=1, keepdim=True)
+            x_sum = x_sum.masked_fill(x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1], 1.0)
+            x = th.div(x, x_sum)
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
