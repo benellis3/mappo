@@ -1,11 +1,7 @@
 batch_size: 32
-xxx_critic_level1_use_sampling: True
-xxx_critic_level1_sample_size: 1620
-xxx_critic_level2_use_sampling: True
-xxx_critic_level2_sample_size: 1620
-xxx_critic_level3_use_sampling: True
-xxx_critic_level3_sample_size: 1620
-defaults: default xxx predator_prey
+coma_critic_use_sampling: True
+coma_critic_sample_size: 1620
+defaults: default coma predator_prey
 env_args:
   agent_obs:
     - 1
@@ -21,3 +17,4 @@ reward_capture: 50
 reward_collision: 0.0
 reward_scare: 0.0
 reward_time: -0.1
+use_replay_buffer: False
