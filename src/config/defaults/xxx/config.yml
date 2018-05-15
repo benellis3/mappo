@@ -45,12 +45,13 @@ xxx_epsilon_decay_mode_level3: "exp"
 xxx_epsilon_start: 0.5
 xxx_epsilon_finish: 0.05
 xxx_epsilon_time_length: 20000
-xxx_epsilon_decay_mode: "exp"
 xxx_exploration_mode_level1: "softmax"
 xxx_exploration_mode_level2: "softmax"
 xxx_exploration_mode_level3: "softmax"
 xxx_use_entropy_regularizer: False
+xxx_use_obs_intersections: True
 xxx_entropy_loss_regularization_factor: 0.000005
+xxx_independent_logit_bias: False
 gamma: 0.99
 learner: xxx
 multiagent_controller: xxx_mac

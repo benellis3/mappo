@@ -206,6 +206,7 @@ def _vdim(tformat):
     assert len(aidx) == 1, "invalid tensor format string!"
     return aidx[0]
 
+
 def _check_nan(input):
     from torch import nn
     if isinstance(input, dict):

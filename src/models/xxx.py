@@ -696,6 +696,13 @@ class XXXRecurrentAgentLevel2(nn.Module):
             h = self.gru(x, h)
             x = self.output(h)
 
+            if self.args.xxx_independent_logit_bias:
+                """
+                Add a bias to the delegation action
+                """
+                x[:,0] = x[:,0] + 2.0
+
+
             # mask policy elements corresponding to unavailable actions
             n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
             x = th.exp(x)
@@ -719,10 +726,7 @@ class XXXRecurrentAgentLevel2(nn.Module):
             # select appropriate pairs
             sampled_pair_ids_slice = sampled_pair_ids[:, :, slice(t, t + 1), :].contiguous()
 
-            try:
-                x = x.gather(0, Variable(sampled_pair_ids_slice.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
-            except Exception as e:
-                pass
+            x = x.gather(0, Variable(sampled_pair_ids_slice.long(), requires_grad=False).repeat(1,1,1,x.shape[_vdim(tformat)]))
 
             h_list.append(h)
             x_list.append(x)

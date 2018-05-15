@@ -20,12 +20,12 @@ class XXXRunner(NStepRunner):
                                         dtype=np.float32,
                                         missing=np.nan,),
                                    dict(name="obs_intersection_all",
-                                        shape=(self.env_state_size if self.args.env_args.intersection_global_view else self.n_agents * self.env_obs_size),
+                                        shape=(self.env_state_size if self.args.env_args["intersection_global_view"] else self.n_agents * self.env_obs_size,),
                                         dtype=np.float32,
                                         missing=np.nan,
                                         ),
                                    *[dict(name="obs_intersection_pair{}".format(_i),
-                                          shape=(self.env_state_size if self.args.env_args.intersection_global_view else 2 * self.env_obs_size),
+                                          shape=(self.env_state_size if self.args.env_args["intersection_global_view"] else 2 * self.env_obs_size,),
                                           dtype=np.float32,
                                           missing=np.nan,
                                           )
@@ -253,6 +253,11 @@ class XXXRunner(NStepRunner):
             for _i, _obs in enumerate(observations):
                 ret_dict["avail_actions__agent{}".format(_i)] = avail_actions[_i]
 
+            # handle observation intersections
+            ret_dict["obs_intersection_all"] = _env.get_obs_intersection(tuple(range(_env.n_agents)))
+            for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
+                ret_dict["obs_intersection_pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
+
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
             # Signal back that queue element was finished processing
@@ -295,7 +300,7 @@ class XXXRunner(NStepRunner):
 
             # handle observation intersections
             ret_dict["obs_intersection_all"] = _env.get_obs_intersection(tuple(range(_env.n_agents)))
-            for _a1, _a2 in _ordered_agent_pairings(_env.n_agents):
+            for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
                 ret_dict["obs_intersection_pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
