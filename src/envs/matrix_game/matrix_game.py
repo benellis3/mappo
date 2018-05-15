@@ -28,19 +28,12 @@ class NormalFormMatrixGame(MultiAgentEnv):
 
         # Define the internal state
         # self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)
-        self.steps = 0
 
         self.p_common = args.p_common
         self.p_observation = args.p_observation
         self.common_knowledge = 0
         self.matrix_id = 0
 
-        self.reset()
-
-    # ---------- INTERACTION METHODS -----------------------------------------------------------------------------------
-
-    def reset(self):
-        """ Returns initial observations and states"""
         self.payoff_values = []
 
         self.payoff_values.append(np.array([  # payoff values
@@ -60,30 +53,33 @@ class NormalFormMatrixGame(MultiAgentEnv):
         ], dtype=np.float32) * 0.1
                                   )
 
-        self.step = 0
         self.n_actions = len(self.payoff_values[0])
+
+        self.reset()
+
+    # ---------- INTERACTION METHODS -----------------------------------------------------------------------------------
+
+    def reset(self):
+        """ Returns initial observations and states"""
+
+        self.steps = 0
 
         return self.get_obs(), self.get_state()
 
     def step(self, actions):
         """ Returns reward, terminated, info """
 
-        self.reward = self.payoff_values[self.matrix_id][actions]
+        self.reward = self.payoff_values[self.matrix_id-1][actions[0], actions[1]]
 
         info = {}
-        self.steps += 1
-        terminated = False
-        if self.steps >= self.episode_limit:
-            terminated = [True for _ in range(self.batch_size)]
-            info["episode_limit"] = True
-        else:
-            info["episode_limit"] = False
+        info["episode_limit"] = True
+        terminated = [True for _ in range(self.batch_size)]
 
-        return self.reward, terminated, info
+        return self.reward.astype(np.float64), terminated, info
 
     def get_obs(self):
         """ Returns all agent observations in a list """
-        agents_obs = [self.get_obs_agent(i) for i in range(self.n_agents)]
+        agents_obs = [self.get_obs_agent(a) for a in range(self.n_agents)]
         return agents_obs
 
     def get_obs_agent(self, agent_id):
@@ -97,7 +93,7 @@ class NormalFormMatrixGame(MultiAgentEnv):
                 if np.random.random() < self.p_observation:
                     observations[a] += self.matrix_id
 
-        return observations[agent_id].astype(float)
+        return observations[agent_id].astype(np.float64)
 
     def get_obs_size(self):
         """ Returns the shape of the observation """
@@ -109,7 +105,7 @@ class NormalFormMatrixGame(MultiAgentEnv):
         else:
             self.common_knowledge = 0
         #     print(common_knowledge)
-        self.matrix_id = np.random.randint(0, 2)
+        self.matrix_id = np.random.randint(1, 3)
 
         return np.array([self.matrix_id, self.common_knowledge], dtype=np.float32)
 
@@ -118,11 +114,11 @@ class NormalFormMatrixGame(MultiAgentEnv):
         return self.state_size
 
     def get_avail_actions(self):
-        return np.ones(self.n_actions)
+        return [self.get_avail_agent_actions(a) for a in range(self.n_agents)]
 
     def get_avail_agent_actions(self, agent_id):
         """ Returns the available actions for agent_id """
-        raise NotImplementedError
+        return np.ones(self.n_actions)
 
     def get_total_actions(self):
         """ Returns the total number of actions an agent could ever take """
