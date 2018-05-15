@@ -1,7 +1,6 @@
 from envs.multiagentenv import MultiAgentEnv
 from utils.dict2namedtuple import convert
 import numpy as np
-import torch as th
 
 
 class NormalFormMatrixGame(MultiAgentEnv):
@@ -16,24 +15,27 @@ class NormalFormMatrixGame(MultiAgentEnv):
         self.batch_size = batch_size if self.batch_mode else 1
 
         # Define the agents
-        self.actions = np.asarray([[0, 1], [1, 0], [0, -1], [-1, 0], [0, 0]], dtype=int_type)
-        self.action_names = ["right", "down", "left", "up", "stay"]
+        # self.actions = np.asarray([[0, 1], [1, 0], [0, -1], [-1, 0], [0, 0]], dtype=int_type)
+        # self.action_names = ["right", "down", "left", "up", "stay"]
         # self.n_actions = self.actions.shape[0]
         self.n_agents = args.n_agents
-        self.agent_obs = args.agent_obs
-        self.agent_obs_dim = np.asarray(self.agent_obs, dtype=int_type)
-        self.obs_size = 2*(2*args.agent_obs[0]+1)*(2*args.agent_obs[1]+1)
+        # self.agent_obs_dim = np.asarray(self.agent_obs, dtype=int_type)
+        self.obs_size = args.obs_size
+        self.state_size = args.state_size
 
         # Define the episode and rewards
         self.episode_limit = args.episode_limit
 
         # Define the internal state
-        self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)
+        # self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)
         self.steps = 0
-        self.reset()
 
         self.p_common = args.p_common
         self.p_observation = args.p_observation
+        self.common_knowledge = 0
+        self.matrix_id = 0
+
+        self.reset()
 
     # ---------- INTERACTION METHODS -----------------------------------------------------------------------------------
 
@@ -41,21 +43,21 @@ class NormalFormMatrixGame(MultiAgentEnv):
         """ Returns initial observations and states"""
         self.payoff_values = []
 
-        self.payoff_values.append(th.Variable(th.from_numpy(np.array([  # payoff values
+        self.payoff_values.append(np.array([  # payoff values
             [5, 0, 0, 2, 0],
             [0, 1, 2, 4, 2],
             [0, 0, 0, 2, 0],
             [0, 0, 0, 1, 0],
             [0, 0, 0, 0, 5],
-        ], dtype=np.float32))) * 0.1
+        ], dtype=np.float32) * 0.1
                                   )
-        self.payoff_values.append(th.Variable(th.from_numpy(np.array([  # payoff values
+        self.payoff_values.append(np.array([  # payoff values
             [0, 0, 1, 0, 5],
             [0, 0, 2, 0, 0],
             [1, 2, 4, 2, 1],
             [0, 0, 2, 0, 0],
             [5, 0, 1, 0, 0],
-        ], dtype=np.float32))) * 0.1
+        ], dtype=np.float32) * 0.1
                                   )
 
         self.step = 0
@@ -70,19 +72,19 @@ class NormalFormMatrixGame(MultiAgentEnv):
 
         info = {}
         self.steps += 1
+        terminated = False
         if self.steps >= self.episode_limit:
             terminated = [True for _ in range(self.batch_size)]
             info["episode_limit"] = True
         else:
             info["episode_limit"] = False
 
-        return self.reward
+        return self.reward, terminated, info
 
     def get_obs(self):
         """ Returns all agent observations in a list """
         agents_obs = [self.get_obs_agent(i) for i in range(self.n_agents)]
         return agents_obs
-
 
     def get_obs_agent(self, agent_id):
         """ Returns observation for agent_id """
@@ -95,11 +97,11 @@ class NormalFormMatrixGame(MultiAgentEnv):
                 if np.random.random() < self.p_observation:
                     observations[a] += self.matrix_id
 
-        return observations[agent_id]
+        return observations[agent_id].astype(float)
 
     def get_obs_size(self):
         """ Returns the shape of the observation """
-        raise NotImplementedError
+        return self.obs_size
 
     def get_state(self):
         if np.random.random() < self.p_common:
@@ -109,14 +111,14 @@ class NormalFormMatrixGame(MultiAgentEnv):
         #     print(common_knowledge)
         self.matrix_id = np.random.randint(0, 2)
 
-        return self.matrix_id, self.common_knowledge
+        return np.array([self.matrix_id, self.common_knowledge], dtype=np.float32)
 
     def get_state_size(self):
         """ Returns the shape of the state"""
-        raise NotImplementedError
+        return self.state_size
 
     def get_avail_actions(self):
-        raise NotImplementedError
+        return np.ones(self.n_actions)
 
     def get_avail_agent_actions(self, agent_id):
         """ Returns the available actions for agent_id """
@@ -125,7 +127,7 @@ class NormalFormMatrixGame(MultiAgentEnv):
     def get_total_actions(self):
         """ Returns the total number of actions an agent could ever take """
         # TODO: This is only suitable for a discrete 1 dimensional action space for each agent
-        raise NotImplementedError
+        return self.n_actions
 
     def get_stats(self):
         raise NotImplementedError

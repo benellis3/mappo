@@ -5,6 +5,7 @@ from torch.autograd import Variable
 
 from utils.xxx import _joint_actions_2_action_pair
 
+
 def _has_gradient(tensor):
     """
     pytorch < 0.4 compatibility
@@ -14,11 +15,13 @@ def _has_gradient(tensor):
     else:
         return False
 
+
 def fillnan(series, value, **kwargs):
     """
     fill nan values in series with value
     """
     return series.fillna(value)
+
 
 def _join_dicts(*dicts):
     """
@@ -39,6 +42,7 @@ def _join_dicts(*dicts):
 
     return ret
 
+
 def _to_batch(item, tformat):
     assert tformat in ["a*bs*t*v", "bs*t*v"], "unknown format: {}".format(tformat)
     if isinstance(item, dict):
@@ -49,17 +53,18 @@ def _to_batch(item, tformat):
     else:
         if tformat in ["a*bs*t*v"]:
             a, bs, t, v = item.shape
-            return item.view(a*bs*t, v), (a, bs, t, v), tformat
+            return item.view(a * bs * t, v), (a, bs, t, v), tformat
         elif tformat in ["bs*t*v"]:
             bs, t, v = item.shape
-            return item.view(bs*t, v), (bs, t, v), tformat
+            return item.view(bs * t, v), (bs, t, v), tformat
+
 
 def _from_batch(item, params, tformat):
     assert tformat in ["a*bs*t*v", "bs*t*v"], "unknown format: {}".format(tformat)
     if isinstance(item, dict):
         res_dict = {}
         for _k, _v in item.items():
-            res_dict[_k]  = _from_batch(_v, params, tformat)
+            res_dict[_k] = _from_batch(_v, params, tformat)
         return res_dict
     else:
         if tformat in ["a*bs*t*v"]:
@@ -69,8 +74,8 @@ def _from_batch(item, params, tformat):
             bs, t, _ = params
             return item.view(bs, t, -1)
 
-def _check_inputs_validity(inputs, input_shapes, formats, allow_nonseq=False):
 
+def _check_inputs_validity(inputs, input_shapes, formats, allow_nonseq=False):
     # Check validity of key set supplied
     assert set(inputs.keys()) == set(input_shapes.keys()), \
         "unexpected set of inputs keys supplied: {}, {}".format(str(inputs.keys()), str(input_shapes.keys()))
@@ -92,10 +97,12 @@ def _check_inputs_validity(inputs, input_shapes, formats, allow_nonseq=False):
         assert (_v.data != _v.data).sum() == 0, "FATAL: np.nan detected in model input {}".format(_k)
         assert abs(_v.data.sum()) != np.inf, "FATAL: +/- np.inf detected in model input {}".format(_k)
 
+
 def _check_nan_inf(series):
     is_nan = any((series != series))
-    is_inf = any([ str(_s) in ["inf", "-inf"]  for _s in series]) #only reliable way I found!
+    is_inf = any([str(_s) in ["inf", "-inf"] for _s in series])  # only reliable way I found!
     return is_nan, is_inf
+
 
 def _naninfmean(tensor):
     _tensor = tensor.clone()
@@ -105,6 +112,7 @@ def _naninfmean(tensor):
     _tensor[_tensor == float("nan")] = 0.0
     _tensor[_tensor == float("-nan")] = 0.0
     return _tensor.mean()
+
 
 def _to_numpy_cpu(item):
     if issubclass(type(item), Variable):
@@ -118,18 +126,19 @@ def _to_numpy_cpu(item):
     else:
         assert False, "unexpected input type: {}".format(str(item))
 
+
 def _build_input(columns, inputs):
     model_inputs = {}
     for _k, _v in columns.items():
         model_inputs[_k] = th.cat([inputs[_c] for _c in _v], 2)
     return model_inputs
 
-def _build_inputs(list_of_columns, inputs, format):
 
+def _build_inputs(list_of_columns, inputs, format):
     model_inputs = []
     for _i, columns in enumerate(list_of_columns):
         model_inputs.append(_build_input(columns=columns,
-                                        inputs=inputs))
+                                         inputs=inputs))
     # join model inputs together
     inputs_dic = {}
     for _input in model_inputs:
@@ -142,6 +151,7 @@ def _build_inputs(list_of_columns, inputs, format):
         inputs_dic[_k] = th.cat(inputs_dic[_k], 1)
     return inputs_dic, format
 
+
 # def _build_contiguous_inputs(list_of_columns, inputs, format):
 #     col_list = []
 #     for columns in list_of_columns:
@@ -151,7 +161,6 @@ def _build_inputs(list_of_columns, inputs, format):
 #     return col_list, format
 
 def _stack_by_key(inputs, format):
-
     dic = {}
     for _k, _v in inputs[0].items():
         dic[_k] = []
@@ -160,13 +169,15 @@ def _stack_by_key(inputs, format):
         dic[_k] = th.cat(dic[_k], dim=0)
     return dic, format
 
+
 def _split_batch(tensor, n_agents, format):
     if format in ["bs"]:
-        return tensor.split(int(tensor.shape[0]/n_agents), dim=0), format
+        return tensor.split(int(tensor.shape[0] / n_agents), dim=0), format
     elif format in ["sb"]:
-        return tensor.split(int(tensor.shape[1]/ n_agents), dim=1), format
+        return tensor.split(int(tensor.shape[1] / n_agents), dim=1), format
     else:
         assert False, "unknown format!"
+
 
 def _bsdim(tformat):
     _f = tformat.split("*")
@@ -174,17 +185,20 @@ def _bsdim(tformat):
     assert len(bsidx) == 1, "invalid tensor format string!"
     return bsidx[0]
 
+
 def _tdim(tformat):
     _f = tformat.split("*")
     tidx = [i for i, x in enumerate(_f) if x == "t"]
     assert len(tidx) == 1, "invalid tensor format string!"
     return tidx[0]
 
+
 def _adim(tformat):
     _f = tformat.split("*")
     aidx = [i for i, x in enumerate(_f) if x == "a"]
     assert len(aidx) == 1, "invalid tensor format string!"
     return aidx[0]
+
 
 def _vdim(tformat):
     _f = tformat.split("*")
@@ -197,14 +211,14 @@ def _check_nan(input):
     if isinstance(input, dict):
         for _k1, _v1 in input.items():
             for _k2, _v2 in _v1.items():
-                if th.sum(_v2.data!=_v2.data) > 0.0:
+                if th.sum(_v2.data != _v2.data) > 0.0:
                     assert False, "NaNs in {}:{}".format(_k1, _k2)
     elif issubclass(type(input), th.Tensor):
-	assert th.sum(input!=input) == 0, "NaNs in tensor!"
+        assert th.sum(input != input) == 0, "NaNs in tensor!"
     elif issubclass(type(input), nn.Module):
         for i, p in enumerate(input.parameters()):
             assert th.sum(p != p) == 0, "NaNs in parameter {}!".format(i)
-    #elif isinstance(input, th.nn.parameter):
+    # elif isinstance(input, th.nn.parameter):
     #    for i, p in enumerate(input):
     #        assert th.sum(p.grad != p.grad), "NaNs in parameter gradient {}!".format(i)
     return
@@ -279,7 +293,8 @@ def _pick_keys(dic, keys):
     """
     convenience function picking only certain keys from a dict and return as new dict with those keys only
     """
-    return {_k:_v for _k,_v in dic.items() if _k in keys}
+    return {_k: _v for _k, _v in dic.items() if _k in keys}
+
 
 def _build_model_inputs(column_dict, inputs, inputs_tformat, to_variable=True, fill_zero=True, stack=True):
     """
@@ -349,22 +364,24 @@ def _build_model_inputs(column_dict, inputs, inputs_tformat, to_variable=True, f
                         assert False, "error: cannot have global key that is also name of a per-agent key"
                     else:
                         ret_dict[_k] = {}
-                    #for _input_region_k in column_dict[list(column_dict.keys())[0]].keys():
-                    for _input_region_k in column_dict[_k+"__agent{}".format(0)].keys():
+                    # for _input_region_k in column_dict[list(column_dict.keys())[0]].keys():
+                    for _input_region_k in column_dict[_k + "__agent{}".format(0)].keys():
                         try:
-                            _vec = th.stack([ret_dict[_k+"__agent{}".format(_id_key)][_input_region_k] for _id_key in id_keys])
+                            _vec = th.stack(
+                                [ret_dict[_k + "__agent{}".format(_id_key)][_input_region_k] for _id_key in id_keys])
                         except Exception as e:
                             pass
                         ret_dict[_k][_input_region_k] = _vec
                     for _id_key in id_keys:
-                        del ret_dict[_k+"__agent{}".format(_id_key)]
+                        del ret_dict[_k + "__agent{}".format(_id_key)]
     else:
         output_tformat = "bs*t*v"
     return ret_dict, output_tformat
 
-def _agent_flatten(lst):
 
+def _agent_flatten(lst):
     pass
+
 
 def _generate_scheme_shapes(transition_scheme, dict_of_schemes):
     """
@@ -375,6 +392,7 @@ def _generate_scheme_shapes(transition_scheme, dict_of_schemes):
         scheme_shapes[_k] = scheme.get_output_sizes(transition_scheme)
     return scheme_shapes
 
+
 def _generate_input_shapes(input_columns, scheme_shapes):
     """
     generates 1D model input shape sizes given scheme_shapes and input_columns
@@ -383,11 +401,13 @@ def _generate_input_shapes(input_columns, scheme_shapes):
     for _input_column_k, _input_column_v in input_columns.items():
         input_shapes[_input_column_k] = {}
         for _input_column_region_k, _input_column_region_v in _input_column_v.items():
-            input_shapes[_input_column_k][_input_column_region_k] = sum([scheme_shapes[_input_column_k][_scheme_list_entry["name"]]
-                                                                         for _scheme_list_entry in _input_column_region_v.scheme_list
-                                                                         if _scheme_list_entry.get("switch", True)])
+            input_shapes[_input_column_k][_input_column_region_k] = sum(
+                [scheme_shapes[_input_column_k][_scheme_list_entry["name"]]
+                 for _scheme_list_entry in _input_column_region_v.scheme_list
+                 if _scheme_list_entry.get("switch", True)])
 
     return input_shapes
+
 
 def _one_hot(ndarray_or_tensor, **kwargs):
     """
@@ -395,7 +415,7 @@ def _one_hot(ndarray_or_tensor, **kwargs):
     One-hot dimensionality is specified by rng=(low, high) parameter
     """
     rng = kwargs.get("range", None)
-    output_size_only=kwargs.get("output_size_only", False)
+    output_size_only = kwargs.get("output_size_only", False)
 
     if output_size_only:
         return (rng[1] - rng[0] + 1) * ndarray_or_tensor
@@ -406,23 +426,25 @@ def _one_hot(ndarray_or_tensor, **kwargs):
     else:
         y_onehot = th.cuda.FloatTensor(*tensor.shape[:-1], (rng[1] - rng[0] + 1)).zero_()
     nan_mask = (tensor != tensor)
-    tensor[nan_mask] = 0 # mask nans the simple way # DEBUG
+    tensor[nan_mask] = 0  # mask nans the simple way # DEBUG
     y_onehot.scatter_(len(tensor.shape) - 1, tensor.long(), 1)
     if len(nan_mask.shape) > 0:
-        y_onehot[nan_mask.repeat(1,1,y_onehot.shape[2])] = 0 # set nans to zero
+        y_onehot[nan_mask.repeat(1, 1, y_onehot.shape[2])] = 0  # set nans to zero
     return y_onehot
+
 
 def _one_hot_pairwise(tensor, **kwargs):
     rng = kwargs.get("range", None)
-    output_size_only=kwargs.get("output_size_only", False)
+    output_size_only = kwargs.get("output_size_only", False)
     if output_size_only:
         return 2 * (rng[1] - rng[0] + 1) * tensor
     # TODO: need to handle delegation action (set all zero)
-    action1, action2  = _joint_actions_2_action_pair(tensor, (rng[1] - rng[0] + 1))
+    action1, action2 = _joint_actions_2_action_pair(tensor, (rng[1] - rng[0] + 1))
     one_hot_action1 = _one_hot(action1, range=rng)
     one_hot_action2 = _one_hot(action2, range=rng)
     assert tensor.dim() == 3, "wrong tensor dim"
     return th.cat([one_hot_action1, one_hot_action2], dim=0)
+
 
 def _mask(tensor, **kwargs):
     output_size_only = kwargs.get("output_size_only", False)
@@ -433,6 +455,7 @@ def _mask(tensor, **kwargs):
     ret = tensor.clone()
     ret.fill_(fill)
     return ret
+
 
 # def _t_repeat(tensor, **kwargs):
 #     """
@@ -458,7 +481,7 @@ def _shift(ndarray_or_tensor, **kwargs):
     tformat = kwargs.get("tformat")
 
     if output_size_only:
-        return ndarray_or_tensor # series[0] depicts the length of the series
+        return ndarray_or_tensor  # series[0] depicts the length of the series
     steps = kwargs.get("steps", None)
     fill = kwargs.get("fill", float("nan"))
     assert steps is not None, "Param nsteps not specified"
@@ -467,14 +490,15 @@ def _shift(ndarray_or_tensor, **kwargs):
         tensor[:, :, :] = fill
         return tensor
     if steps > 0:
-        tensor[:,steps:,:] = tensor[:, 0:tensor.shape[1]-steps, :]
+        tensor[:, steps:, :] = tensor[:, 0:tensor.shape[1] - steps, :]
         tensor[:, :steps, :] = fill
     elif steps < 0:
-        tensor[:,:steps,:] = tensor[:, -steps:, :]
+        tensor[:, :steps, :] = tensor[:, -steps:, :]
         tensor[:, steps:, :] = fill
     elif steps == 0:
         return tensor
     return tensor
+
 
 def _seq_mean(seq, length=100):
     """
@@ -484,7 +508,8 @@ def _seq_mean(seq, length=100):
     assert len(seq) > 0, "empty sequence! fix this."
     warning_msg = None if len(seq) >= length else "seq ({}) is shorter than length ({})".format(len(seq), length)
     ret = np.mean(seq[max(-length, -len(seq)):])
-    return ret #, warning_msg
+    return ret  # , warning_msg
+
 
 def _underscore_to_cap(_str):
     """
@@ -495,12 +520,14 @@ def _underscore_to_cap(_str):
     spl[0] = spl[0].capitalize()
     return " ".join(spl)
 
+
 def _copy_remove_keys(dic, keys):
     """
     convenience function returning the copy a dict missing keys
     """
-    new_dic = {_k:_v for _k,_v in dic.items() if _k not in keys}
+    new_dic = {_k: _v for _k, _v in dic.items() if _k not in keys}
     return new_dic
+
 
 def _make_logging_str(dic):
     """
@@ -510,11 +537,14 @@ def _make_logging_str(dic):
     logging_str = ", ".join(["{}={:g}".format(_k, dic[_k]) for _k in keys])
     return logging_str
 
+
 TRANSFORMS = {"one_hot": _one_hot,
               "shift": _shift,
               "mask": _mask,
               "one_hot_pairwise": _one_hot_pairwise}
-              # "t_repeat": _t_repeat}
+
+
+# "t_repeat": _t_repeat}
 
 def _merge_dicts(a, b, path=None, overwrite=True):
     """
@@ -527,7 +557,7 @@ def _merge_dicts(a, b, path=None, overwrite=True):
             if isinstance(a[key], dict) and isinstance(b[key], dict):
                 _merge_dicts(a[key], b[key], path + [str(key)])
             elif a[key] == b[key]:
-                pass # same leaf value
+                pass  # same leaf value
             else:
                 if not overwrite:
                     raise Exception('Conflict at %s' % '.'.join(path + [str(key)]))
@@ -536,6 +566,7 @@ def _merge_dicts(a, b, path=None, overwrite=True):
         else:
             a[key] = b[key]
     return a
+
 
 def _unpack_random_seed(seeds, output_shape, gen_fn):
     """
@@ -546,15 +577,15 @@ def _unpack_random_seed(seeds, output_shape, gen_fn):
 
     assert len(output_shape) == 2, "output_shape must be of dim 2!"
 
-    if seeds.is_cuda: # inputs["pomace_epsilon_seeds"]
+    if seeds.is_cuda:  # inputs["pomace_epsilon_seeds"]
         _initial_rng_state_all = th.cuda.get_rng_state_all()
         # epsilon_variances.shape[_bsdim(tformat)],
         #                                            self.args.pomace_epsilon_size
         epsilons = th.cuda.FloatTensor(*output_shape)  # not sure if can do this directly on GPU using pytorch.dist...
-        for _bs in range(output_shape[0]):  #(epsilon_variances.shape[0]):
+        for _bs in range(output_shape[0]):  # (epsilon_variances.shape[0]):
             # inputs["pomace_epsilon_seeds"]
             th.cuda.manual_seed_all(int(seeds.data[_bs, 0]))
-            #epsilons[_bs].normal_(mean=0.0, std=epsilon_variances.data[_bs, 0])
+            # epsilons[_bs].normal_(mean=0.0, std=epsilon_variances.data[_bs, 0])
             epsilons[_bs] = gen_fn(out=epsilons[_bs],
                                    bs=_bs)
         th.cuda.set_rng_state_all(_initial_rng_state_all)

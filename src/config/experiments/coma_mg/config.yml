@@ -1,4 +1,4 @@
-batch_size: 32
+batch_size: 2
 coma_critic_use_sampling: True
 coma_critic_sample_size: 1620
 coma_epsilon_decay_mode: linear
@@ -11,3 +11,5 @@ env_args:
   n_agents: 2
   p_common: 0.9
   p_observation: 0.5
+  state_size: 2
+  obs_size: 5
