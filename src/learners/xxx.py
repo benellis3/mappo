@@ -345,7 +345,7 @@ class XXXLearner(BasicLearner):
         self.agent_level1_optimiser = RMSprop(self.agent_level1_parameters, lr=self.args.lr_agent_level1)
 
         if self.args.agent_level2_share_params:
-            self.agent_level2_parameters = self.multiagent_controller.get_parameters(level=1)
+            self.agent_level2_parameters = self.multiagent_controller.get_parameters(level=2)
         else:
             assert False, "TODO"
         self.agent_level2_optimiser = RMSprop(self.agent_level2_parameters, lr=self.args.lr_agent_level2)

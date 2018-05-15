@@ -185,8 +185,8 @@ class XXXMultiagentController():
             return list(self.models["level1"].parameters())
         elif level == 2:
             param_list = []
-            for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
-                param_list.extend(self.models["level2_{}:{}".format(_agent_id1, _agent_id2)].parameters())
+            for _i in range(_n_agent_pairings(self.n_agents)):
+                param_list.extend(self.models["level2_{}".format(_i)].parameters())
             return param_list
         elif level == 3:
             param_list = []
@@ -340,10 +340,7 @@ class XXXMultiagentController():
                                                                                                                               avail_actions=None,
                                                                                                                               tformat=tformat_level1,
                                                                                                                               test_mode=test_mode)
-                try:
-                    _check_nan(sampled_pair_ids) # DEBUG
-                except Exception as e:
-                    pass
+                _check_nan(sampled_pair_ids)
                 if self.args.debug_mode in ["level2_actions_fixed_pair"]:
                     """
                     DEBUG MODE: LEVEL2 ACTIONS FIXED PAIR
@@ -392,6 +389,7 @@ class XXXMultiagentController():
                                                                                     avail_actions=None,
                                                                                     tformat=tformat_level2,
                                                                                     test_mode=test_mode)
+
 
                 self.actions_level2 = pair_sampled_actions.clone()
                 self.selected_actions_format_level2 = selected_actions_format_level2
