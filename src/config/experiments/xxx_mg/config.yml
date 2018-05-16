@@ -19,3 +19,5 @@ env_args:
 lr_critic: 0.0
 use_replay_buffer: False
 xxx_use_obs_intersections: False
+test_interval: 10
+test_nepisode: 30

@@ -446,10 +446,9 @@ class XXXMultiagentController():
             if loss_level == 3 or loss_level is None:
                 # --------------------- LEVEL 3
                 # TODO: np.nan in actions1 !!
-                b = sampled_pair_ids.squeeze(0).squeeze(2).view(-1)
 
                 actions1, actions2 = _joint_actions_2_action_pair(pair_sampled_actions, self.n_actions)
-                pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents) # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
+                pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents, "a*bs*t*v") # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
 
                 inputs_level3, inputs_level3_tformat = _build_model_inputs(self.input_columns_level3,
                                                                            inputs,
@@ -457,12 +456,9 @@ class XXXMultiagentController():
                                                                            inputs_tformat=tformat,
                                                                            )
 
-                tmp = Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])
-                try:
-                    avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), tmp)
-                except Exception as e:
-                    pass
-                avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id2).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)]))
+                #tmp = Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])
+                avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id1.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+                avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id2.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
 
                 # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
                 actions1_masked = actions1.clone()
@@ -481,8 +477,8 @@ class XXXMultiagentController():
                                       pair_sampled_actions.shape[_bsdim(tformat)]*
                                       pair_sampled_actions.shape[_tdim(tformat)]).fill_(float("nan"))
 
-                action_matrix.scatter_(0, pair_id1, actions1.squeeze(0).squeeze(2).view(-1).unsqueeze(0))
-                action_matrix.scatter_(0, pair_id2, actions2.squeeze(0).squeeze(2).view(-1).unsqueeze(0))
+                action_matrix.scatter_(0, pair_id1.squeeze(-1).view(pair_id1.shape[0],-1), actions1.squeeze(-1).view(actions1.shape[0],-1))
+                action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0],-1), actions2.squeeze(-1).view(actions2.shape[0],-1))
 
                 out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3_0"](inputs_level3["agent_input_level3"],
                                                                                                           hidden_states=hidden_states["level3"],

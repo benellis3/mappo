@@ -1,6 +1,7 @@
 from itertools import combinations
 import torch as th
 
+
 def _n_agent_pair_samples(n_agents):
     return n_agents // 2
 
@@ -31,14 +32,14 @@ def _pairing_id_2_agent_ids(pairing_id, n_agents):
     return all_pairings[pairing_id]
 
 
-def _pairing_id_2_agent_ids__tensor(pairing_id, n_agents):
+def _pairing_id_2_agent_ids__tensor(pairing_id, n_agents, tformat):
+    assert tformat in ["a*bs*t*v"], "invalid tensor input format"
     pairing_list = _ordered_agent_pairings(n_agents)
     ttype = th.cuda.LongTensor if pairing_id.is_cuda else th.LongTensor
-    
-
-    all_pairings = ttype(pairing_list).unsqueeze(2).repeat(1,1,pairing_id.shape[0])
-    ret0 = all_pairings[:,0,:].gather(0, pairing_id.unsqueeze(0).long())
-    ret1 = all_pairings[:,1,:].gather(0, pairing_id.unsqueeze(0).long())
+    ids1 = ttype(pairing_list)[:, 0].unsqueeze(0).unsqueeze(0).unsqueeze(0).repeat(pairing_id.shape[0], pairing_id.shape[1], pairing_id.shape[2],1)
+    ids2 = ttype(pairing_list)[:, 1].unsqueeze(0).unsqueeze(0).unsqueeze(0).repeat(pairing_id.shape[0], pairing_id.shape[1], pairing_id.shape[2],1)
+    ret0 = ids1.gather(-1, pairing_id.long())
+    ret1 = ids2.gather(-1, pairing_id.long())
     return ret0, ret1
 
 def _agent_ids_2_pairing_id(agent_ids, n_agents):
