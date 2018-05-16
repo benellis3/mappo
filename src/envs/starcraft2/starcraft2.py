@@ -684,7 +684,6 @@ class SC2(MultiAgentEnv):
     def get_obs_intersection(self, agent_ids):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
-
         nf_al = 4
         nf_en = 3
 
@@ -698,11 +697,16 @@ class SC2(MultiAgentEnv):
         state = np.concatenate((enemy_feats.flatten(),
                                     ally_feats.flatten()))
         state = state.astype(dtype=np.float32)
+        #Todo: Check that the dimensions are consistent.
+        a_a1 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[0])),[-1,1])
+        a_a2 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[1])),[1,-1])
+        avail_actions = a_a1.dot(a_a2)
+        avail_all = avail_actions * 0 + 1
 
         coordinates = np.zeros([len(agent_ids), 2])
         for i, a_id in enumerate(agent_ids):
             if not (self.agents[a_id].health > 0):
-                return state
+                return state, avail_all
             else:
                 coordinates[i] = [self.agents[a_id].pos.x, self.agents[a_id].pos.y]
         # Calculate pairwise distances
@@ -710,7 +714,7 @@ class SC2(MultiAgentEnv):
         sight_range = self.unit_sight_range(agent_ids[0])
         # Check that max pairwise distance is less than sight_range.
         if np.max(distances) > sight_range:
-            return state
+            return state, avail_all
 
         x = np.mean(coordinates, 0)[0]
         y = np.mean(coordinates, 0)[1]
@@ -722,6 +726,7 @@ class SC2(MultiAgentEnv):
 
             if self.get_intersect(coordinates, e_unit, sight_range) and e_unit.health > 0:  # visible and alive
                 # Sight range > shoot range
+                enemy_feats[e_id, 0] = avail_actions[self.n_actions_no_attack + e_id]  # available
                 enemy_feats[e_id, 1] = dist / sight_range # distance
                 enemy_feats[e_id, 2] = (e_x - x) / sight_range # relative X
                 enemy_feats[e_id, 3] = (e_y - y) / sight_range # relative Y
@@ -729,11 +734,13 @@ class SC2(MultiAgentEnv):
                 if self.map_name == '2d_3z' or self.map_name == '3d_5z':
                     type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
                     enemy_feats[e_id, 4 + type_id] = 1
+            else:
+                avail_actions[self.n_actions_no_attack + e_id, :] = 0
+                avail_actions[:, self.n_actions_no_attack + e_id] = 0
 
         # place the features of the agent himself always at the first place
         al_ids = range(self.n_agents)
         for i, al_id in enumerate(al_ids):
-
             al_unit = self.get_unit_by_id(al_id)
             al_x = al_unit.pos.x
             al_y = al_unit.pos.y
@@ -760,7 +767,7 @@ class SC2(MultiAgentEnv):
             print("Enemy feats\n", enemy_feats)
             print("Ally feats\n", ally_feats)
             print("***************************************")
-        return state
+        return state, avail_actions
 
     def get_state_size(self):
 
