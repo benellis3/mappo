@@ -56,7 +56,7 @@ class MultinomialActionSelector():
             _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
         except RuntimeError as e:
             print('Warning in MultinomialActionSelector.available_action(): Categorical throws error {}!'.format(e))
-            masked_policies_batch.random_(0.0, 2.0)
+            masked_policies_batch.random_(0, 2)
             _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
             pass
 

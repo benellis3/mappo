@@ -13,7 +13,7 @@ from debug.debug import IS_PYCHARM_DEBUG
 from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
-    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
+    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap, _check_nan
 from components.losses import EntropyRegularisationLoss
 from components.transforms import _to_batch, \
     _from_batch, _naninfmean
@@ -432,7 +432,7 @@ class XXXLearner(BasicLearner):
         #a = {_k:_v.to_pd() for _k, _v in data_inputs.items()}
         #b = batch_history.to_pd()
         self.train_level1(batch_history, data_inputs, data_inputs_tformat, T_env)
-        self.train_level2(batch_history, data_inputs, data_inputs_tformat, T_env)
+        self.train_level2(batch_history, data_inputs, data_inputs_tformat, T_env) # DEBUG
         self.train_level3(batch_history, data_inputs, data_inputs_tformat, T_env)
         pass
 
@@ -721,6 +721,11 @@ class XXXLearner(BasicLearner):
         # carry out optimization for agents
         agent_optimiser.zero_grad()
         XXX_loss.backward()
+
+        try:
+            _check_nan(agent_parameters)
+        except Exception as e:
+            pass
 
         policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
         agent_optimiser.step()
