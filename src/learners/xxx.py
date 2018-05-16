@@ -87,9 +87,9 @@ class XXXLearner(BasicLearner):
             setattr(self, "T_policy_level{}".format(_i), 0)
             setattr(self, "T_critic_level{}".format(_i), 0)
 
-        self.T_target_critic_update_interval=args.target_critic_update_interval
+        #self.T_target_critic_update_interval=args.target_critic_update_interval
         self.stats = {}
-        self.n_critic_learner_reps = args.n_critic_learner_reps
+        # self.n_critic_learner_reps = args.n_critic_learner_reps
         self.logging_struct = logging_struct
 
         self.critic_level1 = mo_REGISTRY[self.args.xxx_critic_level1]
@@ -682,7 +682,7 @@ class XXXLearner(BasicLearner):
         output_critic = None
 
         # optimize the critic as often as necessary to get the critic loss down reliably
-        for _i in range(self.n_critic_learner_reps):
+        for _i in range(getattr(self.args, "n_critic_level{}_learner_reps".format(level))): #self.n_critic_learner_reps):
             _ = _optimize_critic(xxx_model_inputs=xxx_model_inputs,
                                  tformat=xxx_model_inputs_tformat,
                                  actions=actions,

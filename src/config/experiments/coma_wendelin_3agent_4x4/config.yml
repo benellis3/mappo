@@ -1,24 +1,61 @@
+action_selector: multinomial
+agent: coma_recursive_agent_ac
+agent_model: coma_recursive
+agent_output_type: policies
+agents_encoder_size: 64
+agents_hidden_state_size: 64
 batch_size: 32
-coma_critic_use_sampling: True
+batch_size_run: 32
 coma_critic_sample_size: 1620
+coma_critic_use_sampling: True
+coma_entropy_loss_regularization_factor: 5e-06
 coma_epsilon_decay_mode: linear
-coma_epsilon_finish: 0.0
+coma_epsilon_finish: 0.01
 coma_epsilon_start: 0.5
 coma_epsilon_time_length: 50000
-defaults: default coma predator_prey
+coma_exploration_mode: softmax
+coma_use_entropy_regularizer: False
+debug_mode: None
+debug_verbose: False
+env: pred_prey
 env_args:
-  agent_obs:
-    - 1
-    - 1
-  episode_limit: 50
-  predator_prey_shape:
-    - 4
-    - 4
-  predator_prey_toroidal: False
-  n_agents: 3
-reward_almost_capture: 0.0
-reward_capture: 50
-reward_collision: 0.0
-reward_scare: 0.0
-reward_time: -0.1
-use_replay_buffer: False
+    agent_obs: [1, 1]
+    episode_limit: 50,
+    intersection_global_view: True
+    intersection_id_coded: True
+    n_agents: 3
+    n_prey: 1
+    predator_prey_shape: [4,4]
+    predator_prey_toroidal: False
+    reward_almost_capture: 0.0
+    reward_capture: 50
+    reward_collision: 0.0
+    reward_scare: 0.0
+    reward_time: -0.1
+gamma: 0.99
+learner: coma
+lr_agent: 0.0005
+lr_critic: 0.005
+multiagent_controler: coma_mac
+n_critic_learner_reps: 4
+n_loops_per_thread_or_sub_or_main_process: 0
+n_subprocesses: 0
+n_threads_per_subprocess_or_main_process: 0
+obs_last_action: True
+observe: True
+observe_db: True
+run_mode: sequential
+runner: coma
+runner_test_batch_size: 32
+save_model: False
+save_model_interval: 10e6
+share_agent_params: True
+t_max: 1000000
+target_critic_update_interval: 661500
+td_lambda: 0.8
+tensorboard: False
+test_interval: 8000
+test_nepisode: 50
+use_cuda: True
+use_replay_buffer: True
+use_tensorboard: False
