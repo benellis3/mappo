@@ -70,12 +70,14 @@ class XXXMultiagentController():
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
                                                                              dict(name="avail_actions",
-                                                                                  select_agent_ids=[_agent_id1, _agent_id2])] +
-                                                                             [dict(name="observations",
-                                                                                   select_agent_ids=[_agent_id1, _agent_id2])]
-                                                                                if not self.args.xxx_use_obs_intersections else [
-                                                                             dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))),
-                                                                             dict(name="avail_actions_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)))])
+                                                                                  select_agent_ids=[_agent_id1, _agent_id2]),
+                                                                             dict(name="observations",
+                                                                                  select_agent_ids=[_agent_id1, _agent_id2],
+                                                                                  switch=not self.args.xxx_use_obs_intersections),
+                                                                             dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                                                                  switch=self.args.xxx_use_obs_intersections),
+                                                                             dict(name="avail_actions_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                                                                  switch=self.args.xxx_use_obs_intersections)])
 
         self.agent_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
                                                                      transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
