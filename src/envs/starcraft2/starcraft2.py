@@ -685,11 +685,12 @@ class SC2(MultiAgentEnv):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
         nf_al = 4
-        nf_en = 3
+        nf_en = 4
 
         if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            nf_al += 3
-            nf_en += 3
+            # unit types (in onehot)
+            nf_al += 2
+            nf_en += 2
 
         # move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
