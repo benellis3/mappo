@@ -1,5 +1,5 @@
 action_selector: multinomial
-agent: coma_recursive_agent_ac
+agent: coma_recursive_ac
 agent_model: coma_recursive
 agent_output_type: policies
 agents_encoder_size: 64
@@ -20,7 +20,7 @@ debug_verbose: False
 env: pred_prey
 env_args:
     agent_obs: [1, 1]
-    episode_limit: 50,
+    episode_limit: 50
     intersection_global_view: True
     intersection_id_coded: True
     n_agents: 2
@@ -36,7 +36,8 @@ gamma: 0.99
 learner: coma
 lr_agent: 0.0005
 lr_critic: 0.005
-multiagent_controler: coma_mac
+mongodb_profile: gandalf_pymarl
+multiagent_controller: coma_mac
 n_critic_learner_reps: 4
 n_loops_per_thread_or_sub_or_main_process: 0
 n_subprocesses: 0
@@ -57,5 +58,5 @@ tensorboard: False
 test_interval: 8000
 test_nepisode: 50
 use_cuda: True
-use_replay_buffer: True
+use_replay_buffer: False
 use_tensorboard: False
