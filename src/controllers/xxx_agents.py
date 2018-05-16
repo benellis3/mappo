@@ -485,9 +485,10 @@ class XXXMultiagentController():
                 if loss_level is None:
                     pair_sampled_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
 
+                #print(pair_sampled_actions[0,:,0,0])
                 actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1, avail_actions2)
-
-
+                #print(th.cat([actions1[:,:,0,0], actions2[:,:,0,0]], dim=0))
+                #a = 5
 
                 # #tmp = Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])
                 # avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id1.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
@@ -526,13 +527,12 @@ class XXXMultiagentController():
 
                 tmp = individual_actions_sq.clone()
                 tmp[action_matrix == action_matrix] = float("nan")
-                self.actions_level3 = tmp.view(individual_actions.shape[_adim(tformat_level3)],
+                self.actions_level3 = tmp.view(individual_actions.shape[_adim(tformat_level3)], #self.n_agents, #
                                                individual_actions.shape[_bsdim(tformat_level3)],
                                                individual_actions.shape[_tdim(tformat_level3)],
                                                1)
 
-
-                action_matrix[action_matrix != action_matrix] = individual_actions_sq
+                action_matrix[action_matrix != action_matrix] = individual_actions_sq[action_matrix != action_matrix]
 
                 if self.args.debug_mode in ["level3_actions_only"]:
                     """
@@ -541,7 +541,7 @@ class XXXMultiagentController():
                     """
                     action_matrix  = individual_actions_sq
 
-                self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)],
+                self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)], # self.n_agents, #
                                                         individual_actions.shape[_bsdim(tformat_level3)],
                                                         individual_actions.shape[_tdim(tformat_level3)],
                                                         1)

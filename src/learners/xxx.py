@@ -427,7 +427,8 @@ class XXXLearner(BasicLearner):
                                                               to_cuda=self.args.use_cuda,
                                                               to_variable=True,
                                                               bs_ids=None,
-                                                              fill_zero=True) # DEBUG: Should be True
+                                                              fill_zero=True)
+                                                              #fill_zero=True) # DEBUG: Should be True
 
         #a = {_k:_v.to_pd() for _k, _v in data_inputs.items()}
         #b = batch_history.to_pd()
@@ -511,7 +512,7 @@ class XXXLearner(BasicLearner):
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True)
 
-
+        # a = data_inputs["critic_level3__agent0"].to_pd()
         self._optimize(batch_history,
                        xxx_model_inputs,
                        xxx_model_inputs_tformat,
