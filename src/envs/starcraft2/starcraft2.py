@@ -685,7 +685,7 @@ class SC2(MultiAgentEnv):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
         nf_al = 4
-        nf_en = 4
+        nf_en = 5
 
         if self.map_name == '2d_3z' or self.map_name == '3d_5z':
             # unit types (in onehot)
@@ -727,10 +727,12 @@ class SC2(MultiAgentEnv):
 
             if self.get_intersect(coordinates, e_unit, sight_range) and e_unit.health > 0:  # visible and alive
                 # Sight range > shoot range
-                enemy_feats[e_id, 0] = avail_actions[self.n_actions_no_attack + e_id]  # available
+                enemy_feats[e_id, 0] = a_a1[self.n_actions_no_attack + e_id,0]   # available
                 enemy_feats[e_id, 1] = dist / sight_range # distance
                 enemy_feats[e_id, 2] = (e_x - x) / sight_range # relative X
                 enemy_feats[e_id, 3] = (e_y - y) / sight_range # relative Y
+                enemy_feats[e_id, 4] = a_a2[0,self.n_actions_no_attack + e_id]  # available
+
 
                 if self.map_name == '2d_3z' or self.map_name == '3d_5z':
                     type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
@@ -857,7 +859,7 @@ class SC2(MultiAgentEnv):
     def get_obs_intersect_size(self):
 
         nf_al = 4
-        nf_en = 4
+        nf_en = 5
 
         if self.map_name == '2d_3z' or self.map_name == '3d_5z':
             nf_al += 2
