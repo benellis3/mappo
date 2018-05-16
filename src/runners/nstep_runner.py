@@ -374,7 +374,10 @@ class NStepRunner():
                 _v = th.FloatTensor(_v)
             elif isinstance(_v, bool):
                 _v = int(_v)
-            buffer._transition[id, 0, column_scheme[_k][0]:column_scheme[_k][1]] = _v
+            try:
+                buffer._transition[id, 0, column_scheme[_k][0]:column_scheme[_k][1]] = _v
+            except Exception as e:
+                pass
         pass
     def terminate(self):
         """

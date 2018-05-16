@@ -105,6 +105,8 @@ class Scheme():
         transition_scheme_dic = {_item["name"]:_item for _item in transition_scheme.scheme_list}
         output_size_dic = {}
         for scheme_entry in self.scheme_list:
+            if not scheme_entry.get("switch", True):
+                continue
             if not scheme_entry["name"] in transition_scheme:
                 assert False, "cannot find '{}' in transition_scheme - have you misspelled it?".format(scheme_entry["name"])
             input_size = transition_scheme_dic[scheme_entry["name"]]["shape"][0]

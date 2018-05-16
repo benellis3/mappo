@@ -722,11 +722,7 @@ class XXXLearner(BasicLearner):
         agent_optimiser.zero_grad()
         XXX_loss.backward()
 
-        try:
-            _check_nan(agent_parameters)
-        except Exception as e:
-            pass
-
+        _check_nan(agent_parameters)
         policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
         agent_optimiser.step()
 
