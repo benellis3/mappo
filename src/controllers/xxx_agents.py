@@ -13,7 +13,7 @@ from components.transforms import _build_model_inputs, _join_dicts, \
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
 from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
-    _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings, _agent_ids_2_pairing_id
+    _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings, _agent_ids_2_pairing_id, _joint_actions_2_action_pair_aa
 class XXXMultiagentController():
     """
     container object for a set of independent agents
@@ -443,7 +443,6 @@ class XXXMultiagentController():
                                                                                     tformat=tformat_level2,
                                                                                     test_mode=test_mode)
 
-
                 self.actions_level2 = pair_sampled_actions.clone()
                 self.selected_actions_format_level2 = selected_actions_format_level2
                 self.policies_level2 = modified_inputs_level2.clone()
@@ -459,30 +458,34 @@ class XXXMultiagentController():
                 # --------------------- LEVEL 3
                 # TODO: np.nan in actions1 !!
 
-                actions1, actions2 = _joint_actions_2_action_pair(pair_sampled_actions, self.n_actions)
-                pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents, "a*bs*t*v") # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
-
                 inputs_level3, inputs_level3_tformat = _build_model_inputs(self.input_columns_level3,
                                                                            inputs,
                                                                            to_variable=True,
                                                                            inputs_tformat=tformat,
                                                                            )
 
-                #tmp = Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])
-                avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id1.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
-                avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id2.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+                pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents, "a*bs*t*v") # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
+
+                avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
+                    _adim(inputs_level3_tformat), Variable(pair_id1.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                        "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+                avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
+                    _adim(inputs_level3_tformat), Variable(pair_id2.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                        "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+
+                # selected_level_2_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
+                if loss_level is None:
+                    pair_sampled_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
+
+                actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1, avail_actions2)
+
+
+
+                # #tmp = Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])
+                # avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id1.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+                # avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id2.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
 
                 # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
-                actions1_masked = actions1.clone()
-                actions1_mask = (actions1 != actions1)
-                actions1_masked.masked_fill_(actions1_mask, 0.0)
-                actions2_masked = actions2.clone()
-                actions2_mask = (actions2 != actions2)
-                actions2_masked.masked_fill_(actions2_mask, 0.0)
-                actions1[avail_actions1.gather(_vdim(inputs_level3_tformat), Variable(actions1_masked.long())).data == 0.0] = float("nan")
-                actions2[avail_actions2.gather(_vdim(inputs_level3_tformat), Variable(actions2_masked.long())).data == 0.0] = float("nan")
-                actions1[actions1_mask] = float("nan")
-                actions2[actions2_mask] = float("nan")
 
                 ttype = th.cuda.FloatTensor if self.args.use_cuda else th.FloatTensor
                 action_matrix = ttype(self.n_agents,

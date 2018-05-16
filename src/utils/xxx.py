@@ -1,4 +1,5 @@
 from itertools import combinations
+from torch.autograd import Variable
 import torch as th
 
 
@@ -11,7 +12,7 @@ def _ordered_agent_pairings(n_agents):
 def _n_agent_pairings(n_agents):
     return int((n_agents * (n_agents-1)) / 2)
 
-def _joint_actions_2_action_pair(joint_action, n_actions, use_delegate_action=True):
+def _joint_actions_2_action_pair(joint_action, n_actions,use_delegate_action=True):
     if use_delegate_action:
         mask = (joint_action == 0.0)
         joint_action[mask] = 1.0
@@ -23,6 +24,31 @@ def _joint_actions_2_action_pair(joint_action, n_actions, use_delegate_action=Tr
         _action1 = th.floor(joint_action / n_actions)
         _action2 = (joint_action) % n_actions
     return _action1, _action2
+
+def _joint_actions_2_action_pair_aa(joint_action, n_actions,avail_actions1,avail_actions2, use_delegate_action=True):
+    if use_delegate_action:
+        mask = (joint_action == 0.0)
+        joint_action[mask] = 1.0
+        _action1 = th.floor((joint_action-1.0) / n_actions)
+        _action2 = (joint_action-1.0) % n_actions
+        _action1[mask] = float("nan")
+        _action2[mask] = float("nan")
+    else:
+        _action1 = th.floor(joint_action / n_actions)
+        _action2 = (joint_action) % n_actions
+
+    aa_m1 = _action1 != _action1
+    aa_m2 = _action2 != _action2
+    _action1[aa_m1 ] = 0
+    _action2[aa_m2] = 0
+    aa1 = avail_actions1.data.gather(-1, (_action1.long() ))
+    aa2 = avail_actions2.data.gather(-1, ( _action2.long() ))
+    _action1[aa1 == 0] = float("nan")
+    _action1[aa2 == 0] = float("nan")
+    _action1[aa_m1] = float("nan")
+    _action2[aa_m2] = float("nan")
+    return _action1, _action2
+
 
 def _action_pair_2_joint_actions(action_pair, n_actions):
     return action_pair[0] * n_actions + action_pair[1]

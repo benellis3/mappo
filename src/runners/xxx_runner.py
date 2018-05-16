@@ -322,9 +322,10 @@ class XXXRunner(NStepRunner):
 
             if args.xxx_use_obs_intersections:
                 # handle observation intersections
-                ret_dict["obs_intersection_all"] = _env.get_obs_intersection(tuple(range(_env.n_agents)))
+                ret_dict["obs_intersection_all"], _= _env.get_obs_intersection(tuple(range(_env.n_agents)))
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
-                    ret_dict["obs_intersection_pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
+                    ret_dict["obs_intersection_pair{}".format(_i)],\
+                    ret_dict["avail_actions_pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
