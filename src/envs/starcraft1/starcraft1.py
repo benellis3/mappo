@@ -36,8 +36,8 @@ class SC1(MultiAgentEnv):
         self.map_name = args.map_name
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
         self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        self.episode_limit = args.episode_limit
-        # self.episode_limit = 200
+        # self.episode_limit = args.episode_limit
+        self.episode_limit = 200
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         # self.difficulty = args.difficulty
@@ -61,7 +61,7 @@ class SC1(MultiAgentEnv):
         self.port = args.port + self.bs_id
         self.port_in_use = False
         self.debug_inputs = False
-        self.debug_rewards = True
+        self.debug_rewards = False
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
@@ -248,11 +248,12 @@ class SC1(MultiAgentEnv):
         sent = self.controller.send(sc_actions)
 
         if sent:
-            while True:
-                self._obs = self.controller.recv()
-                if self._obs.battle_frame_count % self._step_mul == 0:
-                    self._obs = self.controller.recv()
-                    break
+            self._obs = self.controller.recv()
+            # while True:
+            #     self._obs = self.controller.recv()
+            #     if self._obs.battle_frame_count % self._step_mul == 0:
+            #         self._obs = self.controller.recv()
+            #         break
         else:
             self.full_restart()
             return 0, True, {"episode_limit": True}
@@ -452,6 +453,9 @@ class SC1(MultiAgentEnv):
                     delta_enemy += prev_health
                 else:
                     delta_enemy += prev_health - e_unit.health - e_unit.shield
+                    # print("Agent: {}\nPrev health: {}\nUnit health: {}\nDelta enemy: {}".format(e_id, prev_health, e_unit.health, delta_enemy))
+                    # print("Agent: {}\nPrev health: {}\nUnit health: {}\nDelta enemy: {}".format(e_id, prev_health, e_unit.health, delta_enemy))
+
 
         if self.reward_only_positive:
 
@@ -837,6 +841,10 @@ class SC1(MultiAgentEnv):
         n_enemy_alive = 0
 
         # Store previous state
+        # for i in range(5):
+        #     if self.enemies[i].health < 40:
+        #         print("Enemy: {} -- Previous Health: {}".format(i, self.enemies[i].health))
+        #         print("Enemy: {} -- Current Health: {}".format(i, self._obs.units[1][i].health))
         self.previous_agent_units = deepcopy(self.agents)
         self.previous_enemy_units = deepcopy(self.enemies)
         # self.previous_agent_units = CloudpickleWrapper(self.agents).__getstate__()
@@ -846,7 +854,7 @@ class SC1(MultiAgentEnv):
             updated = False
             for unit in self._obs.units[0]:
                 if al_unit.id == unit.id:
-                    self.agents[al_id] = unit
+                    self.agents[al_id] = deepcopy(unit)
                     updated = True
                     n_ally_alive += 1
                     break
@@ -858,7 +866,7 @@ class SC1(MultiAgentEnv):
             updated = False
             for unit in self._obs.units[1]:
                 if e_unit.id == unit.id:
-                    self.enemies[e_id] = unit
+                    self.enemies[e_id] = deepcopy(unit)
                     updated = True
                     n_enemy_alive += 1
                     break
