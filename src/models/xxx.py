@@ -682,6 +682,12 @@ class XXXRecurrentAgentLevel2(nn.Module):
         sampled_pair_ids = kwargs["sampled_pair_ids"]
         pairwise_avail_actions = kwargs["pairwise_avail_actions"]
 
+        # ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
+        # delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0],
+        #                                    pairwise_avail_actions.shape[1],
+        #                                    pairwise_avail_actions.shape[2], 1).fill_(1.0), requires_grad=False)
+        # pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=_vdim(tformat))
+
         # select pairs that were actually sampled
         #_inputs = inputs["main"].gather(0, Variable(sampled_pair_ids.long(),
         #                                            requires_grad=False).repeat(1,1,1,inputs["main"].shape[_vdim(tformat)]))

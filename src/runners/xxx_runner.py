@@ -128,7 +128,14 @@ class XXXRunner(NStepRunner):
                                        dtype=np.float32,
                                        missing=np.nan,
                                  )
-                                for _i in range(_n_agent_pairings(self.n_agents))]])
+                                for _i in range(_n_agent_pairings(self.n_agents))],
+                                *[dict(name="avail_actions_pair{}".format(_i),
+                                       shape=(self.n_actions*self.n_actions,),
+                                       dtype=np.float32,
+                                       missing=np.nan,
+                                       )
+                                  for _i in range(_n_agent_pairings(self.n_agents))]
+                                ])
 
         self.data_scheme = Scheme(scheme_list)
         pass
@@ -243,7 +250,9 @@ class XXXRunner(NStepRunner):
                             episode_limit=_env.episode_limit,
                             n_agents = _env.n_agents,
                             n_actions=_env.get_total_actions())
-
+            if args.xxx_use_obs_intersections:
+                env_dict["obs_intersect_pair_size"]= _env.get_obs_intersect_pair_size()
+                env_dict["obs_intersect_all_size"] = _env.get_obs_intersect_all_size()
             # Send results back
             ret_msg = dict(id=id, payload=env_dict)
             if out_queue is None:
@@ -266,9 +275,10 @@ class XXXRunner(NStepRunner):
 
             # handle observation intersections
             if args.xxx_use_obs_intersections:
-                ret_dict["obs_intersection_all"] = _env.get_obs_intersection(tuple(range(_env.n_agents)))
+                ret_dict["obs_intersection_all"], _ = _env.get_obs_intersection(tuple(range(_env.n_agents)))
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
-                    ret_dict["obs_intersection_pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
+                    ret_dict["obs_intersection_pair{}".format(_i)], \
+                    ret_dict["avail_actions_pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
@@ -311,8 +321,6 @@ class XXXRunner(NStepRunner):
                 ret_dict["avail_actions__agent{}".format(_i)] = avail_actions[_i]
 
             if args.xxx_use_obs_intersections:
-                ret_dict["obs_intersect_pair_size"]= _env.get_obs_intersect_pair_size()
-                ret_dict["obs_intersect_all_size"] = _env.get_obs_intersect_all_size()
                 # handle observation intersections
                 ret_dict["obs_intersection_all"] = _env.get_obs_intersection(tuple(range(_env.n_agents)))
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):

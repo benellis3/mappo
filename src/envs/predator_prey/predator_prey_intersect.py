@@ -309,6 +309,12 @@ class PredatorPreyCapture(MultiAgentEnv):
         else:
             return self.grid[0, :, :, :].reshape(self.state_size)
 
+    def get_obs_intersect_pair_size(self):
+        return 2 * self.get_obs_size()
+
+    def get_obs_intersect_all_size(self):
+        return self.n_agents * self.get_obs_size()
+
     def get_obs_intersection(self, agent_ids):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid

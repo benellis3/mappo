@@ -402,10 +402,13 @@ def _generate_input_shapes(input_columns, scheme_shapes):
     for _input_column_k, _input_column_v in input_columns.items():
         input_shapes[_input_column_k] = {}
         for _input_column_region_k, _input_column_region_v in _input_column_v.items():
-            input_shapes[_input_column_k][_input_column_region_k] = sum(
-                [scheme_shapes[_input_column_k][_scheme_list_entry["name"]]
-                 for _scheme_list_entry in _input_column_region_v.scheme_list
-                 if _scheme_list_entry.get("switch", True)])
+            try:
+                input_shapes[_input_column_k][_input_column_region_k] = sum(
+                    [scheme_shapes[_input_column_k][_scheme_list_entry["name"]]
+                     for _scheme_list_entry in _input_column_region_v.scheme_list
+                     if _scheme_list_entry.get("switch", True)])
+            except Exception as e:
+                pass
 
     return input_shapes
 

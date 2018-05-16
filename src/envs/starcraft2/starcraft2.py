@@ -847,6 +847,12 @@ class SC2(MultiAgentEnv):
 
         return move_feats + enemy_feats + ally_feats
 
+    def get_obs_intersect_pair_size(self):
+        return self.get_obs_intersect_size()
+
+    def get_obs_intersect_all_size(self):
+        return self.get_obs_intersect_size()
+
     def get_obs_intersect_size(self):
 
         nf_al = 4
