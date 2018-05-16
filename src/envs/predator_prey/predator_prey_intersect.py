@@ -313,6 +313,11 @@ class PredatorPreyCapture(MultiAgentEnv):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
         grid = np.zeros((self.batch_size, self.grid_shape[0], self.grid_shape[0], 2), dtype=float_type)
+
+        a_a1 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[0])),[-1,1])
+        a_a2 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[1])),[1,-1])
+        avail_actions = a_a1.dot(a_a2)
+        avail_all = avail_actions * 0 + 1
         # If all agent_ids can see each other (otherwise the observation is empty)
         for b in range(self.batch_size):
             if all([self._is_visible(self.agents[agent_ids, b, :], self.agents[agent_ids[a], b, :])
@@ -322,6 +327,7 @@ class PredatorPreyCapture(MultiAgentEnv):
                 # Every agent sees intersected prey
                 self._intersect_targets(grid, agent_ids, targets=self.prey, batch=b, target_id=1,
                                         targets_alive=self.prey_alive)
+                avail_all = avail_actions
         # Return 0-1 encoded intersection if necessary
         if not self.intersection_id_coded:
             grid = (grid != 0.0).astype(np.float32)
@@ -329,9 +335,9 @@ class PredatorPreyCapture(MultiAgentEnv):
         if self.intersection_global_view:
             # Return the intersection as a state
             if self.batch_mode:
-                return grid.reshape((self.batch_size, self.state_size))
+                return grid.reshape((self.batch_size, self.state_size)), avail_all
             else:
-                return grid[0, :, :, :].reshape(self.state_size)
+                return grid[0, :, :, :].reshape(self.state_size), avail_all
         else:
             # Return the intersection as individual observations
             obs = np.zeros((len(agent_ids), self.batch_size, self.obs_size),
@@ -340,9 +346,9 @@ class PredatorPreyCapture(MultiAgentEnv):
                 for a in range(len(agent_ids)):
                     obs[a, b, :] = self._get_obs_from_grid(grid, a, b)
             if self.batch_mode:
-                return obs
+                return obs, avail_all
             else:
-                return obs[:, 0, :]
+                return obs[:, 0, :], avail_all
 
     # ---------- GETTERS -----------------------------------------------------------------------------------------------
     def get_total_actions(self):
