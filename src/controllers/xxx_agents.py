@@ -70,10 +70,10 @@ class XXXMultiagentController():
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
                                                                              dict(name="avail_actions",
-                                                                                  select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             dict(name="observations",
-                                                                                   select_agent_ids=[_agent_id1, _agent_id2])
-                                                                                if not self.args.xxx_use_obs_intersections else
+                                                                                  select_agent_ids=[_agent_id1, _agent_id2])] +
+                                                                             [dict(name="observations",
+                                                                                   select_agent_ids=[_agent_id1, _agent_id2])]
+                                                                                if not self.args.xxx_use_obs_intersections else [
                                                                              dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))),
                                                                              dict(name="avail_actions_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)))])
 
@@ -418,7 +418,14 @@ class XXXMultiagentController():
                 # pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=1)
                 # pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
 
-                pairwise_avail_actions = inputs_level2["agent_input_level2"]["avail_actions_pair"]
+                if "avail_actions_pair" in inputs_level2["agent_input_level2"]:
+                    pairwise_avail_actions = inputs_level2["agent_input_level2"]["avail_actions_pair"]
+                else:
+                    avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id1"], inputs_level2_tformat)
+                    avail_actions2, params_aa2, _ = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id2"], inputs_level2_tformat)
+                    pairwise_avail_actions = th.bmm(avail_actions1.unsqueeze(2), avail_actions2.unsqueeze(1))
+                    pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
+
                 ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
                 delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0],
                                                    pairwise_avail_actions.shape[1],
