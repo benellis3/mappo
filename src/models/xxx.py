@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim
+from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _check_nan
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 from utils.xxx import _n_agent_pairings
 
@@ -680,7 +680,8 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
         test_mode = kwargs["test_mode"]
         sampled_pair_ids = kwargs["sampled_pair_ids"]
-        pairwise_avail_actions = kwargs["pairwise_avail_actions"]
+        pairwise_avail_actions = kwargs["pairwise_avail_actions"].detach()
+        pairwise_avail_actions.requires_grad = False
 
         # ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
         # delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0],
@@ -744,9 +745,9 @@ class XXXRecurrentAgentLevel2(nn.Module):
             x = th.div(x, x_sum)
 
             # throw debug warning if second masking was necessary
-            if th.sum(second_mask.data) > 0:
-                if self.args.debug_verbose:
-                    print('Warning in XXXRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
+            #if th.sum(second_mask.data) > 0:
+            #    if self.args.debug_verbose:
+            #        print('Warning in XXXRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
@@ -757,11 +758,24 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
             # add softmax exploration (if switched on)
             if self.args.xxx_exploration_mode_level2 in ["softmax"] and not test_mode:
-               epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat))
+               epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
                epsilons, _, _ = _to_batch(epsilons, tformat)
+               # x = th.cat([epsilons * self.args.xxx_delegation_probability_bias,
+               #             avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (1 - self.args.xxx_delegation_probability_bias)], dim=1) \
+               #             + x * (1 - epsilons) # DEBUG
+               # assert th.sum(n_available_actions.data - 1 == 0.0) == 0.0, "zeros!"
+               # x = th.cat([epsilons * self.args.xxx_delegation_probability_bias,
+               #             avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (1 - self.args.xxx_delegation_probability_bias)], dim=1) \
+               #              + x * (1 - epsilons) # DEBUG
+               n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
                x = th.cat([epsilons * self.args.xxx_delegation_probability_bias,
-                           avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (1 - self.args.xxx_delegation_probability_bias)], dim=1) \
-                           + x * (1 - epsilons)
+                           avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
+                                       1 - self.args.xxx_delegation_probability_bias)], dim=1) \
+                   + x * (1 - epsilons)
+               #x = x*(1-epsilons)
+               #x = th.cat([epsilons * self.args.xxx_delegation_probability_bias,
+               #                        avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (1 - self.args.xxx_delegation_probability_bias)], dim=1)
+               _check_nan(x)
 
 
             h = _from_batch(h, params_h, tformat_h)
