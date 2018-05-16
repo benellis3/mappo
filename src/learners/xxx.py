@@ -752,7 +752,7 @@ class XXXLearner(BasicLearner):
             self.critic_models["level1"].load_state_dict(self.critic_models["level1"].state_dict())
         if self.args.critic_level2_share_params and level==2:
             self.critic_models["level2_0:1"].load_state_dict(self.critic_models["level2_0:1"].state_dict())
-        if self.args.critic_level2_share_params and level==3:
+        if self.args.critic_level3_share_params and level==3:
             self.critic_models["level3_{}".format(0)].load_state_dict(self.critic_models["level3_{}".format(0)].state_dict())
         pass
 
