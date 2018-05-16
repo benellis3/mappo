@@ -25,7 +25,6 @@ class XXXMultiagentController():
         self.runner = runner
         self.n_agents = n_agents
         self.n_actions = n_actions
-        self.agent_str = args.agent
         self.agent_output_type = "policies"
 
 

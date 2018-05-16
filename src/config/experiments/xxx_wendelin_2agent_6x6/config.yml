@@ -22,13 +22,13 @@ debug_mode: None
 debug_verbose: False
 env: pred_prey
 env_args:
-    agent_obs: [1, 1]
+    agent_obs: [2, 2]
     episode_limit: 50
     intersection_global_view: True
     intersection_id_coded: True
     n_agents: 2
     n_prey: 1
-    predator_prey_shape: [4,4]
+    predator_prey_shape: [6,6]
     predator_prey_toroidal: False
     reward_almost_capture: 0.0
     reward_capture: 50
@@ -93,13 +93,13 @@ xxx_critic_level2_use_sampling: True
 xxx_critic_level3_use_sampling: True
 xxx_epsilon_start_level1: 0.5
 xxx_epsilon_finish_level1: 0.01
-xxx_epsilon_time_length_level1: 50000
+xxx_epsilon_time_length_level1: 10000
 xxx_epsilon_start_level2: 0.5
 xxx_epsilon_finish_level2: 0.01
-xxx_epsilon_time_length_level2: 50000
+xxx_epsilon_time_length_level2: 10000
 xxx_epsilon_start_level3: 0.5
 xxx_epsilon_finish_level3: 0.01
-xxx_epsilon_time_length_level3: 50000
+xxx_epsilon_time_length_level3: 10000
 xxx_epsilon_decay_mode_level1: linear
 xxx_epsilon_decay_mode_level2: linear
 xxx_epsilon_decay_mode_level3: linear
