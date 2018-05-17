@@ -154,8 +154,8 @@ class SC1(MultiAgentEnv):
         self._obs = self.controller.init(micro_battles=True)
 
         self.controller.send([
-            [tcc.set_combine_frames, self._step_mul],
-            [tcc.set_speed, 0],
+            # [tcc.set_combine_frames, self._step_mul],
+            [tcc.set_speed, -5],
             [tcc.set_gui, 1],
             [tcc.set_cmd_optim, 1],
         ])
@@ -166,12 +166,11 @@ class SC1(MultiAgentEnv):
         if self.debug_inputs or self.debug_rewards:
             print('------------>> RESET <<------------')
 
+        self._episode_count += 1
         self._episode_steps = 0
         if self._episode_count > 0:
             # No need to restart for the first episode.
             self._restart()
-
-        self._episode_count += 1
 
         # naive way to measure FPS
         if self.measure_fps:
@@ -229,6 +228,16 @@ class SC1(MultiAgentEnv):
         return np.eye(nb_classes)[targets]
 
     def step(self, actions):
+        acc_reward = 0
+        for i in range(self._step_mul):
+            reward, terminated, info = self._step(actions)
+            acc_reward += reward
+            if terminated:
+                break
+
+        return acc_reward, terminated, info
+
+    def _step(self, actions):
         """ Returns reward, terminated, info """
         self.last_action = self.one_hot(actions, self.n_actions)
 
@@ -276,17 +285,18 @@ class SC1(MultiAgentEnv):
         self._episode_steps += 1
 
         # Update what we know about units
-        end_game = self.update_units()
+        self._obs = self.controller.recv()
+        self.update_units()
 
         terminated = False
         reward = self.reward_battle()
         info = {}
 
-        if end_game is not None:
+        if len(self._obs.units[0]) == 0 or len(self._obs.units[1]) == 0:
             # Battle is over
             terminated = True
             self.battles_game += 1
-            if end_game == 1:
+            if len(self._obs.units[0]) > 0:
                 self.battles_won += 1
                 reward += self.reward_win
 
