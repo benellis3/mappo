@@ -768,7 +768,7 @@ class SC2(MultiAgentEnv):
 
         state = state.astype(dtype=np.float32)
 
-        if self.debug_inputs or True:
+        if self.debug_inputs:
             print("***************************************")
             print("Agent_intersections: ", agent_ids)
             print("Enemy feats\n", enemy_feats)
