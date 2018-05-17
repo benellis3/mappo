@@ -63,7 +63,7 @@ T_target_critic_level3_update_interval: 661500
 target_critic_update_interval: 661500
 td_lambda: 0.8
 use_replay_buffer: False
-xxx_logit_bias: 0
+xxx_logit_bias: 1.5
 use_batch_norm: True
 
 
