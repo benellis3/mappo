@@ -48,7 +48,7 @@ multiagent_controller: xxx_mac
 n_critic_level1_learner_reps: 4
 n_critic_level2_learner_reps: 4
 n_critic_level3_learner_reps: 4
-n_pair_samples: None
+n_pair_samples: ~
 n_loops_per_thread_or_sub_or_main_process: 0
 n_subprocesses: 0
 n_threads_per_subprocess_or_main_process: 0

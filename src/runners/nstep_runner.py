@@ -693,14 +693,11 @@ class NStepRunner():
             # write selected actions to episode_buffer
             if isinstance(selected_actions, list):
                for _sa in selected_actions:
-                   try:
-                       self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                                   col=_sa["name"],
-                                                   t=self.t_episode,
-                                                   agent_ids=_sa.get("select_agent_ids", None),
-                                                   data=_sa["data"])
-                   except Exception as e:
-                       pass
+                   self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                               col=_sa["name"],
+                                               t=self.t_episode,
+                                               agent_ids=_sa.get("select_agent_ids", None),
+                                               data=_sa["data"])
             else:
                 self.episode_buffer.set_col(bs=ids_envs_not_terminated,
                                             col="actions",
@@ -726,7 +723,7 @@ class NStepRunner():
 
         # calculate episode statistics
         self._add_episode_stats(T_env=self.T_env)
-        # a = self.episode_buffer.to_pd()
+        a = self.episode_buffer.to_pd()
         return self.episode_buffer
 
     def _add_episode_stats(self, T_env):
