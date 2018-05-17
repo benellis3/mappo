@@ -694,8 +694,8 @@ class SC2(MultiAgentEnv):
             nf_en += 2
 
         # move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
-        enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
-        ally_feats = np.zeros((self.n_agents, nf_al), dtype=np.float32)
+        enemy_feats = -1*np.ones((self.n_enemies, nf_en), dtype=np.float32)
+        ally_feats = -1*np.ones((self.n_agents, nf_al), dtype=np.float32)
         state = np.concatenate((enemy_feats.flatten(),
                                     ally_feats.flatten()))
         state = state.astype(dtype=np.float32)
@@ -768,7 +768,7 @@ class SC2(MultiAgentEnv):
 
         state = state.astype(dtype=np.float32)
 
-        if self.debug_inputs:
+        if self.debug_inputs or True:
             print("***************************************")
             print("Agent_intersections: ", agent_ids)
             print("Enemy feats\n", enemy_feats)
