@@ -71,13 +71,19 @@ def main(config_name, run=False):
             print("Going to actually run on ngc")
             time.sleep(10)
         log = []
+        print("#!/bin/bash\nshopt -s expand_aliases\nalias ngc=\"python /auto/users/tabhid/.local/lib/python2.7/site-packages/ngccli/ngc.py\"\n")
         for i, params in enumerate(all_experiments):
             log.append(params)
-            command = 'python main.py {} {}'.format(exp_name, params)
-            name = "pymarl_{}".format(i)
-            subprocess.Popen(["ngc", "batch", "run", "--instance", "ngcv1", "--name", name, "--image", "oxford_ml01/pymarl:0.1", "--result", "/pymarl/results",
-                              "--ace", "nv-us-west-2", "--datasetid", "9704:/pymarl/src", "--command", command])
-            time.sleep(2)
+            command = '\'python3 src_new/main.py {} {}\''.format(exp_name, params)
+            name = "{}_{}".format(config.exp_name, i)
+            if True:
+                # subprocess.Popen(["ngc", "batch", "run", "--instance", "ngcv1", "--name", name, "--image", "oxford_ml01/pymarl:v0.2", "--result", "/pymarl/results", "--ace", "nv-us-west-2", "--datasetid", "9929:/pymarl/src_new", "--command", command])
+                cmd_str = " ".join(["ngc", "batch", "run", "--instance", "ngcv1", "--name", name, "--image", "oxford_ml01/pymarl:v0.2", "--result", "/pymarl/results",
+                              "--ace", "nv-us-west-2", "--datasetid", "9936:/pymarl/src_new", "--command", command])
+                print(cmd_str)
+            else:
+                print(command)
+            # time.sleep(2)
         with open("exp_logs/" + config_name + "_log.txt", "w") as f:
             for line in log:
                 f.write(line + "\n")
