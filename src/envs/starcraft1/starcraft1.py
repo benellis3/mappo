@@ -154,8 +154,8 @@ class SC1(MultiAgentEnv):
         self._obs = self.controller.init(micro_battles=True)
 
         self.controller.send([
-            # [tcc.set_combine_frames, self._step_mul],
-            [tcc.set_speed, -5],
+            [tcc.set_combine_frames, self._step_mul],
+            [tcc.set_speed, 0],
             [tcc.set_gui, 1],
             [tcc.set_cmd_optim, 1],
         ])
@@ -228,16 +228,6 @@ class SC1(MultiAgentEnv):
         return np.eye(nb_classes)[targets]
 
     def step(self, actions):
-        acc_reward = 0
-        for i in range(self._step_mul):
-            reward, terminated, info = self._step(actions)
-            acc_reward += reward
-            if terminated:
-                break
-
-        return acc_reward, terminated, info
-
-    def _step(self, actions):
         """ Returns reward, terminated, info """
         self.last_action = self.one_hot(actions, self.n_actions)
 
@@ -770,7 +760,7 @@ class SC1(MultiAgentEnv):
         self.enemies = {}
 
         while len(self._obs.units[0]) > 0 or len(self._obs.units[1]) > 0:
-            commands = []
+            commands = [[tcc.set_combine_frames, 1]]
             for j in range(2):
                 for i in range(len(self._obs.units[j])):
                     u = self._obs.units[j][i]
@@ -783,6 +773,12 @@ class SC1(MultiAgentEnv):
 
             sent = self.controller.send(commands)
             self._obs = self.controller.recv()
+
+        self.controller.send([
+            [tcc.set_combine_frames, self._step_mul],
+        ])
+
+        self._obs = self.controller.recv()
 
     def init_units(self):
 
