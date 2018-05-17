@@ -1,6 +1,8 @@
 batch_size: 2
 env_stats_aggregator: sc2
-n_critic_learner_reps: 30
+n_critic_level1_learner_reps: 4
+n_critic_level2_learner_reps: 4
+n_critic_level3_learner_reps: 4
 n_loops_per_thread_or_sub_or_main_process: 1
 n_subprocesses: 2
 defaults: default xxx sc2

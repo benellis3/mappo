@@ -4,13 +4,13 @@ agent_model: coma_recursive
 agent_output_type: policies
 agents_encoder_size: 64
 agents_hidden_state_size: 64
-batch_size: 32
-batch_size_run: 32
-coma_critic_sample_size: 1620
+batch_size: 2
+batch_size_run: 2
+coma_critic_sample_size: 800
 coma_critic_use_sampling: True
 coma_entropy_loss_regularization_factor: 5e-06
 coma_epsilon_decay_mode: linear
-coma_epsilon_finish: 0.01
+coma_epsilon_finish: 0.05
 coma_epsilon_start: 0.5
 coma_epsilon_time_length: 10000
 coma_exploration_mode: softmax
@@ -18,9 +18,10 @@ coma_use_entropy_regularizer: False
 debug_mode: None
 debug_verbose: False
 env: sc2
+env_stats_aggregator: sc2
 env_args:
   difficulty: "3"
-  episode_limit: 70
+  episode_limit: 40
   heuristic_function: False
   measure_fps: True
   move_amount: 5
@@ -29,9 +30,9 @@ env_args:
   reward_only_positive: True
   reward_scale: False
   reward_scale_rate: 0
-  reward_win: 30
+  reward_win: 200
   state_last_action: True
-  step_mul: 7
+  step_mul: 8
   map_name: 3m_3m
 gamma: 0.99
 learner: coma
@@ -52,12 +53,12 @@ runner_test_batch_size: 32
 save_model: False
 save_model_interval: 10e6
 share_agent_params: True
-t_max: 1000000
-target_critic_update_interval: 661500
+t_max: 5000000
+target_critic_update_interval: 66150
 td_lambda: 0.8
 tensorboard: False
-test_interval: 8000
-test_nepisode: 50
+test_interval: 2000
+test_nepisode: 30
 use_cuda: True
 use_replay_buffer: False
 use_tensorboard: False
