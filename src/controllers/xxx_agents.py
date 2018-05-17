@@ -87,7 +87,7 @@ class XXXMultiagentController():
                                                                      rename="past_actions_level3",
                                                                      select_agent_ids=[_agent_id],
                                                                      transforms=[("shift", dict(steps=1)),
-                                                                                 ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
+                                                                                 ("one_hot", dict(range=(0, self.n_actions)))], # includes no-op actions
                                                                      switch=self.args.xxx_agent_level3_use_past_actions),
                                                                 dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
                                                                 dict(name="xxx_epsilons_central_level3", scope="episode"),
@@ -228,6 +228,10 @@ class XXXMultiagentController():
         modified_inputs_list += [dict(name="policies_level3",
                                       select_agent_ids=list(range(self.n_agents)),
                                       data=self.policies_level3)]
+        modified_inputs_list += [dict(name="avail_actions",
+                                      select_agent_ids=list(range(self.n_agents)),
+                                      data=self.avail_actions)]
+
         return selected_actions_list, modified_inputs_list, self.selected_actions_format
 
     def create_model(self, transition_scheme):
@@ -505,12 +509,14 @@ class XXXMultiagentController():
                 action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0],-1), actions2.squeeze(-1).view(actions2.shape[0],-1))
 
                 if loss_level is None:
-                    avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"]
+
+                    avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
                     active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], -1).unsqueeze(2).clone()
                     active[active == active] = 1.0
                     active[active != active] = 0.0
+                    avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0] = avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0].fill_(0.0)  # DEBUG
                     avail_actions_level3[:, :, :, -1:] = active
-                    inputs_level3["agent_input_level3"]["avail_actions"] = avail_actions_level3
+                    inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3, requires_grad=False)
 
                 out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3_0"](inputs_level3["agent_input_level3"],
                                                                                                           hidden_states=hidden_states["level3"],
@@ -532,10 +538,7 @@ class XXXMultiagentController():
 
                 # fill into action matrix all the actions that are not NaN
                 individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
-
-                tmp = individual_actions_sq.clone()
-                tmp[action_matrix == action_matrix] = float("nan")
-                self.actions_level3 = tmp.view(individual_actions.shape[_adim(tformat_level3)], #self.n_agents, #
+                self.actions_level3 = individual_actions_sq.view(individual_actions.shape[_adim(tformat_level3)], #self.n_agents, #
                                                individual_actions.shape[_bsdim(tformat_level3)],
                                                individual_actions.shape[_tdim(tformat_level3)],
                                                1)
@@ -557,6 +560,7 @@ class XXXMultiagentController():
                 #self.actions_level3 = individual_actions.clone()
                 self.selected_actions_format_level3 = selected_actions_format_level3
                 self.policies_level3 = modified_inputs_level3.clone()
+                self.avail_actions = avail_actions_level3.data
 
             losses = {1:losses_level1,
                       2:losses_level2,

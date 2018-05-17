@@ -638,7 +638,7 @@ class NStepRunner():
                                                                             bs_ids=ids_envs_not_terminated,
                                                                             t_id=self.t_episode,
                                                                             fill_zero=True, # TODO: DEBUG!!!
-                                                                           )
+                                                                            )
 
             # retrieve avail_actions from episode_buffer
             avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,
@@ -723,7 +723,7 @@ class NStepRunner():
 
         # calculate episode statistics
         self._add_episode_stats(T_env=self.T_env)
-        a = self.episode_buffer.to_pd()
+        #a = self.episode_buffer.to_pd()
         return self.episode_buffer
 
     def _add_episode_stats(self, T_env):
