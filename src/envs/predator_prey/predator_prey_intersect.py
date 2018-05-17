@@ -227,17 +227,22 @@ class PredatorPreyCapture(MultiAgentEnv):
             self._place_actors(self.agents, 0)
         else:
             for b in range(self.batch_size):
-                if self.n_agents <= 1:
-                    self.agents[0, b, :] = [0, 0]
-                if self.n_agents <= 2:
-                    self.agents[1, b, :] = self.grid_shape - 1
-                if self.n_agents <= 3:
-                    self.agents[2, b, 0] = self.grid_shape - 1
+                if self.n_agents > 0:
+                    self.agents[0, b, 0] = 0
+                    self.agents[0, b, 1] = 0
+                if self.n_agents > 1:
+                    self.agents[1, b, 0] = self.grid_shape[0] - 1
+                    self.agents[1, b, 1] = self.grid_shape[1] - 1
+                if self.n_agents > 2:
+                    self.agents[2, b, 0] = self.grid_shape[0] - 1
                     self.agents[2, b, 1] = 0
-                if self.n_agents <= 4:
+                if self.n_agents > 3:
                     self.agents[3, b, 0] = 0
-                    self.agents[3, b, 1] = self.grid_shape - 1
+                    self.agents[3, b, 1] = self.grid_shape[1] - 1
+                for a in range(min(self.n_agents, 4)):
+                    self.grid[b, self.agents[a, b, 0], self.agents[a, b, 1], :] = [1, 0]
             self._place_actors(self.agents[4:, :, :], 0)
+            print(self.agents[:, 0, :])
 
         # Place n prey in the world
         self._place_actors(self.prey, 1)
@@ -543,7 +548,7 @@ if __name__ == "__main__":
         'intersection_global_view': False,
         'intersection_id_coded': True,
         'intersection_unknown': True,
-        'random_start': False,
+        'random_start': True,
         'reward_only_positive': True,
         'reward_negative_scale': 0.5,
         'reward_death_value': 10,
@@ -574,7 +579,7 @@ if __name__ == "__main__":
         'n_prey': 1,
         'agent_obs': (2, 2),
         'episode_limit': 20,
-        'n_agents': 4,
+        'n_agents': 6,
     }
     env_args = convert(env_args)
     print(env_args)
