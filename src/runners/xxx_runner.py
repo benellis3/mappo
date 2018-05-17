@@ -67,8 +67,7 @@ class XXXRunner(NStepRunner):
                             dtype=np.float32,
                             missing=np.nan),
                        *[dict(name="policies_level2__sample{}".format(_i),
-                              shape=(1+self.n_actions*self.n_actions,), # i.e. just one number for a pair of actions!
-                              #select_agent_ids=range(0, _n_agent_pairings(self.n_agents)),
+                              shape=(2+self.n_actions*self.n_actions,), # include delegation and no-op
                               dtype=np.int32,
                               missing=-1,) for _i in range(_n_agent_pair_samples(self.n_agents))],
                        dict(name="policies_level3",
@@ -135,7 +134,7 @@ class XXXRunner(NStepRunner):
                                  )
                                 for _i in range(_n_agent_pairings(self.n_agents))],
                                 *[dict(name="avail_actions__pair{}".format(_i),
-                                       shape=(self.n_actions*self.n_actions,),
+                                       shape=(self.n_actions*self.n_actions + 1,), # include no-op
                                        dtype=np.float32,
                                        missing=np.nan,
                                        )
@@ -294,6 +293,7 @@ class XXXRunner(NStepRunner):
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
                     ret_dict["obs_intersection__pair{}".format(_i)], \
                     ret_dict["avail_actions__pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
+                    ret_dict["avail_actions__pair{}".format(_i)] = ret_dict["avail_actions__pair{}".format(_i)].flatten().tolist() + [0]
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
@@ -341,6 +341,7 @@ class XXXRunner(NStepRunner):
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
                     ret_dict["obs_intersection__pair{}".format(_i)],\
                     ret_dict["avail_actions__pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
+                    ret_dict["avail_actions__pair{}".format(_i)] = ret_dict["avail_actions__pair{}".format(_i)].flatten().tolist() + [0]
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
