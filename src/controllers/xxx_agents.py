@@ -504,6 +504,14 @@ class XXXMultiagentController():
                 action_matrix.scatter_(0, pair_id1.squeeze(-1).view(pair_id1.shape[0],-1), actions1.squeeze(-1).view(actions1.shape[0],-1))
                 action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0],-1), actions2.squeeze(-1).view(actions2.shape[0],-1))
 
+                if loss_level is None:
+                    avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone()
+                    active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], -1).unsqueeze(2)
+                    active[active == active] = 1.0
+                    active[active != active] = 0.0
+                    avail_actions_level3[:, :, :, -1:] = active
+                    inputs_level3["agent_input_level3"]["avail_actions"] = avail_actions_level3
+
                 out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3_0"](inputs_level3["agent_input_level3"],
                                                                                                           hidden_states=hidden_states["level3"],
                                                                                                           loss_fn=loss_fn if loss_level==3 else None,
