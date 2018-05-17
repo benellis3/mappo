@@ -73,6 +73,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.n_actions = self.actions.shape[0]
         self.n_agents = args.n_agents
         self.random_start = getattr(args, "random_start", True)
+        self.cluster_start = getattr(args, "cluster_start", False)
         self.n_prey = args.n_prey
         self.agent_obs = args.agent_obs
         self.agent_obs_dim = np.asarray(self.agent_obs, dtype=int_type)
@@ -224,25 +225,58 @@ class PredatorPreyCapture(MultiAgentEnv):
 
         # Place n_agents and n_preys on the grid
         if self.random_start:
-            self._place_actors(self.agents, 0)
+            if self.cluster_start:
+                px = np.random.randint(0, self.grid_shape[0] - 2)
+                py = np.random.randint(0, self.grid_shape[1] - 2)
+                if self.n_agents > 0:
+                    self.agents[0, :, 0] = px + 0
+                    self.agents[0, :, 1] = py + 0
+                if self.n_agents > 1:
+                    self.agents[1, :, 0] = px + 0
+                    self.agents[1, :, 1] = py + 1
+                if self.n_agents > 2:
+                    self.agents[2, :, 0] = px + 1
+                    self.agents[2, :, 1] = py + 0
+                if self.n_agents > 3:
+                    self.agents[3, :, 0] = px + 1
+                    self.agents[3, :, 1] = py + 1
+                for b in range(self.batch_size):
+                    for a in range(min(self.n_agents, 4)):
+                        self.grid[b, self.agents[a, b, 0], self.agents[a, b, 1], :] = [1, 0]
+                self._place_actors(self.agents[4:, :, :], 0)
+            else:
+                self._place_actors(self.agents, 0)
         else:
             for b in range(self.batch_size):
-                if self.n_agents > 0:
-                    self.agents[0, b, 0] = 0
-                    self.agents[0, b, 1] = 0
-                if self.n_agents > 1:
-                    self.agents[1, b, 0] = self.grid_shape[0] - 1
-                    self.agents[1, b, 1] = self.grid_shape[1] - 1
-                if self.n_agents > 2:
-                    self.agents[2, b, 0] = self.grid_shape[0] - 1
-                    self.agents[2, b, 1] = 0
-                if self.n_agents > 3:
-                    self.agents[3, b, 0] = 0
-                    self.agents[3, b, 1] = self.grid_shape[1] - 1
+                if self.cluster_start:
+                    if self.n_agents > 0:
+                        self.agents[0, :, 0] = 0
+                        self.agents[0, :, 1] = 0
+                    if self.n_agents > 1:
+                        self.agents[1, :, 0] = 0
+                        self.agents[1, :, 1] = 1
+                    if self.n_agents > 2:
+                        self.agents[2, :, 0] = 1
+                        self.agents[2, :, 1] = 0
+                    if self.n_agents > 3:
+                        self.agents[3, :, 0] = 1
+                        self.agents[3, :, 1] = 1
+                else:
+                    if self.n_agents > 0:
+                        self.agents[0, b, 0] = 0
+                        self.agents[0, b, 1] = 0
+                    if self.n_agents > 1:
+                        self.agents[1, b, 0] = self.grid_shape[0] - 1
+                        self.agents[1, b, 1] = self.grid_shape[1] - 1
+                    if self.n_agents > 2:
+                        self.agents[2, b, 0] = self.grid_shape[0] - 1
+                        self.agents[2, b, 1] = 0
+                    if self.n_agents > 3:
+                        self.agents[3, b, 0] = 0
+                        self.agents[3, b, 1] = self.grid_shape[1] - 1
                 for a in range(min(self.n_agents, 4)):
                     self.grid[b, self.agents[a, b, 0], self.agents[a, b, 1], :] = [1, 0]
             self._place_actors(self.agents[4:, :, :], 0)
-            print(self.agents[:, 0, :])
 
         # Place n prey in the world
         self._place_actors(self.prey, 1)
@@ -549,6 +583,7 @@ if __name__ == "__main__":
         'intersection_id_coded': True,
         'intersection_unknown': True,
         'random_start': True,
+        'cluster_start': False,
         'reward_only_positive': True,
         'reward_negative_scale': 0.5,
         'reward_death_value': 10,
