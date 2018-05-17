@@ -4,8 +4,8 @@ agent_model: coma_recursive
 agent_output_type: policies
 agents_encoder_size: 64
 agents_hidden_state_size: 64
-batch_size: 2
-batch_size_run: 2
+batch_size: 32
+batch_size_run: 32
 coma_critic_sample_size: 800
 coma_critic_use_sampling: True
 coma_entropy_loss_regularization_factor: 5e-06
