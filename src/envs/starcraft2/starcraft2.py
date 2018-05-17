@@ -279,10 +279,10 @@ class SC2(MultiAgentEnv):
             self._obs = self.controller.observe()
         except protocol.ProtocolError:
             self.full_restart()
-            return 0, True, {"episode_limit": True}
+            return 0, True, {"episode_limit": True} #{"episode_limit": True}
         except protocol.ConnectionError:
             self.full_restart()
-            return 0, True, {"episode_limit": True}
+            return 0, True, {"episode_limit": True} #{"episode_limit": True}
 
         self._total_steps += 1
         self._episode_steps += 1
@@ -305,7 +305,8 @@ class SC2(MultiAgentEnv):
         elif self.episode_limit > 0 and self._episode_steps >= self.episode_limit:
             # Episode limit reached
             terminated = True
-            info["episode_limit"] = True
+            # info["episode_limit"] = True
+            info["episode_limit"] = False
             self.battles_game += 1
             self.timeouts += 1
 

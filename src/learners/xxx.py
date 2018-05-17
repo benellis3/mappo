@@ -152,7 +152,7 @@ class XXXLearner(BasicLearner):
                                                         rename="agent_action".format(0),
                                                         ),
                                                    dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                   *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents))], #select_agent_ids=[_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)])
+                                                   *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)], #range(_n_agent_pair_samples(self.n_agents))], #select_agent_ids=[_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)])
                                                    dict(name="state"),
                                                    dict(name="avail_actions",
                                                         select_agent_ids=[_agent_id1]),
@@ -254,7 +254,7 @@ class XXXLearner(BasicLearner):
                         ])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_action"] = Scheme([dict(name="agent_action")])
-            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["policies_level2"] = Scheme([dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents))])
+            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["policies_level2"] = Scheme([dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)]) #range(_n_agent_pair_samples(self.n_agents))])
             self.input_columns_level2["target_critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]
 
 
@@ -502,7 +502,7 @@ class XXXLearner(BasicLearner):
             self.last_target_update_T_critic_level2 = self.T_critic_level2
             print("updating target net!")
 
-        assert self.n_agents <= 3, "only implemented for 3 or fewer agents"
+        assert self.n_agents <= 3 or self.args.n_pair_samples == 1 , "only implemented for 3 or fewer agents, or if n_pair_samples == 1"
         actions, actions_tformat = batch_history.get_col(bs=None,
                                                          col="actions_level2__sample{}".format(0))
         actions = actions.unsqueeze(0)

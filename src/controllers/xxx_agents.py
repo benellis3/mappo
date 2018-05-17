@@ -38,10 +38,11 @@ class XXXMultiagentController():
         else:
             self.action_selector = action_selector
 
+        # b = _n_agent_pairings(self.n_agents)
         self.agent_scheme_level1 = Scheme([*[dict(name="actions_level1__sample{}".format(_i),
                                                 rename="past_actions_level1__sample{}".format(_i),
                                                 transforms=[("shift", dict(steps=1)),
-                                                            ("one_hot", dict(range=(0, self.n_actions-1)))],
+                                                            ("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))], # DEBUG
                                                 switch=self.args.xxx_agent_level1_use_past_actions)
                                              for _i in range(_n_agent_pair_samples(self.n_agents))],
                                            dict(name="xxx_epsilons_central_level1",
@@ -93,7 +94,7 @@ class XXXMultiagentController():
                                                                 dict(name="xxx_epsilons_central_level3", scope="episode"),
                                                                 * [dict(name="actions_level1__sample{}".format(_i),
                                                                         rename="past_actions_level1__sample{}".format(_i),
-                                                                        transforms=[("one_hot", dict(range=(0, self.n_actions - 1)))],
+                                                                        transforms=[("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))],
                                                                         switch=self.args.xxx_agent_level3_use_past_actions_level1)
                                                                    for _i in range(_n_agent_pair_samples(self.n_agents))],
                                                                 dict(name="avail_actions", select_agent_ids=[_agent_id]) ])
@@ -206,12 +207,15 @@ class XXXMultiagentController():
     def select_actions(self, inputs, avail_actions, tformat, info, test_mode=False):
 
         selected_actions_list = []
-        for _i in range(_n_agent_pair_samples(self.n_agents)):
+        for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples): #_n_agent_pair_samples(self.n_agents)):
             selected_actions_list += [dict(name="actions_level1__sample{}".format(_i),
                                            data=self.actions_level1[_i])]
-        for _i in range(_n_agent_pair_samples(self.n_agents)):
+        for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples):
             selected_actions_list += [dict(name="actions_level2__sample{}".format(_i),
-                                           data=self.actions_level2[_i])]
+                                           data=self.actions_level2_sampled[_i])] # TODO: BUG!?
+        selected_actions_list += [dict(name="actions_level2",
+                                       select_agent_ids=list(range(self.n_agents)),
+                                       data=self.actions_level2)]
         selected_actions_list += [dict(name="actions_level3",
                                        select_agent_ids=list(range(self.n_agents)),
                                        data=self.actions_level3)]
@@ -368,9 +372,11 @@ class XXXMultiagentController():
                 self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
 
             elif loss_level == 2 or loss_level == 3:
-                assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
-                for _i in  range(_n_agent_pair_samples(self.n_agents)):
+                #assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
+                assert self.n_agents <= 3 or self.args.n_pair_samples == 1, "only implemented for 3 or fewer agents, or if n_pair_samples == 1"
+                for _i in  range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples):
                     sampled_pair_ids, _ = batch_history.get_col(col="actions_level1__sample{}".format(_i),)
+                #sampled_pair_ids, _ = batch_history.get_col(col="actions_level1__sample{}".format(0), )
                 sampled_pair_ids[sampled_pair_ids != sampled_pair_ids] = 0.0
                 sampled_pair_ids = sampled_pair_ids.unsqueeze(0).contiguous()
 
@@ -456,12 +462,14 @@ class XXXMultiagentController():
                                                                                     test_mode=test_mode)
 
                 self.actions_level2 = pair_sampled_actions.clone()
+                self.actions_level2_sampled = pair_sampled_actions.gather(0, sampled_pair_ids.long())
                 self.selected_actions_format_level2 = selected_actions_format_level2
                 self.policies_level2 = modified_inputs_level2.clone()
 
             elif loss_level == 3:
-                assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
-                for _i in  range(_n_agent_pair_samples(self.n_agents)):
+                #assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
+                assert self.n_agents <= 3 or self.args.n_pair_samples == 1, "only implemented for 3 or fewer agents, or if n_pair_samples == 1"
+                for _i in  range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples):
                     pair_sampled_actions, _ = batch_history.get_col(col="actions_level2__sample{}".format(_i))
                     pair_sampled_actions[pair_sampled_actions != pair_sampled_actions] = 0.0
                 pair_sampled_actions = pair_sampled_actions.unsqueeze(0).contiguous()
