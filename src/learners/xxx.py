@@ -717,7 +717,8 @@ class XXXLearner(BasicLearner):
         agent_optimiser.zero_grad()
         XXX_loss.backward()
 
-        _check_nan(agent_parameters)
+        if self.args.debug_mode:
+            _check_nan(agent_parameters)
         policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
         agent_optimiser.step()
 

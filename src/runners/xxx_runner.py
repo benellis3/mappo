@@ -1,6 +1,7 @@
 import numpy as np
 from components.scheme import Scheme
 from components.transforms import _seq_mean
+from copy import deepcopy
 from itertools import combinations
 import torch as th
 from torch.distributions import Normal
@@ -162,15 +163,14 @@ class XXXRunner(NStepRunner):
         #               T_env=T_env,
         #               suffix=test_suffix)
 
-        try:
-            actions_level2, _ = self.episode_buffer.get_col(col="actions_level2__sample{}".format(0))
-            delegation_rate = (th.sum(actions_level2==0.0) - th.sum(actions_level2!=actions_level2)) / actions_level2.contiguous().view(-1).shape[0]
-            self._add_stat("level2_delegation_rate",
-                           delegation_rate,
-                           T_env=T_env,
-                           suffix=test_suffix)
-        except:
-            pass
+
+        actions_level2, _ = self.episode_buffer.get_col(col="actions_level2__sample{}".format(0))
+        delegation_rate = th.sum(actions_level2==0.0) / actions_level2.contiguous().view(-1).shape[0]
+        self._add_stat("level2_delegation_rate",
+                       delegation_rate,
+                       T_env=T_env,
+                       suffix=test_suffix)
+
 
         # TODO: Policy entropy across levels! (Use suffix)
         return
@@ -220,16 +220,20 @@ class XXXRunner(NStepRunner):
 
 
     def log(self, log_directly=True):
+        stats = self.get_stats()
+        self._stats = deepcopy(stats)
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
             log_str += ", XXX_epsilon_level1={:g}".format(self.xxx_epsilon_decay_schedule_level1.eval(self.T_env))
             log_str += ", XXX_epsilon_level2={:g}".format(self.xxx_epsilon_decay_schedule_level2.eval(self.T_env))
             log_str += ", XXX_epsilon_level3={:g}".format(self.xxx_epsilon_decay_schedule_level3.eval(self.T_env))
+            log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate"]))
             # log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
             # log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy"]))
             # log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
             self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
         else:
+            log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate_test"]))
             # log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy_test"]))
             # log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy_test"]))
             # log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy_test"]))

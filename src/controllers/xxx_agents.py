@@ -359,14 +359,17 @@ class XXXMultiagentController():
                                                                            inputs,
                                                                            to_variable=True,
                                                                            inputs_tformat=tformat)
-                _check_nan(inputs_level1)
+                if self.args.debug_mode:
+                    _check_nan(inputs_level1)
                 out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.models["level1"](inputs_level1["agent_input_level1"],
                                                                                                         hidden_states=hidden_states["level1"],
                                                                                                         loss_fn=loss_fn if loss_level == 1 else None,
                                                                                                         tformat=inputs_level1_tformat,
                                                                                                         n_agents=self.n_agents,
                                                                                                         **kwargs)
-                _check_nan(out_level1)
+                if self.args.debug_mode:
+                    _check_nan(inputs_level1)
+
                 if loss_level == 1:
                     return dict(losses=losses_level1), tformat_level1
 
