@@ -36,8 +36,8 @@ class SC1(MultiAgentEnv):
         self.map_name = args.map_name
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
         self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        # self.episode_limit = args.episode_limit
-        self.episode_limit = 200
+        self.episode_limit = args.episode_limit
+        # self.episode_limit = 1000
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         # self.difficulty = args.difficulty
@@ -154,6 +154,7 @@ class SC1(MultiAgentEnv):
         self._obs = self.controller.init(micro_battles=True)
 
         self.controller.send([
+            [tcc.set_combine_frames, self._step_mul],
             [tcc.set_speed, 0],
             [tcc.set_gui, 1],
             [tcc.set_cmd_optim, 1],
@@ -758,22 +759,20 @@ class SC1(MultiAgentEnv):
         self.agents = {}
         self.enemies = {}
 
-        commands = []
-        for j in range(2):
-            for i in range(len(self._obs.units[j])):
-                u = self._obs.units[j][i]
-                command = [
-                    tcc.command_openbw,
-                    tcc.openbwcommandtypes.KillUnit,
-                    u.id,
-                ]
-                commands.append(command)
-
-        # There is probably a bug in TorchCraft. Sending the kill command does not always kill the units.
         while len(self._obs.units[0]) > 0 or len(self._obs.units[1]) > 0:
+            commands = []
+            for j in range(2):
+                for i in range(len(self._obs.units[j])):
+                    u = self._obs.units[j][i]
+                    command = [
+                        tcc.command_openbw,
+                        tcc.openbwcommandtypes.KillUnit,
+                        u.id,
+                    ]
+                    commands.append(command)
+
             sent = self.controller.send(commands)
-            if sent:
-                self._obs = self.controller.recv()
+            self._obs = self.controller.recv()
 
     def init_units(self):
 
@@ -783,7 +782,7 @@ class SC1(MultiAgentEnv):
             self.agents = {}
             self.enemies = {}
 
-            ally_units = [unit for unit in self._obs.units[0]]
+            ally_units = [deepcopy(unit) for unit in self._obs.units[0]]
             # ally_units = [unit for unit in self._obs.observation.raw_data.units if unit.owner == 1]
             ally_units_sorted = sorted(ally_units, key=attrgetter('type', 'x', 'y'), reverse=False)
             # ally_units_sorted = sorted(ally_units, key=attrgetter('unit_type', 'x', 'y'), reverse=False)
@@ -797,7 +796,7 @@ class SC1(MultiAgentEnv):
             for unit in self._obs.units[1]:
                 # for unit in self._obs.observation.raw_data.units:
                 # if unit.owner == 2: # agent
-                self.enemies[len(self.enemies)] = unit
+                self.enemies[len(self.enemies)] = deepcopy(unit)
 
             if self.agents == {}:
                 counter += 1
