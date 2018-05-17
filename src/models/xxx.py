@@ -126,7 +126,7 @@ class XXXQFunctionLevel3(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = self.n_actions # qvals
+        self.output_shapes["qvalues"] = self.n_actions + 1 # no-op added
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
