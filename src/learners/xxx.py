@@ -142,7 +142,7 @@ class XXXLearner(BasicLearner):
                                                    dict(name="actions_level2",
                                                         rename="agent_action",
                                                         select_agent_ids=[_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)],
-                                                        transforms=[("one_hot_pairwise", dict(range=(0, self.n_actions * self.n_actions + 2)))]
+                                                        #transforms=[("one_hot_pairwise", dict(range=(0, self.n_actions * self.n_actions + 2)))]
                                                         ),
                                                    *[dict(name="actions_level1__sample{}".format(_i),
                                                           transforms=[("one_hot", dict(
@@ -232,12 +232,9 @@ class XXXLearner(BasicLearner):
         # construct model-specific input regions
 
         # level 1
-        # assert self.n_agents <=4, "NOT IMPLEMENTED FOR >= 4 agents!"
         self.input_columns_level1 = {}
         self.input_columns_level1["critic_level1"] = {}
-        #self.input_columns_level1["critic_input_level1"]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
         self.input_columns_level1["critic_level1"]["qfunction"] = Scheme([dict(name="state"),
-                                                                          # dict(name="observations", select_agent_ids=list(range(self.n_agents))),
                                                                           *[dict(name="past_actions_level1__sample{}".format(_i))
                                                                             for _i in range(_n_agent_pair_samples(self.n_agents))],
                                                                           dict(name="past_actions",
@@ -273,7 +270,6 @@ class XXXLearner(BasicLearner):
                           for _i in range(_n_agent_pair_samples(
                                 self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                         ])
-            #self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_action"] = Scheme([dict(name="agent_action", select_agent_ids=[_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)])])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["policies_level2"] = Scheme([dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)]) #range(_n_agent_pair_samples(self.n_agents))])
             self.input_columns_level2["target_critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]
@@ -284,17 +280,17 @@ class XXXLearner(BasicLearner):
             self.input_columns_level3["critic_level3__agent{}".format(_agent_id)] = {}
             self.input_columns_level3["critic_level3__agent{}".format(_agent_id)]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
             self.input_columns_level3["critic_level3__agent{}".format(_agent_id)]["qfunction"] = Scheme([dict(name="other_agent_actions", select_agent_ids=[ _i for _i in range(0, self.n_agents) if _i != _agent_id],), # select all agent ids here, as have mask=0 transform on current agent action
-                                                                                                  dict(name="state"),
-                                                                                                  dict(name="agent_observation", select_agent_ids=[_agent_id]),
-                                                                                                  dict(name="agent_id", select_agent_ids=[_agent_id]),
-                                                                                                  dict(name="past_actions", select_agent_ids=list(range(self.n_agents))),
-                                                                                                 *[dict(name="actions_level2__sample{}".format(_i),
-                                                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level2)
-                                                                                                   for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
-                                                                                                 *[dict(name="actions_level1__sample{}".format(_i),
-                                                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level1)
-                                                                                                   for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
-                                                                                                 ]).agent_flatten()
+                                                                                                          dict(name="state"),
+                                                                                                          dict(name="agent_observation", select_agent_ids=[_agent_id]),
+                                                                                                          dict(name="agent_id", select_agent_ids=[_agent_id]),
+                                                                                                          dict(name="past_actions", select_agent_ids=list(range(self.n_agents))),
+                                                                                                         *[dict(name="actions_level2__sample{}".format(_i),
+                                                                                                                switch=self.args.xxx_agent_level3_use_past_actions_level2)
+                                                                                                           for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                                                                                                         *[dict(name="actions_level1__sample{}".format(_i),
+                                                                                                                switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                                                           for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                                                                                                         ]).agent_flatten()
             self.input_columns_level3["critic_level3__agent{}".format(_agent_id)]["agent_action"] = Scheme([dict(name="agent_action", select_agent_ids=[_agent_id])]).agent_flatten()
             self.input_columns_level3["critic_level3__agent{}".format(_agent_id)]["agent_policy"] = Scheme([dict(name="agent_policy", select_agent_ids=[_agent_id])]).agent_flatten()
             self.input_columns_level3["target_critic_level3__agent{}".format(_agent_id)] = self.input_columns_level3["critic_level3__agent{}".format(_agent_id)]
@@ -608,20 +604,16 @@ class XXXLearner(BasicLearner):
 
 
 
-            try:
-                target_critic_td_targets, \
-                target_critic_td_targets_tformat = batch_history.get_stat("td_lambda_targets",
-                                                                           bs_ids=None,
-                                                                           td_lambda=self.args.td_lambda,
-                                                                           gamma=self.args.gamma,
-                                                                           value_function_values=output_target_critic["qvalue"].detach(),
-                                                                           to_variable=True,
-                                                                           n_agents=output_target_critic["qvalue"].shape[_adim(output_target_critic_tformat)],
-                                                                           to_cuda=self.args.use_cuda)
+            target_critic_td_targets, \
+            target_critic_td_targets_tformat = batch_history.get_stat("td_lambda_targets",
+                                                                       bs_ids=None,
+                                                                       td_lambda=self.args.td_lambda,
+                                                                       gamma=self.args.gamma,
+                                                                       value_function_values=output_target_critic["qvalue"].detach(),
+                                                                       to_variable=True,
+                                                                       n_agents=output_target_critic["qvalue"].shape[_adim(output_target_critic_tformat)],
+                                                                       to_cuda=self.args.use_cuda)
 
-            except Exception as e:
-                a = 5
-                pass
             # sample!!
             if xxx_critic_use_sampling:
                 critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
