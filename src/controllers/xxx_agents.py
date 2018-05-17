@@ -65,7 +65,6 @@ class XXXMultiagentController():
                                                                                   transforms=[("shift", dict(steps=1)),
                                                                                               ("one_hot_pairwise", dict(range=(0, self.n_actions-1)))],
                                                                                   switch=self.args.xxx_agent_level2_use_past_actions),
-                                                                             # TODO: transform to split into two actions (with maybe one-hot encoding each)!
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
@@ -74,9 +73,9 @@ class XXXMultiagentController():
                                                                              dict(name="observations",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],
                                                                                   switch=not self.args.xxx_use_obs_intersections),
-                                                                             dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                                                             dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
                                                                                   switch=self.args.xxx_use_obs_intersections),
-                                                                             dict(name="avail_actions_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                                                             dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
                                                                                   switch=self.args.xxx_use_obs_intersections)])
 
         self.agent_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
@@ -149,7 +148,7 @@ class XXXMultiagentController():
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["main"] = \
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])
                         if not self.args.xxx_use_obs_intersections else
-                        dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2),self.n_agents))),
+                        dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2),self.n_agents))),
                         dict(name="past_actions_level2",
                              switch=self.args.xxx_agent_level2_use_past_actions),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
@@ -160,10 +159,10 @@ class XXXMultiagentController():
             self.input_columns_level2[
                 "agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
             if self.args.xxx_use_obs_intersections:
-                self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["obs_intersection_pair"] = Scheme([dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["obs_intersection_pair"] = Scheme([dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
                                                                                                                                                                                  switch=self.args.xxx_use_obs_intersections)])
                 self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] \
-                                            ["avail_actions_pair"] = Scheme([dict(name="avail_actions_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                            ["avail_actions_pair"] = Scheme([dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
                                                         switch=self.args.xxx_use_obs_intersections)])
             #self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_level2"] = \
             #    Scheme([dict(name="xxx_epsilons_level2")])
@@ -214,7 +213,7 @@ class XXXMultiagentController():
             selected_actions_list += [dict(name="actions_level2__sample{}".format(_i),
                                            data=self.actions_level2_sampled[_i])] # TODO: BUG!?
         selected_actions_list += [dict(name="actions_level2",
-                                       select_agent_ids=list(range(self.n_agents)),
+                                       select_agent_ids=list(range(_n_agent_pairings(self.n_agents))),
                                        data=self.actions_level2)]
         selected_actions_list += [dict(name="actions_level3",
                                        select_agent_ids=list(range(self.n_agents)),
@@ -382,7 +381,7 @@ class XXXMultiagentController():
 
             if loss_level is None or loss_level == 2:
                 # --------------------- LEVEL 2
-                assert self.n_agents < 5, "pair selection only implemented for up to 4 agents yet!!"
+                # assert self.n_agents < 5, "pair selection only implemented for up to 4 agents yet!!"
 
                 inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
                                                                            inputs,
