@@ -679,10 +679,11 @@ class NStepRunner():
             if isinstance(action_selector_outputs, list):
                 for _sa in action_selector_outputs:
                     self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                                col=_sa["name"],
-                                                t=self.t_episode,
-                                                agent_ids=_sa.get("select_agent_ids", None),
-                                                data=_sa["data"])
+                                            col=_sa["name"],
+                                            t=self.t_episode,
+                                            agent_ids=_sa.get("select_agent_ids", None),
+                                            data=_sa["data"])
+
             else:
                 self.episode_buffer.set_col(bs=ids_envs_not_terminated,
                                             col=self.multiagent_controller.agent_output_type,

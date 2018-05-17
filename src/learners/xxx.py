@@ -96,8 +96,7 @@ class XXXLearner(BasicLearner):
         self.critic_level2 = mo_REGISTRY[self.args.xxx_critic_level2]
         self.critic_level3 = mo_REGISTRY[self.args.xxx_critic_level3]
 
-        self.critic_level1_scheme = Scheme([dict(name="observations",
-                                                 select_agent_ids=list(range(self.n_agents))),
+        self.critic_level1_scheme = Scheme([dict(name="obs_intersection_all"),
                                             dict(name="actions",
                                                  rename="past_actions",
                                                  select_agent_ids=list(range(self.n_agents)),
@@ -120,21 +119,15 @@ class XXXLearner(BasicLearner):
                                           ])
         self.target_critic_level1_scheme = self.critic_level1_scheme
 
-
         self.critic_scheme_level2_fn = \
             lambda _agent_id1, _agent_id2: Scheme([dict(name="agent_id",
                                                         rename="agent_ids",
                                                         transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
                                                         select_agent_ids=[_agent_id1, _agent_id2],),
-                                                   dict(name="observations",
-                                                        select_agent_ids=[_agent_id1, _agent_id2]),
-                                                   #dict(name="actions_level3",
-                                                   #     rename="past_actions",
-                                                   #     select_agent_ids=list(range(self.n_agents)),
-                                                   #     transforms=[("shift", dict(steps=1)),
-                                                   #                #("one_hot", dict(range=(0, self.n_actions - 1)))
-                                                   #                ],
-                                                   #   switch=self.args.xxx_critic_level2_use_past_actions),
+                                                   dict(name="obs_intersection__pair{}".format(
+                                                       _agent_ids_2_pairing_id((_agent_id1, _agent_id2),
+                                                                               self.n_agents)),
+                                                        switch=self.args.xxx_use_obs_intersections),
                                                    *[dict(name="actions_level2__sample{}".format(0), # MIGHT BE PROBLEMATIC
                                                         rename="other_agent_actions_level2__sample{}".format(_i),
                                                         transforms=[] if _agent_ids_2_pairing_id((_agent_id1, _agent_id2),
@@ -152,7 +145,7 @@ class XXXLearner(BasicLearner):
                                                         rename="agent_action".format(0),
                                                         ),
                                                    dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                   *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)], #range(_n_agent_pair_samples(self.n_agents))], #select_agent_ids=[_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)])
+                                                   *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                    dict(name="state"),
                                                    dict(name="avail_actions",
                                                         select_agent_ids=[_agent_id1]),
@@ -221,7 +214,7 @@ class XXXLearner(BasicLearner):
         # construct model-specific input regions
 
         # level 1
-        assert self.n_agents <=4, "NOT IMPLEMENTED FOR >= 4 agents!"
+        # assert self.n_agents <=4, "NOT IMPLEMENTED FOR >= 4 agents!"
         self.input_columns_level1 = {}
         self.input_columns_level1["critic_level1"] = {}
         #self.input_columns_level1["critic_input_level1"]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
@@ -230,8 +223,8 @@ class XXXLearner(BasicLearner):
                                                                           *[dict(name="past_actions_level1__sample{}".format(_i))
                                                                             for _i in range(_n_agent_pair_samples(self.n_agents))],
                                                                           dict(name="past_actions",
-                                                                               select_agent_ids=list(range(self.n_agents)),)])
-        self.input_columns_level1["critic_level1"]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
+                                                                               select_agent_ids=list(range(self.n_agents)),),
+                                                                          dict(name="obs_intersection_all")])
         self.input_columns_level1["critic_level1"]["agent_action"] = Scheme([dict(name="agent_actions__sample{}".format(_i))
                                                                                   for _i in range(1)],) # TODO: Expand for more than 4 agents!!
         self.input_columns_level1["critic_level1"]["agent_policy"] = Scheme([dict(name="agent_policy")])
@@ -250,9 +243,12 @@ class XXXLearner(BasicLearner):
                         dict(name="state"),
                         dict(name="past_action_level2__sample{}".format(0)),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2]),
+                        dict(name="obs_intersection__pair{}".format(
+                            _agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                             switch=self.args.xxx_use_obs_intersections),
                         #dict(name="past_actions", select_agent_ids=list(range(self.n_agents)))
                         ])
-            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
+            #self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_action"] = Scheme([dict(name="agent_action")])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["policies_level2"] = Scheme([dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)]) #range(_n_agent_pair_samples(self.n_agents))])
             self.input_columns_level2["target_critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]
@@ -405,34 +401,12 @@ class XXXLearner(BasicLearner):
 
         # Retrieve and view all data that can be retrieved from batch_history in a single step (caching efficient)
 
-        # create one single batch_history view suitable for all
-        # data_inputs_level1, data_inputs_tformat_level1 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level1,
-        #                                                                     to_cuda=self.args.use_cuda,
-        #                                                                     to_variable=True,
-        #                                                                     bs_ids=None,
-        #                                                                     fill_zero=True) # DEBUG: Should be True
-        #
-        # data_inputs_level2, data_inputs_tformat_level2 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level2,
-        #                                                                     to_cuda=self.args.use_cuda,
-        #                                                                     to_variable=True,
-        #                                                                     bs_ids=None,
-        #                                                                     fill_zero=True) # DEBUG: Should be True
-        #
-        # data_inputs_level3, data_inputs_tformat_level3 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level3,
-        #                                                                     to_cuda=self.args.use_cuda,
-        #                                                                     to_variable=True,
-        #                                                                     bs_ids=None,
-        #                                                                     fill_zero=True) # DEBUG: Should be True
-
         data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=self.joint_scheme_dict,
                                                               to_cuda=self.args.use_cuda,
                                                               to_variable=True,
                                                               bs_ids=None,
                                                               fill_zero=True)
-                                                              #fill_zero=True) # DEBUG: Should be True
 
-        #a = {_k:_v.to_pd() for _k, _v in data_inputs.items()}
-        #b = batch_history.to_pd()
         self.train_level1(batch_history, data_inputs, data_inputs_tformat, T_env)
         self.train_level2(batch_history, data_inputs, data_inputs_tformat, T_env) # DEBUG
         self.train_level3(batch_history, data_inputs, data_inputs_tformat, T_env)
@@ -445,15 +419,7 @@ class XXXLearner(BasicLearner):
             self.last_target_update_T_critic_level1 = self.T_critic_level1
             print("updating target net!")
 
-        # actions_level1 = []
-        # for _i in range(_n_agent_pair_samples(self.n_agents)):
-        #     actions, actions_tformat = batch_history.get_col(bs=None,
-        #                                                      col="actions_level1__sample{}".format(_i),
-        #                                                      # agent_ids=list(range(0, self.n_agents)),
-        #                                                      stack=True)
-        #     actions_level1.append(actions)
-
-        assert self.n_agents <= 4, "not implemented for >= 4 agents!"
+        # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
         actions, actions_tformat = batch_history.get_col(bs=None,
                                                          col="actions_level1__sample{}".format(0),
                                                          # agent_ids=list(range(0, self.n_agents)),
@@ -513,7 +479,6 @@ class XXXLearner(BasicLearner):
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True)
 
-        # a = data_inputs["critic_level3__agent0"].to_pd()
         self._optimize(batch_history,
                        xxx_model_inputs,
                        xxx_model_inputs_tformat,

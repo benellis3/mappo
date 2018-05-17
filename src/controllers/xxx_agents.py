@@ -65,7 +65,10 @@ class XXXMultiagentController():
                                                                                   transforms=[("shift", dict(steps=1)),
                                                                                               ("one_hot_pairwise", dict(range=(0, self.n_actions-1)))],
                                                                                   switch=self.args.xxx_agent_level2_use_past_actions),
-                                                                             # TODO: transform to split into two actions (with maybe one-hot encoding each)!
+                                                                             *[dict(name="actions_level1__sample{}".format(_i),
+                                                                                 transforms=[("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))],
+                                                                                 switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                               for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
@@ -74,10 +77,13 @@ class XXXMultiagentController():
                                                                              dict(name="observations",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],
                                                                                   switch=not self.args.xxx_use_obs_intersections),
-                                                                             dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                                                             dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
                                                                                   switch=self.args.xxx_use_obs_intersections),
-                                                                             dict(name="avail_actions_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                                                  switch=self.args.xxx_use_obs_intersections)])
+                                                                             dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                                                                  switch=self.args.xxx_use_obs_intersections),
+                                                                             dict(name="xxx_epsilons_central_level2",
+                                                                                  scope="episode"),
+                                                                             ])
 
         self.agent_scheme_level3_fn = lambda _agent_id: Scheme([dict(name="agent_id",
                                                                      transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
@@ -91,13 +97,19 @@ class XXXMultiagentController():
                                                                                  ("one_hot", dict(range=(0, self.n_actions)))], # includes no-op actions
                                                                      switch=self.args.xxx_agent_level3_use_past_actions),
                                                                 dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
-                                                                dict(name="xxx_epsilons_central_level3", scope="episode"),
+                                                                * [dict(name="actions_level2__sample{}".format(_i),
+                                                                        transforms=[("one_hot_pairwise", dict(range=(0, self.n_actions*self.n_actions + 2)))],
+                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                   for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                                 * [dict(name="actions_level1__sample{}".format(_i),
-                                                                        rename="past_actions_level1__sample{}".format(_i),
                                                                         transforms=[("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))],
                                                                         switch=self.args.xxx_agent_level3_use_past_actions_level1)
-                                                                   for _i in range(_n_agent_pair_samples(self.n_agents))],
-                                                                dict(name="avail_actions", select_agent_ids=[_agent_id]) ])
+                                                                   for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                                                                dict(name="xxx_epsilons_central_level3", scope="episode"),
+                                                                dict(name="avail_actions", select_agent_ids=[_agent_id]),
+                                                                dict(name="xxx_epsilons_central_level3",
+                                                                     scope="episode"),
+                                                                ])
 
         # Set up schemes
         self.schemes = {}
@@ -128,8 +140,7 @@ class XXXMultiagentController():
         self.input_columns_level1 = {}
         self.input_columns_level1["agent_input_level1"] = {}
         self.input_columns_level1["agent_input_level1"]["main"] = \
-            Scheme([#dict(name="observations", select_agent_ids=list(range(self.n_agents))),
-                    dict(name="observations", select_agent_ids=list(range(self.n_agents)))
+            Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))
                         if not self.args.xxx_use_obs_intersections else
                     dict(name="obs_intersection_all"),
                     *[dict(name="past_actions_level1__sample{}".format(_i),
@@ -139,8 +150,6 @@ class XXXMultiagentController():
         self.input_columns_level1["agent_input_level1"]["epsilons_central_level1"] = \
             Scheme([dict(name="xxx_epsilons_central_level1",
                          scope="episode")])
-        #self.input_columns_level1["agent_input_level1"]["epsilons_level1"] = \
-        #    Scheme([dict(name="xxx_epsilons_level1")])
 
         # level 2
         self.input_columns_level2 = {}
@@ -149,24 +158,25 @@ class XXXMultiagentController():
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["main"] = \
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])
                         if not self.args.xxx_use_obs_intersections else
-                        dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2),self.n_agents))),
+                        dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2),self.n_agents))),
                         dict(name="past_actions_level2",
                              switch=self.args.xxx_agent_level2_use_past_actions),
-                        dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2])])
+                        dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2]),
+                        *[dict(name="actions_level1__sample{}".format(_i),
+                               switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                          for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                        ])
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_central_level2"] = \
                 Scheme([dict(name="xxx_epsilons_central_level2",
                              scope="episode")])
+
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
             self.input_columns_level2[
                 "agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
             if self.args.xxx_use_obs_intersections:
-                self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["obs_intersection_pair"] = Scheme([dict(name="obs_intersection_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                                                                                                                                                 switch=self.args.xxx_use_obs_intersections)])
                 self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] \
-                                            ["avail_actions_pair"] = Scheme([dict(name="avail_actions_pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                                            ["avail_actions_pair"] = Scheme([dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
                                                         switch=self.args.xxx_use_obs_intersections)])
-            #self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_level2"] = \
-            #    Scheme([dict(name="xxx_epsilons_level2")])
 
         # level 3
         self.input_columns_level3 = {}
@@ -177,16 +187,23 @@ class XXXMultiagentController():
                         dict(name="past_actions_level3",
                              select_agent_ids=[_agent_id],
                              switch=self.args.xxx_agent_level3_use_past_actions),
-                        dict(name="agent_id", select_agent_ids=[_agent_id])],
-                        dict(name="actions_level1"))
+                        dict(name="agent_id", select_agent_ids=[_agent_id]),
+                        *[dict(name="actions_level2__sample{}".format(_i),
+                               switch=self.args.xxx_agent_level3_use_past_actions_level2)
+                          for _i in range(_n_agent_pair_samples(
+                                self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                        *[dict(name="actions_level1__sample{}".format(_i),
+                               switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                          for _i in range(_n_agent_pair_samples(
+                                self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                        ])
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_central_level3"] = \
                 Scheme([dict(name="xxx_epsilons_central_level3",
                              scope="episode")])
+
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["avail_actions"] = \
                 Scheme([dict(name="avail_actions",
                              select_agent_ids=[_agent_id])])
-           # self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_level3"] = \
-           #     Scheme([dict(name="xxx_epsilons_level3")])
 
         pass
 
@@ -214,7 +231,7 @@ class XXXMultiagentController():
             selected_actions_list += [dict(name="actions_level2__sample{}".format(_i),
                                            data=self.actions_level2_sampled[_i])] # TODO: BUG!?
         selected_actions_list += [dict(name="actions_level2",
-                                       select_agent_ids=list(range(self.n_agents)),
+                                       select_agent_ids=list(range(_n_agent_pairings(self.n_agents))),
                                        data=self.actions_level2)]
         selected_actions_list += [dict(name="actions_level3",
                                        select_agent_ids=list(range(self.n_agents)),
@@ -382,7 +399,7 @@ class XXXMultiagentController():
 
             if loss_level is None or loss_level == 2:
                 # --------------------- LEVEL 2
-                assert self.n_agents < 5, "pair selection only implemented for up to 4 agents yet!!"
+                # assert self.n_agents < 5, "pair selection only implemented for up to 4 agents yet!!"
 
                 inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
                                                                            inputs,
@@ -392,42 +409,7 @@ class XXXMultiagentController():
 
                 assert self.args.agent_level2_share_params, "not implemented!"
 
-                # # create pairwise avail actions
-                # avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id1"], inputs_level2_tformat)
-                # avail_actions2, params_aa2, _ = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id2"], inputs_level2_tformat)
 
-                ########## HOW TO DETERMINE AVAILABLE ACTIONS ##########################################################
-                # One cannot a priori say anything about the other agent's available actions based
-                # on the common knowledge. This would need to be learnt. We are therefore hard-coding it for
-                #
-                # In the last step, we then check whether the actions sent to the individual agents are legal.
-                # If not so, then those actions have to be chosen from the independent sampler.
-                ########################################################################################################
-
-                # if self.args.env in ["pred_prey", "matrix_game"]:
-                #     pairwise_avail_actions = th.bmm(avail_actions1.unsqueeze(2), avail_actions2.unsqueeze(1))
-                # elif self.args.env in ["sc1", "sc2"]:
-                #     tmp = (avail_actions1  * avail_actions2)
-                #     pairwise_avail_actions = th.bmm(tmp.unsqueeze(2), tmp.unsqueeze(1))
-                # else:
-                #     assert False, "pairwise_avail_actions not determined for this environment!"
-                #
-                #
-                # ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
-                # delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0], 1).fill_(1.0), requires_grad=False)
-                # pairwise_avail_actions = pairwise_avail_actions.view(pairwise_avail_actions.shape[0], -1)
-                #
-                #
-                # # if self.args.xxx_use_obs_intersections:
-                # #     # if there is no observation intersection, pair-wise can choose any conceivable action
-                # #     # (if this results in invalid actions, then those will be picked in a decentralized fashion)
-                # #     obs_intersections, i_params, i_format = _to_batch(inputs_level2["agent_input_level2"]["obs_intersection_pair"], tformat=inputs_level2_tformat)
-                # #     obs_intersections_mask = (obs_intersections.sum(dim=1, keepdim=True) == 0)
-                # #     tmp = obs_intersections_mask.repeat(1, pairwise_avail_actions.shape[1])
-                # #     pairwise_avail_actions[tmp.data] = 1.0
-                #
-                # pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=1)
-                # pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
 
                 if "avail_actions_pair" in inputs_level2["agent_input_level2"]:
                     pairwise_avail_actions = inputs_level2["agent_input_level2"]["avail_actions_pair"]
@@ -442,6 +424,12 @@ class XXXMultiagentController():
                                                    pairwise_avail_actions.shape[1],
                                                    pairwise_avail_actions.shape[2], 1).fill_(1.0), requires_grad=False)
                 pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=_vdim(tformat))
+
+                if loss_level is None:
+                    mask = pairwise_avail_actions.data.clone().fill_(0.0)
+                    mask[:,:,:,-1] = 1.0
+                    mask.scatter_(_adim(inputs_level2_tformat),  sampled_pair_ids.repeat(1,1,1,pairwise_avail_actions.shape[-1]).long(), pairwise_avail_actions.data)
+                    pairwise_avail_actions = Variable(mask, requires_grad=False)
 
                 out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level2_0"](inputs_level2["agent_input_level2"],
                                                                                                           hidden_states=hidden_states["level2"],
@@ -497,14 +485,7 @@ class XXXMultiagentController():
                 if loss_level is None:
                     pair_sampled_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
 
-                #print(pair_sampled_actions[0,:,0,0])
                 actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1, avail_actions2)
-                #print(th.cat([actions1[:,:,0,0], actions2[:,:,0,0]], dim=0))
-                #a = 5
-
-                # #tmp = Variable(pair_id1).unsqueeze(2).unsqueeze(3).repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])
-                # avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id1.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
-                # avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(_adim(inputs_level3_tformat), Variable(pair_id2.repeat(1,1,1,inputs_level3["agent_input_level3"]["avail_actions"].shape[_vdim(inputs_level3_tformat)])))
 
                 # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
 
@@ -517,7 +498,6 @@ class XXXMultiagentController():
                 action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0],-1), actions2.squeeze(-1).view(actions2.shape[0],-1))
 
                 if loss_level is None:
-
                     avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
                     active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], -1).unsqueeze(2).clone()
                     active[active == active] = 1.0

@@ -52,6 +52,7 @@ n_critic_level1_learner_reps: 4
 n_critic_level2_learner_reps: 4
 n_critic_level3_learner_reps: 4
 n_loops_per_thread_or_sub_or_main_process: 0
+n_pair_samples: ~
 n_subprocesses: 0
 n_threads_per_subprocess_or_main_process: 0
 obs_last_action: True
@@ -112,3 +113,4 @@ xxx_exploration_mode_level3: softmax
 xxx_delegation_probability_bias: 0.5
 xxx_use_obs_intersections: True
 xxx_use_entropy_regularizer: False
+xxx_agent_level3_use_past_actions_level2: True

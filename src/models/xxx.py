@@ -76,7 +76,7 @@ class XXXQFunctionLevel2(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = 1 + self.n_actions*self.n_actions # qvals
+        self.output_shapes["qvalues"] = 2 + self.n_actions*self.n_actions # includes delegation + no-op action
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
@@ -658,7 +658,7 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
         # Set up layer_args automatically if required
         self.output_shapes = {}
-        self.output_shapes["output"] = 1 + self.n_actions*self.n_actions # output
+        self.output_shapes["output"] = 2 + self.n_actions*self.n_actions # includes no-op + delegation action
         if self.output_shapes is not None:
             self.output_shapes.update(output_shapes)
 

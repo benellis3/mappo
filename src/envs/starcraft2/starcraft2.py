@@ -694,8 +694,8 @@ class SC2(MultiAgentEnv):
             nf_en += 2
 
         # move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
-        enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
-        ally_feats = np.zeros((self.n_agents, nf_al), dtype=np.float32)
+        enemy_feats = -1*np.ones((self.n_enemies, nf_en), dtype=np.float32)
+        ally_feats = -1*np.ones((self.n_agents, nf_al), dtype=np.float32)
         state = np.concatenate((enemy_feats.flatten(),
                                     ally_feats.flatten()))
         state = state.astype(dtype=np.float32)
@@ -743,7 +743,10 @@ class SC2(MultiAgentEnv):
                 avail_actions[:, self.n_actions_no_attack + e_id] = 0
 
         # place the features of the agent himself always at the first place
-        al_ids = range(self.n_agents)
+        al_ids = list(agent_ids)
+        for al in range(self.n_agents):
+            if al not in agent_ids:
+                al_ids.append(al)
         for i, al_id in enumerate(al_ids):
             al_unit = self.get_unit_by_id(al_id)
             al_x = al_unit.pos.x
