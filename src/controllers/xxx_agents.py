@@ -372,9 +372,11 @@ class XXXMultiagentController():
                 self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
 
             elif loss_level == 2 or loss_level == 3:
-                assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
-                for _i in  range(_n_agent_pair_samples(self.n_agents)):
+                #assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
+                assert self.n_agents <= 3 or self.args.n_pair_samples == 1, "only implemented for 3 or fewer agents, or if n_pair_samples == 1"
+                for _i in  range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples):
                     sampled_pair_ids, _ = batch_history.get_col(col="actions_level1__sample{}".format(_i),)
+                #sampled_pair_ids, _ = batch_history.get_col(col="actions_level1__sample{}".format(0), )
                 sampled_pair_ids[sampled_pair_ids != sampled_pair_ids] = 0.0
                 sampled_pair_ids = sampled_pair_ids.unsqueeze(0).contiguous()
 
@@ -465,8 +467,9 @@ class XXXMultiagentController():
                 self.policies_level2 = modified_inputs_level2.clone()
 
             elif loss_level == 3:
-                assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
-                for _i in  range(_n_agent_pair_samples(self.n_agents)):
+                #assert self.n_agents <= 3, "only implemented for 3 or fewer agents!!"
+                assert self.n_agents <= 3 or self.args.n_pair_samples == 1, "only implemented for 3 or fewer agents, or if n_pair_samples == 1"
+                for _i in  range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples):
                     pair_sampled_actions, _ = batch_history.get_col(col="actions_level2__sample{}".format(_i))
                     pair_sampled_actions[pair_sampled_actions != pair_sampled_actions] = 0.0
                 pair_sampled_actions = pair_sampled_actions.unsqueeze(0).contiguous()
