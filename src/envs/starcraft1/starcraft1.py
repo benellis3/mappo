@@ -36,8 +36,8 @@ class SC1(MultiAgentEnv):
         self.map_name = args.map_name
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
         self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        # self.episode_limit = args.episode_limit
-        self.episode_limit = 1000
+        self.episode_limit = args.episode_limit
+        # self.episode_limit = 1000
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         # self.difficulty = args.difficulty
@@ -154,6 +154,7 @@ class SC1(MultiAgentEnv):
         self._obs = self.controller.init(micro_battles=True)
 
         self.controller.send([
+            [tcc.set_combine_frames, self._step_mul],
             [tcc.set_speed, 0],
             [tcc.set_gui, 1],
             [tcc.set_cmd_optim, 1],
