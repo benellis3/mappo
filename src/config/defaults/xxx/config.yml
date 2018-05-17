@@ -19,6 +19,7 @@ xxx_agent_model_level2: xxx_recurrent_agent_level2
 xxx_agent_model_level3: xxx_recurrent_agent_level3
 xxx_agent_level1_use_past_actions: True
 xxx_agent_level2_use_past_actions: True
+xxx_agent_level3_use_past_actions_level2: True
 xxx_agent_level3_use_past_actions: True
 xxx_agent_level3_use_past_actions_level1: True
 xxx_critic_level1: xxx_critic_level1
