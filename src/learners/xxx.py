@@ -96,8 +96,7 @@ class XXXLearner(BasicLearner):
         self.critic_level2 = mo_REGISTRY[self.args.xxx_critic_level2]
         self.critic_level3 = mo_REGISTRY[self.args.xxx_critic_level3]
 
-        self.critic_level1_scheme = Scheme([dict(name="observations",
-                                                 select_agent_ids=list(range(self.n_agents))),
+        self.critic_level1_scheme = Scheme([dict(name="obs_intersection_all"),
                                             dict(name="actions",
                                                  rename="past_actions",
                                                  select_agent_ids=list(range(self.n_agents)),
@@ -229,8 +228,8 @@ class XXXLearner(BasicLearner):
                                                                           *[dict(name="past_actions_level1__sample{}".format(_i))
                                                                             for _i in range(_n_agent_pair_samples(self.n_agents))],
                                                                           dict(name="past_actions",
-                                                                               select_agent_ids=list(range(self.n_agents)),)])
-        self.input_columns_level1["critic_level1"]["observations"] = Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))])
+                                                                               select_agent_ids=list(range(self.n_agents)),),
+                                                                          dict(name="obs_intersection_all")])
         self.input_columns_level1["critic_level1"]["agent_action"] = Scheme([dict(name="agent_actions__sample{}".format(_i))
                                                                                   for _i in range(1)],) # TODO: Expand for more than 4 agents!!
         self.input_columns_level1["critic_level1"]["agent_policy"] = Scheme([dict(name="agent_policy")])
