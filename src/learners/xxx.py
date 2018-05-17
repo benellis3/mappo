@@ -401,34 +401,12 @@ class XXXLearner(BasicLearner):
 
         # Retrieve and view all data that can be retrieved from batch_history in a single step (caching efficient)
 
-        # create one single batch_history view suitable for all
-        # data_inputs_level1, data_inputs_tformat_level1 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level1,
-        #                                                                     to_cuda=self.args.use_cuda,
-        #                                                                     to_variable=True,
-        #                                                                     bs_ids=None,
-        #                                                                     fill_zero=True) # DEBUG: Should be True
-        #
-        # data_inputs_level2, data_inputs_tformat_level2 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level2,
-        #                                                                     to_cuda=self.args.use_cuda,
-        #                                                                     to_variable=True,
-        #                                                                     bs_ids=None,
-        #                                                                     fill_zero=True) # DEBUG: Should be True
-        #
-        # data_inputs_level3, data_inputs_tformat_level3 = batch_history.view(dict_of_schemes=self.joint_scheme_dict_level3,
-        #                                                                     to_cuda=self.args.use_cuda,
-        #                                                                     to_variable=True,
-        #                                                                     bs_ids=None,
-        #                                                                     fill_zero=True) # DEBUG: Should be True
-
         data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=self.joint_scheme_dict,
                                                               to_cuda=self.args.use_cuda,
                                                               to_variable=True,
                                                               bs_ids=None,
                                                               fill_zero=True)
-                                                              #fill_zero=True) # DEBUG: Should be True
 
-        #a = {_k:_v.to_pd() for _k, _v in data_inputs.items()}
-        #b = batch_history.to_pd()
         self.train_level1(batch_history, data_inputs, data_inputs_tformat, T_env)
         self.train_level2(batch_history, data_inputs, data_inputs_tformat, T_env) # DEBUG
         self.train_level3(batch_history, data_inputs, data_inputs_tformat, T_env)
@@ -440,14 +418,6 @@ class XXXLearner(BasicLearner):
             self.update_target_nets(level=1)
             self.last_target_update_T_critic_level1 = self.T_critic_level1
             print("updating target net!")
-
-        # actions_level1 = []
-        # for _i in range(_n_agent_pair_samples(self.n_agents)):
-        #     actions, actions_tformat = batch_history.get_col(bs=None,
-        #                                                      col="actions_level1__sample{}".format(_i),
-        #                                                      # agent_ids=list(range(0, self.n_agents)),
-        #                                                      stack=True)
-        #     actions_level1.append(actions)
 
         # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
         actions, actions_tformat = batch_history.get_col(bs=None,
@@ -509,7 +479,6 @@ class XXXLearner(BasicLearner):
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True)
 
-        # a = data_inputs["critic_level3__agent0"].to_pd()
         self._optimize(batch_history,
                        xxx_model_inputs,
                        xxx_model_inputs_tformat,

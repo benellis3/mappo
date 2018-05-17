@@ -65,7 +65,6 @@ class XXXMultiagentController():
                                                                                   transforms=[("shift", dict(steps=1)),
                                                                                               ("one_hot_pairwise", dict(range=(0, self.n_actions-1)))],
                                                                                   switch=self.args.xxx_agent_level2_use_past_actions),
-                                                                             # TODO: transform to split into two actions (with maybe one-hot encoding each)!
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
                                                                              dict(name="xxx_epsilons_central_level2",
                                                                                   scope="episode"),
