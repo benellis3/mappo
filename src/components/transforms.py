@@ -431,7 +431,12 @@ def _one_hot(ndarray_or_tensor, **kwargs):
         y_onehot = th.cuda.FloatTensor(*tensor.shape[:-1], (rng[1] - rng[0] + 1)).zero_()
     nan_mask = (tensor != tensor)
     tensor[nan_mask] = 0  # mask nans the simple way # DEBUG
-    y_onehot.scatter_(len(tensor.shape) - 1, tensor.long(), 1)
+    try:
+        y_onehot.scatter_(len(tensor.shape) - 1, tensor.long(), 1)
+    except Exception as e:
+        a = th.max(tensor)
+        b = y_onehot.shape
+        pass
     if len(nan_mask.shape) > 0:
         y_onehot[nan_mask.repeat(1, 1, y_onehot.shape[2])] = 0  # set nans to zero
     return y_onehot
