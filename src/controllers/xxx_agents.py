@@ -214,7 +214,7 @@ class XXXMultiagentController():
             selected_actions_list += [dict(name="actions_level2__sample{}".format(_i),
                                            data=self.actions_level2_sampled[_i])] # TODO: BUG!?
         selected_actions_list += [dict(name="actions_level2",
-                                       select_agent_ids=list(range(self.n_agents)),
+                                       select_agent_ids=list(range(_n_agent_pairings(self.n_agents))),
                                        data=self.actions_level2)]
         selected_actions_list += [dict(name="actions_level3",
                                        select_agent_ids=list(range(self.n_agents)),
@@ -382,7 +382,7 @@ class XXXMultiagentController():
 
             if loss_level is None or loss_level == 2:
                 # --------------------- LEVEL 2
-                assert self.n_agents < 5, "pair selection only implemented for up to 4 agents yet!!"
+                # assert self.n_agents < 5, "pair selection only implemented for up to 4 agents yet!!"
 
                 inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
                                                                            inputs,

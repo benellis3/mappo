@@ -120,7 +120,6 @@ class XXXLearner(BasicLearner):
                                           ])
         self.target_critic_level1_scheme = self.critic_level1_scheme
 
-
         self.critic_scheme_level2_fn = \
             lambda _agent_id1, _agent_id2: Scheme([dict(name="agent_id",
                                                         rename="agent_ids",
@@ -221,7 +220,7 @@ class XXXLearner(BasicLearner):
         # construct model-specific input regions
 
         # level 1
-        assert self.n_agents <=4, "NOT IMPLEMENTED FOR >= 4 agents!"
+        # assert self.n_agents <=4, "NOT IMPLEMENTED FOR >= 4 agents!"
         self.input_columns_level1 = {}
         self.input_columns_level1["critic_level1"] = {}
         #self.input_columns_level1["critic_input_level1"]["avail_actions"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id])]).agent_flatten()
@@ -453,7 +452,7 @@ class XXXLearner(BasicLearner):
         #                                                      stack=True)
         #     actions_level1.append(actions)
 
-        assert self.n_agents <= 4, "not implemented for >= 4 agents!"
+        # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
         actions, actions_tformat = batch_history.get_col(bs=None,
                                                          col="actions_level1__sample{}".format(0),
                                                          # agent_ids=list(range(0, self.n_agents)),
