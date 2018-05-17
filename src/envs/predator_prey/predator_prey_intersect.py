@@ -58,6 +58,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         # Define the environment grid
         self.intersection_id_coded = getattr(args, "intersection_id_coded", False)
         self.intersection_global_view = getattr(args, "intersection_global_view", False)
+        self.intersection_unknown = getattr(args, "intersection_unknown", False)
         self.toroidal = args.predator_prey_toroidal
         shape = args.predator_prey_shape
         self.x_max, self.y_max = shape
@@ -71,6 +72,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.action_names = ["right", "down", "left", "up", "stay"]
         self.n_actions = self.actions.shape[0]
         self.n_agents = args.n_agents
+        self.random_start = getattr(args, "random_start", True)
         self.n_prey = args.n_prey
         self.agent_obs = args.agent_obs
         self.agent_obs_dim = np.asarray(self.agent_obs, dtype=int_type)
@@ -164,7 +166,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         # Return true if all targets are visible by all agents
         return np.all(d <= self.agent_obs)
 
-    def _intersect_targets(self, grid, agent_ids, targets, batch=0, target_id=0, targets_alive=None):
+    def _intersect_targets(self, grid, agent_ids, targets, batch=0, target_id=0, targets_alive=None, offset=0):
         """" Helper for get_obs_intersection(). """
         for a in range(targets.shape[0]):
             if targets_alive is None or targets_alive[a, batch]:
@@ -172,7 +174,7 @@ class PredatorPreyCapture(MultiAgentEnv):
                 if self._is_visible(self.agents[agent_ids, batch, :], targets[a, batch, :]):
                     # include the target in all observations (in relative positions)
                     for o in range(len(agent_ids)):
-                        grid[batch, targets[a, batch, 0], targets[a, batch, 1], target_id] = a + 1
+                        grid[batch, targets[a, batch, 0] + offset, targets[a, batch, 1] + offset, target_id] = a + 1
 
     def _get_obs_from_grid(self, grid, agent_id, batch=0):
         if self.toroidal:
@@ -182,9 +184,10 @@ class PredatorPreyCapture(MultiAgentEnv):
 
     def _get_obs_from_grid_bounded(self, grid, agent_id, batch=0):
         """ Return a bounded observation for other agents' locations and targets, the size specified by observation
-            shape, centered on the agent. Values outside the bounds of the grid are set to 0. """
+            shape, centered on the agent. Values outside the bounds of the grid are set to [-1, 0]. """
         # Create the empty observation grid
         agent_obs = np.zeros((2*self.agent_obs[0]+1, 2*self.agent_obs[1]+1, 2), dtype=float_type)
+        agent_obs[:, :, 0] = -1
         # Determine the unbounded limits of the agent's observation
         ul = self.agents[agent_id, batch, :] - self.agent_obs
         lr = self.agents[agent_id, batch, :] + self.agent_obs
@@ -220,7 +223,23 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.grid.fill(0.0)
 
         # Place n_agents and n_preys on the grid
-        self._place_actors(self.agents, 0)
+        if self.random_start:
+            self._place_actors(self.agents, 0)
+        else:
+            for b in range(self.batch_size):
+                if self.n_agents <= 1:
+                    self.agents[0, b, :] = [0, 0]
+                if self.n_agents <= 2:
+                    self.agents[1, b, :] = self.grid_shape - 1
+                if self.n_agents <= 3:
+                    self.agents[2, b, 0] = self.grid_shape - 1
+                    self.agents[2, b, 1] = 0
+                if self.n_agents <= 4:
+                    self.agents[3, b, 0] = 0
+                    self.agents[3, b, 1] = self.grid_shape - 1
+            self._place_actors(self.agents[4:, :, :], 0)
+
+        # Place n prey in the world
         self._place_actors(self.prey, 1)
 
         return self.get_obs(), self.get_state()
@@ -316,14 +335,92 @@ class PredatorPreyCapture(MultiAgentEnv):
         return self.n_agents * self.get_obs_size()
 
     def get_obs_intersection(self, agent_ids):
+        if self.toroidal or not self.intersection_unknown:
+            return self.get_obs_intersection1(agent_ids)
+        else:
+            return self.get_obs_intersection2(agent_ids)
+
+    def get_obs_intersection2(self, agent_ids):
+        # Compute available actions
+        a_a1 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[0])), [-1, 1])
+        a_a2 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[1])), [1, -1])
+        avail_actions = a_a1.dot(a_a2)
+        avail_all = avail_actions * 0 + 1
+        # Create oversized grid
+        ashape = np.array(self.agent_obs)
+        ushape = self.grid_shape + 2 * ashape
+        grid = np.zeros((self.batch_size, ushape[0], ushape[1], 2), dtype=float_type)
+        # Make walls
+        grid[:, :ashape[0], :, 0] = -1
+        grid[:, (self.grid_shape[0]+ashape[0]):, :, 0] = -1
+        grid[:, :, :ashape[1], 0] = -1
+        grid[:, :, (self.grid_shape[1] + ashape[1]):, 0] = -1
+        # Mark the grid with all intersected entities
+        noinformation = False
+        for b in range(self.batch_size):
+            if all([self._is_visible(self.agents[agent_ids, b, :], self.agents[agent_ids[a], b, :])
+                    for a in range(len(agent_ids))]):
+                # Every agent sees other intersected agents
+                self._intersect_targets(grid, agent_ids, targets=self.agents, batch=b, target_id=0, offset=ashape)
+                # Every agent sees intersected prey
+                self._intersect_targets(grid, agent_ids, targets=self.prey, batch=b, target_id=1,
+                                        targets_alive=self.prey_alive, offset=ashape)
+            else:
+                noinformation = True
+        # Mask out all unknown
+        for b in range(self.batch_size):
+            for a in agent_ids:
+                self._mask_agent(grid, self.agents[a, b, :] + ashape, ashape)
+
+        if self.intersection_global_view:
+            # In case of the global view
+            obs = grid[:, ashape[0]:(ashape[0] + self.grid_shape[0]), ashape[1]:(ashape[1] + self.grid_shape[1]), :]
+            obs = obs.reshape((1, self.batch_size, self.state_size))
+
+        else:
+            # otherwise local view
+            obs = np.zeros((len(agent_ids), self.batch_size, 2*ashape[0]+1, 2*ashape[1]+1, 2), dtype=float_type)
+            for b in range(self.batch_size):
+                for i, a in enumerate(agent_ids):
+                    obs[i, b, :, :, :] = grid[b, (self.agents[a, b, 0]):(self.agents[a, b, 0] + 2*ashape[0] + 1),
+                                              (self.agents[a, b, 1]):(self.agents[a, b, 1] + 2*ashape[1] + 1), :]
+            obs = obs.reshape(len(agent_ids), self.batch_size, -1)
+
+        # Final check: if not all agents can see each other, the mutual knowledge is empty
+        if noinformation:
+            obs = obs.reshape(obs.shape[0], obs.shape[1], obs.shape[2] // 2, 2)
+            obs[:, :, :, 0] = 0
+            obs[:, :, :, 1] = -1
+            obs = obs.reshape(obs.shape[0], obs.shape[1], 2 * obs.shape[2])
+
+        # Return considering batch-mode
+        if self.batch_mode:
+            return obs, avail_all
+        else:
+            return obs[:, 0, :].squeeze(), avail_all
+
+    def _mask_agent(self, grid, pos, ashape):
+        grid[:, :(pos[0] - ashape[0]), :, 0] = 0
+        grid[:, :(pos[0] - ashape[0]), :, 1] = -1
+        grid[:, (pos[0] + ashape[0]+1):, :, 0] = 0
+        grid[:, (pos[0] + ashape[0]+1):, :, 1] = -1
+        grid[:, :, :(pos[1] - ashape[1]), 0] = 0
+        grid[:, :, :(pos[1] - ashape[1]), 1] = -1
+        grid[:, :, (pos[1] + ashape[1] + 1):, 0] = 0
+        grid[:, :, (pos[1] + ashape[1] + 1):, 1] = -1
+
+    def get_obs_intersection1(self, agent_ids):
         """ Returns the intersection of the all of agent_ids agents' observations. """
         # Create grid
-        grid = np.zeros((self.batch_size, self.grid_shape[0], self.grid_shape[0], 2), dtype=float_type)
+        grid = np.zeros((self.batch_size, self.grid_shape[0], self.grid_shape[1], 2), dtype=float_type)
+        noinformation = False
 
+        # Compute available actions
         a_a1 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[0])),[-1,1])
         a_a2 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[1])),[1,-1])
         avail_actions = a_a1.dot(a_a2)
         avail_all = avail_actions * 0 + 1
+
         # If all agent_ids can see each other (otherwise the observation is empty)
         for b in range(self.batch_size):
             if all([self._is_visible(self.agents[agent_ids, b, :], self.agents[agent_ids[a], b, :])
@@ -334,16 +431,34 @@ class PredatorPreyCapture(MultiAgentEnv):
                 self._intersect_targets(grid, agent_ids, targets=self.prey, batch=b, target_id=1,
                                         targets_alive=self.prey_alive)
                 avail_all = avail_actions
-        # Return 0-1 encoded intersection if necessary
-        if not self.intersection_id_coded:
-            grid = (grid != 0.0).astype(np.float32)
+            else:
+                noinformation = True
+
+        # Unknown positions are encoded [0, -1]
+        if self.intersection_unknown:
+           # All agents remove the grid-positions they cannot see
+            for b in range(self.batch_size):
+                for a in range(len(agent_ids)):
+                    # kill upper quadrant
+                    if self.agents[a, b, 0] > self.agent_obs[0]:
+                        grid[b, :(self.agents[a, b, 0] - self.agent_obs[0]), :, 0] = 0
+                        grid[b, :(self.agents[a, b, 0] - self.agent_obs[0]), :, 1] = -1
+                    # Kill the lower quadrant
+                    if self.agents[a, b, 0] < self.grid_shape[0] - self.agent_obs[0] - 1:
+                        grid[b, (self.agents[a, b, 0] + self.agent_obs[0] + 1):, :, 0] = 0
+                        grid[b, (self.agents[a, b, 0] + self.agent_obs[0] + 1):, :, 1] = -1
+                        # kill left quadrant
+                    if self.agents[a, b, 1] > self.agent_obs[1]:
+                        grid[b, :, :(self.agents[a, b, 1] - self.agent_obs[0]), 0] = 0
+                        grid[b, :, :(self.agents[a, b, 1] - self.agent_obs[0]), 1] = -1
+                    # Kill the right quadrant
+                    if self.agents[a, b, 1] < self.grid_shape[1] - self.agent_obs[1] - 1:
+                        grid[b, :, (self.agents[a, b, 1] + self.agent_obs[1] + 1):, 0] = 0
+                        grid[b, :, (self.agents[a, b, 1] + self.agent_obs[1] + 1):, 1] = -1
+
         # The intersection grid is constructed, now we have to generate the observations from it
         if self.intersection_global_view:
-            # Return the intersection as a state
-            if self.batch_mode:
-                return grid.reshape((self.batch_size, self.state_size)), avail_all
-            else:
-                return grid[0, :, :, :].reshape(self.state_size), avail_all
+            obs = grid.reshape((1, self.batch_size, self.state_size))
         else:
             # Return the intersection as individual observations
             obs = np.zeros((len(agent_ids), self.batch_size, self.obs_size),
@@ -351,10 +466,23 @@ class PredatorPreyCapture(MultiAgentEnv):
             for b in range(self.batch_size):
                 for a in range(len(agent_ids)):
                     obs[a, b, :] = self._get_obs_from_grid(grid, a, b)
-            if self.batch_mode:
-                return obs, avail_all
-            else:
-                return obs[:, 0, :], avail_all
+
+        # Return 0-1 encoded (including negative 1) intersection if necessary
+        if not self.intersection_id_coded:
+            obs = (obs > 0).astype(np.float32) - (obs < 0).astype(np.float32)
+
+        # Final check: if not all agents can see each other, the mutual knowledge is empty
+        if noinformation:
+            obs = obs.reshape(obs.shape[0], obs.shape[1], obs.shape[2]//2, 2)
+            obs[:, :, :, 0] = 0
+            obs[:, :, :, 1] = -1
+            obs = obs.reshape(obs.shape[0], obs.shape[1], 2*obs.shape[2])
+
+        # Return considering batch-mode
+        if self.batch_mode:
+            return obs, avail_all
+        else:
+            return obs[:, 0, :].squeeze(), avail_all
 
     # ---------- GETTERS -----------------------------------------------------------------------------------------------
     def get_total_actions(self):
@@ -413,7 +541,9 @@ if __name__ == "__main__":
         'step_mul': 8,  # lets you skip observations and actions
         'difficulty': "3",
         'intersection_global_view': False,
-        'intersection_id_coded': False,
+        'intersection_id_coded': True,
+        'intersection_unknown': True,
+        'random_start': False,
         'reward_only_positive': True,
         'reward_negative_scale': 0.5,
         'reward_death_value': 10,
@@ -454,32 +584,43 @@ if __name__ == "__main__":
     print("Env is ", "batched" if env.batch_mode else "not batched")
 
     if False:
-        print(state)
+        env.print_agents()
+        print()
+        obs_shape = (2 * env_args.agent_obs[0] + 1, 2 * env_args.agent_obs[1] + 1)
         for i in range(env.n_agents):
-            print(all_obs[i])
+            obs = all_obs[i].reshape(obs_shape[0], obs_shape[1], 2)
+            print(obs[:, :, 0] - 2 * obs[:, :, 1])
+            print()
+
+    if False:
+        env.print_agents()
+        print()
+        state = state.reshape(env_args.predator_prey_shape[0], env_args.predator_prey_shape[1], 2)
+        print(state[:, :, 0] - 2 * state[:, :, 1])
 
         acts = np.asarray([[0, 1, 2, 3], [3, 2, 1, 0]]).transpose()
         env.step(acts[:, 0])
 
-        env.print_grid()
+        #env.print_grid()
         obs = []
         for i in range(4):
             obs.append(np.expand_dims(env.get_obs_agent(i), axis=1))
-        print(np.concatenate(obs, axis=1))
+        #print(np.concatenate(obs, axis=1))
 
-    if False:
+    if True:
         print("STATE:\n")
         env.print_agents()
         print()
         state_shape = (env_args.predator_prey_shape[0], env_args.predator_prey_shape[1], 2)
         obs_shape = (2*env_args.agent_obs[0] + 1, 2*env_args.agent_obs[1] + 1)
         agent_ids = [0, 1]
-        iobs = env.get_obs_intersection(agent_ids).reshape(len(agent_ids), obs_shape[0], obs_shape[1], 2)
+        iobs, _ = env.get_obs_intersection(agent_ids)
+        iobs = iobs.reshape(len(agent_ids), obs_shape[0], obs_shape[1], 2)
 
         print("\n\nINTERSECTIONS of", agent_ids, "\n")
         for a in range(len(agent_ids)):
-            print(iobs[a, :, :, 0].reshape(obs_shape) - iobs[a, :, :, 1].reshape(obs_shape), "\n")
+            print(iobs[a, :, :, 0].reshape(obs_shape) + 10*iobs[a, :, :, 1].reshape(obs_shape), "\n")
 
-    if True:
+    if False:
         env.print_agents()
         print(env.get_avail_actions())
