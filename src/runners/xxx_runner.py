@@ -44,7 +44,7 @@ class XXXRunner(NStepRunner):
                             dtype=np.int32,
                             missing=-1, ),
                        dict(name="avail_actions",
-                            shape=(self.n_actions,),
+                            shape=(self.n_actions+1,), # includes no-op
                             select_agent_ids=range(0, self.n_agents),
                             dtype=np.int32,
                             missing=-1,),
@@ -67,7 +67,7 @@ class XXXRunner(NStepRunner):
                               dtype=np.int32,
                               missing=-1,) for _i in range(_n_agent_pair_samples(self.n_agents))],
                        dict(name="policies_level3",
-                            shape=(self.n_actions,),
+                            shape=(self.n_actions+1,), # includes no-op
                             select_agent_ids=range(0, self.n_agents),
                             dtype=np.float32,
                             missing=np.nan),
@@ -266,7 +266,7 @@ class XXXRunner(NStepRunner):
             # perform environment steps and insert into transition buffer
             observations = _env.get_obs()
             state = _env.get_state()
-            avail_actions = _env.get_avail_actions()
+            avail_actions = [_aa + [0] for _aa in _env.get_avail_actions()]  # add place for noop action
             ret_dict = dict(state=state)  # TODO: Check that env_info actually exists
             for _i, _obs in enumerate(observations):
                 ret_dict["observations__agent{}".format(_i)] = observations[_i]
@@ -307,7 +307,7 @@ class XXXRunner(NStepRunner):
             # perform environment steps and add to transition buffer
             observations = _env.get_obs()
             state = _env.get_state()
-            avail_actions = _env.get_avail_actions()
+            avail_actions = [_aa + [0] for _aa in _env.get_avail_actions()]  # add place for noop action
             terminated = terminated
             truncated = terminated and env_info.get("episode_limit", False)
             ret_dict = dict(state=state,

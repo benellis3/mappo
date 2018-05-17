@@ -800,6 +800,15 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
 class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
 
+    def __init__(self, input_shapes, n_actions, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
+        super().__init__(input_shapes,
+        n_actions,
+        output_type = output_type,
+        output_shapes = dict(output=n_actions + 1),
+        layer_args = layer_args,
+        args = args, ** kwargs)  # need to expand using no-op action
+
+
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
 
@@ -836,6 +845,14 @@ class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
         return x, hidden_states, losses, tformat
 
 class XXXRecurrentAgentLevel3(RecurrentAgent):
+
+    def __init__(self, input_shapes, n_actions, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
+        super().__init__(input_shapes,
+        n_actions,
+        output_type = output_type,
+        output_shapes = dict(output=n_actions + 1),
+        layer_args = layer_args,
+        args = args, ** kwargs)  # need to expand using no-op action
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
