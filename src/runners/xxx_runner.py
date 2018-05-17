@@ -7,7 +7,7 @@ from torch.distributions import Normal
 
 from components.epsilon_schedules import FlatThenDecaySchedule
 from runners import REGISTRY as r_REGISTRY
-from utils.xxx import _n_agent_pair_samples, _n_agent_pairings, _ordered_agent_pairings
+from utils.xxx import _n_agent_pair_samples, _n_agent_pairings, _ordered_agent_pairings, _n_agent_pairings
 
 NStepRunner = r_REGISTRY["nstep"]
 
@@ -33,6 +33,11 @@ class XXXRunner(NStepRunner):
                               shape=(1,), # i.e. just one number for a pair of actions!
                               dtype=np.int32,
                               missing=-1,) for _i in range(_n_agent_pair_samples(self.n_agents))],
+                       dict(name="actions_level2",  # stores action for each agent that was chosen individually
+                            shape=(1,),
+                            select_agent_ids=range(0, _n_agent_pairings(self.n_agents)),
+                            dtype=np.int32,
+                            missing=-1, ),
                        dict(name="actions_level3", # stores action for each agent that was chosen individually
                             shape=(1,),
                             select_agent_ids=range(0, self.n_agents),

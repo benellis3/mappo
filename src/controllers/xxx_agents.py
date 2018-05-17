@@ -211,7 +211,10 @@ class XXXMultiagentController():
                                            data=self.actions_level1[_i])]
         for _i in range(_n_agent_pair_samples(self.n_agents)):
             selected_actions_list += [dict(name="actions_level2__sample{}".format(_i),
-                                           data=self.actions_level2[_i])]
+                                           data=self.actions_level2_sampled[_i])] # TODO: BUG!?
+        selected_actions_list += [dict(name="actions_level2",
+                                       select_agent_ids=list(range(self.n_agents)),
+                                       data=self.actions_level2)]
         selected_actions_list += [dict(name="actions_level3",
                                        select_agent_ids=list(range(self.n_agents)),
                                        data=self.actions_level3)]
@@ -456,6 +459,7 @@ class XXXMultiagentController():
                                                                                     test_mode=test_mode)
 
                 self.actions_level2 = pair_sampled_actions.clone()
+                self.actions_level2_sampled = pair_sampled_actions.gather(0, sampled_pair_ids.long())
                 self.selected_actions_format_level2 = selected_actions_format_level2
                 self.policies_level2 = modified_inputs_level2.clone()
 
