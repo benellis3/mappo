@@ -743,7 +743,10 @@ class SC2(MultiAgentEnv):
                 avail_actions[:, self.n_actions_no_attack + e_id] = 0
 
         # place the features of the agent himself always at the first place
-        al_ids = range(self.n_agents)
+        al_ids = list(agent_ids)
+        for al in range(self.n_agents):
+            if al not in agent_ids:
+                al_ids.append(al)
         for i, al_id in enumerate(al_ids):
             al_unit = self.get_unit_by_id(al_id)
             al_x = al_unit.pos.x
