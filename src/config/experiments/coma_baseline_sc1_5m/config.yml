@@ -12,6 +12,7 @@ env_args:
   map_name: m5v5_c_far
   hostname: localhost
   port: 11111
+  step_mul: 4
 env_stats_aggregator: sc1
 n_critic_learner_reps: 30
 n_loops_per_thread_or_sub_or_main_process: 1
