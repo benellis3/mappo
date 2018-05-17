@@ -21,7 +21,7 @@ env: sc2
 env_stats_aggregator: sc2
 env_args:
   difficulty: "3"
-  episode_limit: 40
+  episode_limit: 80
   heuristic_function: False
   measure_fps: True
   move_amount: 5
