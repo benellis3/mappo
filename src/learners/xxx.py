@@ -124,15 +124,10 @@ class XXXLearner(BasicLearner):
                                                         rename="agent_ids",
                                                         transforms=[("one_hot",dict(range=(0, self.n_agents-1)))],
                                                         select_agent_ids=[_agent_id1, _agent_id2],),
-                                                   dict(name="observations",
-                                                        select_agent_ids=[_agent_id1, _agent_id2]),
-                                                   #dict(name="actions_level3",
-                                                   #     rename="past_actions",
-                                                   #     select_agent_ids=list(range(self.n_agents)),
-                                                   #     transforms=[("shift", dict(steps=1)),
-                                                   #                #("one_hot", dict(range=(0, self.n_actions - 1)))
-                                                   #                ],
-                                                   #   switch=self.args.xxx_critic_level2_use_past_actions),
+                                                   dict(name="obs_intersection__pair{}".format(
+                                                       _agent_ids_2_pairing_id((_agent_id1, _agent_id2),
+                                                                               self.n_agents)),
+                                                        switch=self.args.xxx_use_obs_intersections),
                                                    *[dict(name="actions_level2__sample{}".format(0), # MIGHT BE PROBLEMATIC
                                                         rename="other_agent_actions_level2__sample{}".format(_i),
                                                         transforms=[] if _agent_ids_2_pairing_id((_agent_id1, _agent_id2),
@@ -150,7 +145,7 @@ class XXXLearner(BasicLearner):
                                                         rename="agent_action".format(0),
                                                         ),
                                                    dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                   *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)], #range(_n_agent_pair_samples(self.n_agents))], #select_agent_ids=[_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)])
+                                                   *[dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                    dict(name="state"),
                                                    dict(name="avail_actions",
                                                         select_agent_ids=[_agent_id1]),
@@ -248,9 +243,12 @@ class XXXLearner(BasicLearner):
                         dict(name="state"),
                         dict(name="past_action_level2__sample{}".format(0)),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2]),
+                        dict(name="obs_intersection__pair{}".format(
+                            _agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
+                             switch=self.args.xxx_use_obs_intersections),
                         #dict(name="past_actions", select_agent_ids=list(range(self.n_agents)))
                         ])
-            self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
+            #self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["observations"] = Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["agent_action"] = Scheme([dict(name="agent_action")])
             self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["policies_level2"] = Scheme([dict(name="policies_level2__sample{}".format(_i)) for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)]) #range(_n_agent_pair_samples(self.n_agents))])
             self.input_columns_level2["target_critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = self.input_columns_level2["critic_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]
