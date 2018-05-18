@@ -25,6 +25,9 @@ env_args:
   agent_obs: [1, 1]
   episode_limit: 50
   intersection_global_view: True
+  small_box: 1
+  big_box: 10
+  big_box_fail: -0.2
 gamma: 0.99
 learner: coma
 lr_agent: 0.0005
