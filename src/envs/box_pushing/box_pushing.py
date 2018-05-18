@@ -61,7 +61,7 @@ class CoopBoxPushing(MultiAgentEnv):
         self.intersection_unknown = getattr(args, "intersection_unknown", False)
         self.toroidal = args.predator_prey_toroidal
 
-        shape = args.predator_prey_shape
+        shape = (3,3)
         self.x_max, self.y_max = shape
         self.state_size = self.x_max * self.y_max * 3
         self.env_max = lTensor(shape)
@@ -362,10 +362,11 @@ class CoopBoxPushing(MultiAgentEnv):
 
         # Final check: if not all agents can see each other, the mutual knowledge is empty
         if noinformation:
-            obs = obs.reshape(obs.shape[0], obs.shape[1], obs.shape[2] // 2, 2)
+            obs = obs.reshape(obs.shape[0], obs.shape[1], obs.shape[2] // 3, 3)
             obs[:, :, :, 0] = 0
             obs[:, :, :, 1] = -1
-            obs = obs.reshape(obs.shape[0], obs.shape[1], 2 * obs.shape[2])
+            obs[:, :, :, 2] = -1
+            obs = obs.reshape(obs.shape[0], obs.shape[1], 3 * obs.shape[2])
 
         # Return considering batch-mode
         if self.batch_mode:
@@ -449,10 +450,11 @@ class CoopBoxPushing(MultiAgentEnv):
 
         # Final check: if not all agents can see each other, the mutual knowledge is empty
         if noinformation:
-            obs = obs.reshape(obs.shape[0], obs.shape[1], obs.shape[2]//2, 2)
+            obs = obs.reshape(obs.shape[0], obs.shape[1], obs.shape[2]//3, 3)
             obs[:, :, :, 0] = 0
             obs[:, :, :, 1] = -1
-            obs = obs.reshape(obs.shape[0], obs.shape[1], 2*obs.shape[2])
+            obs[:, :, :, 2] = -1
+            obs = obs.reshape(obs.shape[0], obs.shape[1], 3*obs.shape[2])
 
         # Return considering batch-mode
         if self.batch_mode:
