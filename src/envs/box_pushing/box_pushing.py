@@ -89,7 +89,7 @@ class CoopBoxPushing(MultiAgentEnv):
         #self.capture_rewards = [20, 1]
         self.r_small = 1
         self.r_big = 10
-        self.r_fail = -1
+        self.r_fail = -0.5
 
         # Define the internal state
         self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)
