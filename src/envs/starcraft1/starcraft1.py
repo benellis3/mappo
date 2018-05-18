@@ -61,7 +61,7 @@ class SC1(MultiAgentEnv):
         self.port = args.port + self.bs_id
         self.port_in_use = False
         self.debug_inputs = False
-        self.debug_rewards = True
+        self.debug_rewards = False
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
