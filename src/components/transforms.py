@@ -370,11 +370,8 @@ def _build_model_inputs(column_dict, inputs, inputs_tformat, to_variable=True, f
                         ret_dict[_k] = {}
                     # for _input_region_k in column_dict[list(column_dict.keys())[0]].keys():
                     for _input_region_k in column_dict[_k + "__agent{}".format(0)].keys():
-                        try:
-                            _vec = th.stack(
-                                [ret_dict[_k + "__agent{}".format(_id_key)][_input_region_k] for _id_key in id_keys])
-                        except Exception as e:
-                            pass
+                        _vec = th.stack(
+                            [ret_dict[_k + "__agent{}".format(_id_key)][_input_region_k] for _id_key in id_keys])
                         ret_dict[_k][_input_region_k] = _vec
                     for _id_key in id_keys:
                         del ret_dict[_k + "__agent{}".format(_id_key)]

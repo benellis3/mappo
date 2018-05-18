@@ -487,7 +487,7 @@ class BatchEpisodeBuffer():
         to_cuda = kwargs.get("to_cuda", False)
         to_variable = kwargs.get("to_variable", False)
         bs = kwargs.get("bs", None)
-        policy_label = kwargs.get("policy_label", None)
+
 
         if label in []:
             pass # batch-wise or custom statistics go in here
@@ -499,11 +499,12 @@ class BatchEpisodeBuffer():
         elif label in ["episode_length"]:
             return self.seq_lens
         elif label in ["policy_entropy"]:
+            policy_label = kwargs.get("policy_label", None)
             if policy_label is None:
                 entropies = [ np.nanmean(np.nansum((-th.log(self["policies__agent{}".format(_aid)][0]) *
                                                     self["policies__agent{}".format(_aid)][0]).cpu().numpy(), axis=2)) for _aid in range(self.n_agents)]
             else:
-                entropies = [np.nanmean(np.nansum((-th.log(self["policies__agent{}".format(_aid)][0]) *
+                entropies = [np.nanmean(np.nansum((-th.log(self["{}__agent{}".format(policy_label, _aid)][0]) *
                                                    self["{}__agent{}".format(policy_label, _aid)][0]).cpu().numpy(), axis=2))
                              for _aid in range(self.n_agents)]
             return np.asscalar(np.mean(entropies))
@@ -552,8 +553,8 @@ class BatchEpisodeBuffer():
         def _align_right(tensor, h, lengths):
             for _i, _l in enumerate(lengths):
                 if _l < h + 1 and _l > 0:
-                    a = tensor[:, _i, -_l:, :]
-                    b = tensor[:, _i, :_l, :]
+                    # a = tensor[:, _i, -_l:, :]
+                    # b = tensor[:, _i, :_l, :]
                     tensor[:, _i, -_l:, :] = tensor[:, _i, :_l, :].clone() # clone is super important as otherwise, cyclical reference!
                     tensor[:, _i, :(h + 1 - _l), :] = float("nan")  # not strictly necessary as will shift back anyway later...
             return tensor
@@ -573,10 +574,10 @@ class BatchEpisodeBuffer():
         G_buffer[:, :, h - 1, :] = R_tensor[:, :, h, :]
         G_buffer[:, :, h - 1:h, :] += gamma * V_tensor[:, :, h:, :] * truncated_tensor
 
-        a =  R_tensor[:, :, h, :]
-        b = G_buffer[:, :, h - 1:h, :]
-        c = V_tensor[:, :, h:, :]
-        d = truncated_tensor
+        # a =  R_tensor[:, :, h, :]
+        # b = G_buffer[:, :, h - 1:h, :]
+        # c = V_tensor[:, :, h:, :]
+        # d = truncated_tensor
         for t in range(h - 1, 0, -1):
             # delta_tm1 = R_tensor[:, :, t, :] + gamma * V_tensor[:, :, t, :]
             new_G = gamma * td_lambda * G_buffer[:, :, t, :] + gamma*(1-td_lambda) * V_tensor[:, :, t, :] + R_tensor[:, :, t, :]
