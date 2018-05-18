@@ -742,7 +742,7 @@ class XXXRecurrentAgentLevel2(nn.Module):
                 second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10)
                 x_sum = x_sum.masked_fill(second_mask, 1.0)
                 z =  (1 - x[:, 0:1])
-                z[z <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10] = np.sqrt(float(np.finfo(np.float32).tiny))
+                z = z.masked_fill(z <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
                 x = th.cat([ x[:, 0:1], z * th.div(x[:,1:].clone(), x_sum)], dim=1 ).clone()
             else:
                 x = th.exp(x)
