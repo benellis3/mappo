@@ -11,12 +11,11 @@ N_GPUS=`nvidia-smi -L | wc -l`
 N_UPPER=`expr $N_GPUS - 1`
 
 declare -a arr=(-1.5 0.01 1.5)
-for i in "${arr[@]}"
-do
-    for i in $(seq 1 $N_REPEAT); do
+for i in "${arr[@]}"; do
+    for j in $(seq 1 $N_REPEAT); do
       GPU_ID=`shuf -i0-${N_UPPER} -n1`
-      echo "Starting repeat number $i on GPU $GPU_ID"
-      NV_GPU=${GPU_ID} ../.././docker.sh python3 /pymarl/src/main.py --exp_name="xxx_jakob_sc2_2d_3z" with xxx_logit_bias=${i} name=${TAG}:$i__xxx_jakob_sc2_2d_3z__${TIMESTAMP}__repeat${i} use_tensorboard=False &
+      echo "Starting repeat number ${j} on GPU $GPU_ID"
+      NV_GPU=${GPU_ID} ../.././docker.sh python3 /pymarl/src/main.py --exp_name="xxx_jakob_sc2_2d_3z" with xxx_logit_bias=${i} name=${TAG}:$i__xxx_jakob_sc2_2d_3z__${TIMESTAMP}__repeat${j} use_tensorboard=False &
       sleep 10s
     done
 done
