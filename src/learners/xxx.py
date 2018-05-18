@@ -714,13 +714,18 @@ class XXXLearner(BasicLearner):
                                                      tformat="a*bs*t*v").sum()
 
         # carry out optimization for agents
+
         agent_optimiser.zero_grad()
         XXX_loss.backward()
 
-        if self.args.debug_mode:
-            _check_nan(agent_parameters)
+        #if self.args.debug_mode:
+        #    _check_nan(agent_parameters)
         policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
-        agent_optimiser.step()
+        try:
+            _check_nan(agent_parameters)
+            agent_optimiser.step()
+        except:
+            print("NaN in gradient or model!")
 
         #for p in self.agent_level1_parameters:
         #    print('===========\ngradient:\n----------\n{}'.format(p.grad))
