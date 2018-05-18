@@ -20,7 +20,8 @@ StarCraft I: Brood War
 '''
 
 # map parameter registry
-map_param_registry = {"m5v5_c_far": {"n_agents": 5, "n_enemies": 5}}
+map_param_registry = {"m5v5_c_far": {"n_agents": 5, "n_enemies": 5},
+                      "dragoons_zealots": {"n_agents": 5, "n_enemies": 5}}
 
 
 class SC1(MultiAgentEnv):
@@ -76,10 +77,6 @@ class SC1(MultiAgentEnv):
             self.env_file_type = 'dylib'
             # self.stalker_id = 1885
             # self.zealot_id = 1886
-        # else:
-        #     self.game_version = "4.1.2"  # latest release, uses visualisations
-        #     self.stalker_id = 1922
-        #     self.zealot_id = 1923
 
         if self.map_name == 'm5v5_c_far':
             self._agent_race = "Terran"
@@ -89,12 +86,19 @@ class SC1(MultiAgentEnv):
             self.unit_health_max_m = 40
 
             self.max_reward = 5 * self.unit_health_max_m + 5 * self.unit_health_max_m + self.n_enemies * self.reward_death_value + self.reward_win
-        else:
-            self._agent_race = "Terran"  # Terran
-            self._bot_race = "Terran"  # Terran
-            self.unit_health_max = 45
+        elif self.map_name == 'dragoons_zealots':
+            self._agent_race = "Protoss"
+            self._bot_race = "Protoss"
 
-            self.max_reward = self.n_enemies * (self.unit_health_max + self.reward_death_value) + self.reward_win
+            self.zealot_id = 65
+            self.dragoon_id = 66
+
+            self.unit_health_max_d = 100
+            self.unit_health_max_z = 100
+
+            self.max_reward = 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
+                              + 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
+                              + self.n_enemies * self.reward_death_value + self.reward_win
 
         # Check if server has already been launched
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -634,6 +638,108 @@ class SC1(MultiAgentEnv):
 
         return state
 
+    def get_intersect(self, coordinates, e_unit, sight_range):
+        e_x = e_unit.x
+        e_y = e_unit.y
+        distances = np.sum((coordinates - np.array([e_x, e_y])) ** 2, 1) ** 0.5
+        if max(distances) > sight_range:
+            return False
+        else:
+            return True
+
+    def get_obs_intersection(self, agent_ids):
+        """ Returns the intersection of the all of agent_ids agents' observations. """
+        # Create grid
+        nf_al = 4
+        nf_en = 5
+
+        if self.map_name == 'dragoons_zealots':
+            # unit types (in onehot)
+            nf_al += 2
+            nf_en += 2
+
+        # move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
+        enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
+        ally_feats = np.zeros((self.n_agents, nf_al), dtype=np.float32)
+        state = np.concatenate((enemy_feats.flatten(),
+                                ally_feats.flatten()))
+        state = state.astype(dtype=np.float32)
+        # Todo: Check that the dimensions are consistent.
+        a_a1 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[0])), [-1, 1])
+        a_a2 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[1])), [1, -1])
+        avail_actions = a_a1.dot(a_a2)
+        avail_all = avail_actions * 0 + 1
+
+        coordinates = np.zeros([len(agent_ids), 2])
+        for i, a_id in enumerate(agent_ids):
+            if not (self.agents[a_id].health > 0):
+                return state, avail_all
+            else:
+                coordinates[i] = [self.agents[a_id].x, self.agents[a_id].y]
+        # Calculate pairwise distances
+        distances = ((coordinates[:, 0:1] - coordinates[:, 0:1].T) ** 2 + (
+                coordinates[:, 1:2] - coordinates[:, 1:2].T) ** 2) ** 0.5
+        sight_range = self.unit_sight_range(agent_ids[0])
+        # Check that max pairwise distance is less than sight_range.
+        if np.max(distances) > sight_range:
+            return state, avail_all
+
+        x = np.mean(coordinates, 0)[0]
+        y = np.mean(coordinates, 0)[1]
+
+        for e_id, e_unit in self.enemies.items():
+            e_x = e_unit.x
+            e_y = e_unit.y
+            dist = self.distance(x, y, e_x, e_y)
+
+            if self.get_intersect(coordinates, e_unit, sight_range) and e_unit.health > 0:  # visible and alive
+                # Sight range > shoot range
+                enemy_feats[e_id, 0] = a_a1[self.n_actions_no_attack + e_id, 0]  # available
+                enemy_feats[e_id, 1] = dist / sight_range  # distance
+                enemy_feats[e_id, 2] = (e_x - x) / sight_range  # relative X
+                enemy_feats[e_id, 3] = (e_y - y) / sight_range  # relative Y
+                enemy_feats[e_id, 4] = a_a2[0, self.n_actions_no_attack + e_id]  # available
+
+                # TODO: Confirm that this is correct
+                if self.map_name == 'dragoons_zealots':
+                    type_id = e_unit.unit_type - 65  # 65 is the Protoss Zealot Type ID
+                    enemy_feats[e_id, 4 + type_id] = 1
+            else:
+                avail_actions[self.n_actions_no_attack + e_id, :] = 0
+                avail_actions[:, self.n_actions_no_attack + e_id] = 0
+
+        # place the features of the agent himself always at the first place
+        al_ids = range(self.n_agents)
+        for i, al_id in enumerate(al_ids):
+            al_unit = self.get_unit_by_id(al_id)
+            al_x = al_unit.x
+            al_y = al_unit.y
+            dist = self.distance(x, y, al_x, al_y)
+
+            if self.get_intersect(coordinates, al_unit, sight_range) and al_unit.health > 0:  # visible and alive
+                ally_feats[i, 0] = 1  # visible
+                ally_feats[i, 1] = dist / sight_range  # distance
+                ally_feats[i, 2] = (al_x - x) / sight_range  # relative X
+                ally_feats[i, 3] = (al_y - y) / sight_range  # relative Y
+
+                # TODO: Confirm that this is correct
+                if self.map_name == 'dragoons_zealots':
+                    type_id = al_unit.type - 66  # 66 is the Protoss dragoon Type ID
+                    ally_feats[i, 4 + type_id] = 1
+
+        state = np.concatenate((enemy_feats.flatten(),
+                                ally_feats.flatten()))
+
+        state = state.astype(dtype=np.float32)
+
+        if self.debug_inputs:
+            print("***************************************")
+            print("Agent_intersections: ", agent_ids)
+            print("Enemy feats\n", enemy_feats)
+            print("Ally feats\n", ally_feats)
+            print("***************************************")
+        return state, avail_actions
+
     def get_state_size(self):
         """ Returns the shape of the state"""
         nf_al = 4
@@ -707,6 +813,25 @@ class SC1(MultiAgentEnv):
         ally_feats = (self.n_agents - 1) * nf_al
 
         return move_feats + enemy_feats + ally_feats
+
+    def get_obs_intersect_pair_size(self):
+        return self.get_obs_intersect_size()
+
+    def get_obs_intersect_all_size(self):
+        return self.get_obs_intersect_size()
+
+    def get_obs_intersect_size(self):
+        nf_al = 4
+        nf_en = 5
+
+        if self.map_name == 'dragoons_zealots':
+            nf_al += 2
+            nf_en += 2
+
+        enemy_feats = self.n_enemies * nf_en
+        ally_feats = (self.n_agents) * nf_al
+
+        return enemy_feats + ally_feats
 
     def close(self):
         print("Closing StarCraftI")
