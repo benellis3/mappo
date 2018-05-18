@@ -1,6 +1,5 @@
 env: sc1
 env_args:
-  difficulty: "3"
   episode_limit: 70
   heuristic_function: False
   measure_fps: True
@@ -12,4 +11,4 @@ env_args:
   reward_scale_rate: 0
   reward_win: 30
   state_last_action: True
-  step_mul: 7
+  step_mul: 4

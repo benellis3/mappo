@@ -76,17 +76,18 @@ class SC1(MultiAgentEnv):
             os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
             self.env_file_type = 'dylib'
             # self.stalker_id = 1885
-            # self.zealot_id = 1886
 
         if self.map_name == 'm5v5_c_far':
+
             self._agent_race = "Terran"
             self._bot_race = "Terran"
 
-            # TODO: add more specs for other maps
             self.unit_health_max_m = 40
 
             self.max_reward = 5 * self.unit_health_max_m + 5 * self.unit_health_max_m + self.n_enemies * self.reward_death_value + self.reward_win
+
         elif self.map_name == 'dragoons_zealots':
+
             self._agent_race = "Protoss"
             self._bot_race = "Protoss"
 
@@ -216,7 +217,7 @@ class SC1(MultiAgentEnv):
             # self.restore_units()
             self._obs = self.controller.init(micro_battles=True)
         except:
-            # self.full_restart()
+            # self.full_restart()  # TODO: implement
             pass
 
     def full_restart(self):
@@ -240,6 +241,7 @@ class SC1(MultiAgentEnv):
             agent_action = self.get_agent_action(a_id, action)
             if agent_action:
                 sc_actions.append(agent_action)
+        # TODO: implement
         # for a_id, action in enumerate(actions):
         #     if not self.heuristic_function:
         #         agent_action = self.get_agent_action(a_id, action)
@@ -253,15 +255,11 @@ class SC1(MultiAgentEnv):
 
         if sent:
             self._obs = self.controller.recv()
-            # while True:
-            #     self._obs = self.controller.recv()
-            #     if self._obs.battle_frame_count % self._step_mul == 0:
-            #         self._obs = self.controller.recv()
-            #         break
         else:
             self.full_restart()
             return 0, True, {"episode_limit": True}
 
+        # TODO: implement
         # try:
         #     res_actions = self.controller.actions(req_actions)
         #     # Make step in SC2, i.e. apply actions
@@ -388,7 +386,7 @@ class SC1(MultiAgentEnv):
 
         return sc_action
 
-    # TODO: DO this
+    # TODO: implement
     def get_agent_action_heuristic(self, a_id, action):
 
         # unit = self.get_unit_by_id(a_id)
@@ -456,11 +454,9 @@ class SC1(MultiAgentEnv):
                     self.death_tracker_enemy[e_id] = 1
                     delta_deaths += self.reward_death_value
                     delta_enemy += prev_health
+                # still alive
                 else:
                     delta_enemy += prev_health - e_unit.health - e_unit.shield
-                    # print("Agent: {}\nPrev health: {}\nUnit health: {}\nDelta enemy: {}".format(e_id, prev_health, e_unit.health, delta_enemy))
-                    # print("Agent: {}\nPrev health: {}\nUnit health: {}\nDelta enemy: {}".format(e_id, prev_health, e_unit.health, delta_enemy))
-
 
         if self.reward_only_positive:
 
@@ -499,17 +495,6 @@ class SC1(MultiAgentEnv):
     def unit_sight_range(self, agent_id):
         unit = self.get_unit_by_id(agent_id)
         return tcc.staticvalues["sightRange"][unit.type]
-
-    # def unit_max_cooldown(self, agent_id):
-    #     # These are the biggest I've seen, there is no info about this
-    #     # if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-    #     #     return 15
-    #
-    #     unit = self.get_unit_by_id(agent_id)
-    #     if unit.unit_type == self.stalker_id: # Protoss's Stalker
-    #         return 35
-    #     if unit.unit_type == self.zealot_id: # Protoss's Zaelot
-    #         return 22
 
     def unit_max_shield(self, unit_id, ally):
         # These are the biggest I've seen, there is no info about this
@@ -554,6 +539,7 @@ class SC1(MultiAgentEnv):
                     enemy_feats[e_id, 2] = (e_x - x) / sight_range  # relative X
                     enemy_feats[e_id, 3] = (e_y - y) / sight_range  # relative Y
 
+                    # TODO: do we need this in SC1?
                     # if self.map_name == '2d_3z' or self.map_name == '3d_5z':
                     #     type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
                     #     enemy_feats[e_id, 4 + type_id] = 1
@@ -654,7 +640,7 @@ class SC1(MultiAgentEnv):
         nf_en = 5
 
         if self.map_name == 'dragoons_zealots':
-            # unit types (in onehot)
+            # unit types (in one-hot)
             nf_al += 2
             nf_en += 2
 
@@ -676,10 +662,12 @@ class SC1(MultiAgentEnv):
                 return state, avail_all
             else:
                 coordinates[i] = [self.agents[a_id].x, self.agents[a_id].y]
+
         # Calculate pairwise distances
         distances = ((coordinates[:, 0:1] - coordinates[:, 0:1].T) ** 2 + (
                 coordinates[:, 1:2] - coordinates[:, 1:2].T) ** 2) ** 0.5
         sight_range = self.unit_sight_range(agent_ids[0])
+
         # Check that max pairwise distance is less than sight_range.
         if np.max(distances) > sight_range:
             return state, avail_all
@@ -700,9 +688,9 @@ class SC1(MultiAgentEnv):
                 enemy_feats[e_id, 3] = (e_y - y) / sight_range  # relative Y
                 enemy_feats[e_id, 4] = a_a2[0, self.n_actions_no_attack + e_id]  # available
 
-                # TODO: Confirm that this is correct
+                # TODO: do we need this in SC1
                 if self.map_name == 'dragoons_zealots':
-                    type_id = e_unit.unit_type - 65  # 65 is the Protoss Zealot Type ID
+                    type_id = e_unit.unit_type - self.zealot_id
                     enemy_feats[e_id, 4 + type_id] = 1
             else:
                 avail_actions[self.n_actions_no_attack + e_id, :] = 0
@@ -722,9 +710,9 @@ class SC1(MultiAgentEnv):
                 ally_feats[i, 2] = (al_x - x) / sight_range  # relative X
                 ally_feats[i, 3] = (al_y - y) / sight_range  # relative Y
 
-                # TODO: Confirm that this is correct
+                # TODO: do we need this in SC1?
                 if self.map_name == 'dragoons_zealots':
-                    type_id = al_unit.type - 66  # 66 is the Protoss dragoon Type ID
+                    type_id = al_unit.type - self.dragoon_id
                     ally_feats[i, 4 + type_id] = 1
 
         state = np.concatenate((enemy_feats.flatten(),
@@ -799,8 +787,6 @@ class SC1(MultiAgentEnv):
             avail_agent = self.get_avail_agent_actions(agent_id)
             avail_actions.append(avail_agent)
 
-        # if [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] in avail_actions:
-        #     print("\nAvailable actions for {}:\n{}".format(self.bs_id, avail_actions))
         return avail_actions
 
     def get_obs_size(self):
@@ -833,6 +819,7 @@ class SC1(MultiAgentEnv):
 
         return enemy_feats + ally_feats
 
+    # TODO: Check if we need this
     def close(self):
         print("Closing StarCraftI")
         self.controller.close()
@@ -853,15 +840,10 @@ class SC1(MultiAgentEnv):
         for unit in self._obs.units[1]:
             self.enemies_orig[len(self.enemies_orig)] = unit
 
-        # for unit in self._obs.observation.raw_data.units:
-        #     if unit.owner == 1: # agent
-        #         self.agents_orig[len(self.agents_orig)] = unit
-        #     else:
-        #         self.enemies_orig[len(self.enemies_orig)] = unit
-
         assert len(self.agents_orig) == self.n_agents, "Incorrect number of agents: " + str(len(self.agents_orig))
         assert len(self.enemies_orig) == self.n_enemies, "Incorrect number of enemies: " + str(len(self.enemies_orig))
 
+    # TODO: implement
     def restore_units(self):
         # restores the original state of the game
         pass
@@ -949,6 +931,7 @@ class SC1(MultiAgentEnv):
             else:
                 self.full_restart()
 
+            # TODO: implement
             # try:
             #     self.controller.step(1)
             #     self._obs = self.controller.recv()
@@ -971,10 +954,6 @@ class SC1(MultiAgentEnv):
         n_enemy_alive = 0
 
         # Store previous state
-        # for i in range(5):
-        #     if self.enemies[i].health < 40:
-        #         print("Enemy: {} -- Previous Health: {}".format(i, self.enemies[i].health))
-        #         print("Enemy: {} -- Current Health: {}".format(i, self._obs.units[1][i].health))
         self.previous_agent_units = deepcopy(self.agents)
         self.previous_enemy_units = deepcopy(self.enemies)
         # self.previous_agent_units = CloudpickleWrapper(self.agents).__getstate__()
