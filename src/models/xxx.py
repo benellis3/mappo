@@ -735,13 +735,15 @@ class XXXRecurrentAgentLevel2(nn.Module):
                 x = th.cat([x[:, 0:1] + self.args.xxx_logit_bias, x[:, 1:]], dim=1)
                 x = th.exp(x)
                 x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
-                x_mask = 1.0 + x[:, 0]
-
+                # x_mask = 1.0 + x[:, 0]
+                # x_mask[x_mask - 1.0 < np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10] = np.sqrt(float(np.finfo(np.float32).tiny))
                 x[:, 0] = th.div(x[:, 0].clone(), 1.0 + x[:, 0])
                 x_sum = x[:,1:].sum(dim=1, keepdim=True)
                 second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10)
                 x_sum = x_sum.masked_fill(second_mask, 1.0)
-                x = th.cat([ x[:, 0:1],  (1 - x[:, 0:1]) * th.div(x[:,1:].clone(), x_sum)], dim =1 ).clone()
+                z =  (1 - x[:, 0:1])
+                z = z.masked_fill(z <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
+                x = th.cat([ x[:, 0:1], z * th.div(x[:,1:].clone(), x_sum)], dim=1 ).clone()
             else:
                 x = th.exp(x)
                 x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
