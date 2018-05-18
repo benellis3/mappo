@@ -1,5 +1,5 @@
 defaults: default coma sc1
-batch_size: 30
+batch_size: 32
 coma_critic_use_sampling: True
 coma_critic_sample_size: 1620
 coma_epsilon_start: 0.5
@@ -9,14 +9,11 @@ coma_epsilon_decay_mode: "exp"
 coma_exploration_mode: "softmax"
 coma_use_entropy_regularizer: False
 env_args:
-  map_name: 2d_3z
+  map_name: dragoons_zealots
   hostname: localhost
   port: 11111
 env_stats_aggregator: sc1
-n_critic_learner_reps: 30
+n_critic_learner_reps: 4
 n_loops_per_thread_or_sub_or_main_process: 1
-n_sub
-processes: 30
+n_subprocesses: 32
 target_critic_update_interval: 162000
-test_interval: 48600
-test_nepisode: 30
