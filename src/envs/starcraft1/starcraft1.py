@@ -37,11 +37,10 @@ class SC1(MultiAgentEnv):
         self.map_name = args.map_name
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
         self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        # self.episode_limit = args.episode_limit
-        self.episode_limit = 1000
+        self.episode_limit = args.episode_limit
+        # self.episode_limit = 1000
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
-        # self.difficulty = args.difficulty
         self.state_last_action = args.state_last_action
 
         # Rewards args
