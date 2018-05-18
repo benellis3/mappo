@@ -10,9 +10,9 @@ coma_critic_sample_size: 1620
 coma_critic_use_sampling: True
 coma_entropy_loss_regularization_factor: 5e-06
 coma_epsilon_decay_mode: linear
-coma_epsilon_finish: 0.01
-coma_epsilon_start: 0.5
-coma_epsilon_time_length: 50000
+coma_epsilon_finish: 0.05
+coma_epsilon_start: 0.9
+coma_epsilon_time_length: 100000
 coma_exploration_mode: softmax
 coma_use_entropy_regularizer: False
 debug_mode: None
