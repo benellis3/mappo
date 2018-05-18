@@ -61,7 +61,7 @@ class CoopBoxPushing(MultiAgentEnv):
         self.intersection_unknown = getattr(args, "intersection_unknown", False)
         self.toroidal = args.predator_prey_toroidal
 
-        shape = (3,3)
+        shape = args.predator_prey_shape
         self.x_max, self.y_max = shape
         self.state_size = self.x_max * self.y_max * 3
         self.env_max = lTensor(shape)
