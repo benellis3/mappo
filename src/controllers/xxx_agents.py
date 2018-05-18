@@ -13,7 +13,8 @@ from components.transforms import _build_model_inputs, _join_dicts, \
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
 from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
-    _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings, _agent_ids_2_pairing_id, _joint_actions_2_action_pair_aa
+    _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings, \
+    _agent_ids_2_pairing_id, _joint_actions_2_action_pair_aa, _ordered_agent_pairings
 class XXXMultiagentController():
     """
     container object for a set of independent agents
@@ -97,10 +98,11 @@ class XXXMultiagentController():
                                                                                  ("one_hot", dict(range=(0, self.n_actions)))], # includes no-op actions
                                                                      switch=self.args.xxx_agent_level3_use_past_actions),
                                                                 dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
-                                                                * [dict(name="actions_level2__sample{}".format(_i),
-                                                                        transforms=[("one_hot_pairwise", dict(range=(0, self.n_actions*self.n_actions + 2)))],
-                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level1)
-                                                                   for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                                                                dict(name="actions_level2",
+                                                                     transforms=[("one_hot_pairwise", dict(range=(0, self.n_actions*self.n_actions + 2)))],
+                                                                     select_agent_ids=[_i for _i in range(_n_agent_pairings(self.n_agents)) if _agent_id in _ordered_agent_pairings(self.n_agents)[_i]],
+                                                                     switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                               ,
                                                                 * [dict(name="actions_level1__sample{}".format(_i),
                                                                         transforms=[("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))],
                                                                         switch=self.args.xxx_agent_level3_use_past_actions_level1)
@@ -188,14 +190,17 @@ class XXXMultiagentController():
                              select_agent_ids=[_agent_id],
                              switch=self.args.xxx_agent_level3_use_past_actions),
                         dict(name="agent_id", select_agent_ids=[_agent_id]),
-                        *[dict(name="actions_level2__sample{}".format(_i),
-                               switch=self.args.xxx_agent_level3_use_past_actions_level2)
-                          for _i in range(_n_agent_pair_samples(
-                                self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                        dict(name="actions_level2",
+                             select_agent_ids=[_i for _i in range(_n_agent_pairings(self.n_agents)) if _agent_id in _ordered_agent_pairings(self.n_agents)[_i]],
+                             switch=self.args.xxx_agent_level3_use_past_actions_level2),
+                          #for _i in range(_n_agent_pair_samples(
+                          #      self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples) if (_agent_id in _pairing_id_2_agent_ids(_i, self.n_agents))],
                         *[dict(name="actions_level1__sample{}".format(_i),
                                switch=self.args.xxx_agent_level3_use_past_actions_level1)
                           for _i in range(_n_agent_pair_samples(
-                                self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
+                                self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)]
+                          #for _i in range(_n_agent_pair_samples(
+                          #      self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)),
                         ])
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_central_level3"] = \
                 Scheme([dict(name="xxx_epsilons_central_level3",

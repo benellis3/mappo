@@ -149,20 +149,36 @@ class XXXRunner(NStepRunner):
         super()._add_episode_stats(T_env)
 
         test_suffix = "" if not self.test_mode else "_test"
-        # TODO!
-        # self._add_stat("policy_level1_entropy",
-        #               self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level1"),
-        #               T_env=T_env,
-        #               suffix=test_suffix)
-        # self._add_stat("policy_level2_entropy_",
-        #               self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level2"),
-        #               T_env=T_env,
-        #               suffix=test_suffix)
-        # self._add_stat("policy_level3_entropy_",
-        #               self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level3"),
-        #               T_env=T_env,
-        #               suffix=test_suffix)
 
+        #[np.nanmean(np.nansum((-th.log(self["policies__agent{}".format(_aid)][0]) *
+        #                       self["{}__agent{}".format(policy_label, _aid)][0]).cpu().numpy(), axis=2))
+        # TODO!
+        #self._add_stat("policy_level1_entropy",
+        #              self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level1"),
+        #              T_env=T_env,
+        #              suffix=test_suffix)
+
+        tmp = self.episode_buffer["policies_level1"][0]
+        entropy1 = np.nanmean(np.nansum((-th.log(tmp)*tmp).cpu().numpy(), axis=2))
+        self._add_stat("policy_level1_entropy",
+                       entropy1,
+                       T_env=T_env,
+                       suffix=test_suffix)
+
+
+        for _i in range(_n_agent_pair_samples(self.n_agents)):
+            tmp = self.episode_buffer["policies_level2__sample{}".format(_i)][0]
+            entropy2 = np.nanmean(np.nansum((-th.log(tmp) * tmp).cpu().numpy(), axis=2))
+            self._add_stat("policy_level2_entropy_sample{}".format(_i),
+                           entropy2,
+                           T_env=T_env,
+                           suffix=test_suffix)
+
+        #entropy3 = np.nanmean(np.nansum((-th.log(tmp) * tmp).cpu().numpy(), axis=2))
+        self._add_stat("policy_level3_entropy",
+                        self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level3"),
+                        T_env=T_env,
+                        suffix=test_suffix)
 
         actions_level2, _ = self.episode_buffer.get_col(col="actions_level2__sample{}".format(0))
         delegation_rate = th.sum(actions_level2==0.0) / actions_level2.contiguous().view(-1).shape[0]
@@ -228,12 +244,20 @@ class XXXRunner(NStepRunner):
             log_str += ", XXX_epsilon_level2={:g}".format(self.xxx_epsilon_decay_schedule_level2.eval(self.T_env))
             log_str += ", XXX_epsilon_level3={:g}".format(self.xxx_epsilon_decay_schedule_level3.eval(self.T_env))
             log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate"]))
+            log_str += ", policies_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
+            for _i in range(_n_agent_pair_samples(self.n_agents)):
+                log_str += ", policies_level2_entropy_sample{}={:g}".format(_i, _seq_mean(stats["policy_level2_entropy_sample{}".format(_i)]))
+            log_str += ", policies_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
             # log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
             # log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy"]))
             # log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
             self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
         else:
             log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate_test"]))
+            log_str += ", policies_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy_test"]))
+            for _i in range(_n_agent_pair_samples(self.n_agents)):
+                log_str += ", policies_level2_entropy_sample{}={:g}".format(_i, _seq_mean(stats["policy_level2_entropy_sample{}_test".format(_i)]))
+            log_str += ", policies_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy_test"]))
             # log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy_test"]))
             # log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy_test"]))
             # log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy_test"]))
