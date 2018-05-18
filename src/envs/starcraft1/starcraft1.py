@@ -70,6 +70,7 @@ class SC1(MultiAgentEnv):
             # self.game_version = "1.4.0"
             os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
             self.env_file_type = 'so'
+
         if sys.platform == 'darwin':
             # self.game_version = "1.4.0"
             os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
@@ -540,9 +541,9 @@ class SC1(MultiAgentEnv):
                     enemy_feats[e_id, 3] = (e_y - y) / sight_range  # relative Y
 
                     # TODO: do we need this in SC1?
-                    # if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-                    #     type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
-                    #     enemy_feats[e_id, 4 + type_id] = 1
+                    if self.map_name == 'dragoons_zealots':
+                        type_id = e_unit.unit_type - self.zealot_id
+                        enemy_feats[e_id, 4 + type_id] = 1
 
             # place the features of the agent himself always at the first place
             al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
