@@ -34,12 +34,12 @@ TODO: Fine tune the reward to allow fast learning.
 '''
 
 
-if torch.cuda.is_available():
-    Tensor = torch.cuda.FloatTensor
-    lTensor = torch.cuda.LongTensor
-else:
-    Tensor = torch.FloatTensor
-    lTensor = torch.LongTensor
+# if torch.cuda.is_available():
+#     Tensor = torch.cuda.FloatTensor
+#     lTensor = torch.cuda.LongTensor
+# else:
+Tensor = torch.FloatTensor
+lTensor = torch.LongTensor
 
 
 class CoopBoxPushing(MultiAgentEnv):
