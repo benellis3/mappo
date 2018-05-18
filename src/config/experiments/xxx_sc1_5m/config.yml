@@ -39,6 +39,7 @@ env_args:
   port: 11111
   intersection_global_view: False
   step_mul: 1
+  episode_limit: 800
 gamma: 0.99
 learner: xxx
 lr_agent_level1: 0.0005

@@ -37,8 +37,8 @@ class SC1(MultiAgentEnv):
         self.map_name = args.map_name
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
         self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        self.episode_limit = args.episode_limit
-        # self.episode_limit = 1000
+        # self.episode_limit = args.episode_limit
+        self.episode_limit = 1000
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         # self.difficulty = args.difficulty
@@ -62,20 +62,19 @@ class SC1(MultiAgentEnv):
         self.port = args.port + self.bs_id
         self.port_in_use = False
         self.debug_inputs = False
-        self.debug_rewards = False
+        self.debug_rewards = True
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
         if sys.platform == 'linux':
             # self.game_version = "1.4.0"
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI') # os.pardir,
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
             self.env_file_type = 'so'
         if sys.platform == 'darwin':
             # self.game_version = "1.4.0"
             os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
             self.env_file_type = 'dylib'
-            # self.stalker_id = 1885
 
         if self.map_name == 'm5v5_c_far':
 
@@ -84,7 +83,10 @@ class SC1(MultiAgentEnv):
 
             self.unit_health_max_m = 40
 
-            self.max_reward = 5 * self.unit_health_max_m + 5 * self.unit_health_max_m + self.n_enemies * self.reward_death_value + self.reward_win
+            self.max_reward = 5 * self.unit_health_max_m\
+                              + 5 * self.unit_health_max_m \
+                              + self.n_enemies * self.reward_death_value \
+                              + self.reward_win
 
         elif self.map_name == 'dragoons_zealots':
 
@@ -99,7 +101,8 @@ class SC1(MultiAgentEnv):
 
             self.max_reward = 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
                               + 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
-                              + self.n_enemies * self.reward_death_value + self.reward_win
+                              + self.n_enemies * self.reward_death_value \
+                              + self.reward_win
 
         # Check if server has already been launched
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -136,8 +139,6 @@ class SC1(MultiAgentEnv):
         self.battles_game = 0
         self.timeouts = 0
         self.force_restarts = 0
-
-        # self.last_action = tc.zeros((self.n_agents, self.n_actions))
 
     def _launch_server(self):
         my_env = {"OPENBW_ENABLE_UI": '0',
