@@ -2,6 +2,7 @@ from functools import partial
 
 from components.transforms import _join_dicts
 from .predator_prey import PredatorPreyCapture
+from .box_pushing import CoopBoxPushing
 #from .predator_prey import PredatorPreyCaptureCython
 from .predator_prey__old import PredatorPreyEnv as PredatorPreyOldEnv
 from .matrix_game import NormalFormMatrixGame
@@ -18,6 +19,7 @@ REGISTRY["pred_prey"] = partial(env_fn, env=PredatorPreyCapture)
 #                                     env = PredatorPreyCaptureCython)
 REGISTRY["matrix_game"] = partial(env_fn, env=NormalFormMatrixGame)
 REGISTRY["integration_test"] = partial(env_fn, env=IntegrationTestEnv)
+REGISTRY["box_push"] = partial(env_fn, env=CoopBoxPushing)
 
 try:
     from .starcraft1 import StarCraft1Env
