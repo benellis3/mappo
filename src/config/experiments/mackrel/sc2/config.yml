@@ -5,7 +5,7 @@ n_critic_level2_learner_reps: 4
 n_critic_level3_learner_reps: 4
 n_loops_per_thread_or_sub_or_main_process: 1
 n_subprocesses: 2
-defaults: default xxx sc2
+defaults: default mackrel sc2
 mackrel_critic_level1_use_sampling: False
 mackrel_critic_level1_sample_size: 1620
 mackrel_critic_level2_use_sampling: False
@@ -22,4 +22,4 @@ test_interval: 48600
 test_nepisode: 30
 use_replay_buffer: False
 mackrel_agent_level3_use_past_actions_level2: True
-defaults: xxx
+defaults: mackrel

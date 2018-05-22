@@ -9,7 +9,7 @@ coma_epsilon_decay_mode: linear
 coma_epsilon_finish: 0.0
 coma_epsilon_start: 0.5
 coma_epsilon_time_length: 50000
-defaults: default xxx predator_prey
+defaults: default mackrel predator_prey
 env_args:
   agent_obs:
     - 1
@@ -26,4 +26,4 @@ reward_collision: 0.0
 reward_scare: 0.0
 reward_time: -0.1
 mackrel_agent_level3_use_past_actions_level2: True
-defaults: xxx
+defaults: mackrel

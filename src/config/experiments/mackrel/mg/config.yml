@@ -5,7 +5,7 @@ mackrel_critic_level2_use_sampling: True
 mackrel_critic_level2_sample_size: 1620
 mackrel_critic_level3_use_sampling: True
 mackrel_critic_level3_sample_size: 1620
-defaults: default xxx matrix_game
+defaults: default mackrel matrix_game
 env_args:
   episode_limit: 1
   n_agents: 2
@@ -20,4 +20,4 @@ mackrel_use_obs_intersections: False
 test_interval: 10
 test_nepisode: 30
 mackrel_agent_level3_use_past_actions_level2: True
-defaults: xxx
+defaults: mackrel

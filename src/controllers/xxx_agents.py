@@ -12,10 +12,10 @@ from components.transforms import _build_model_inputs, _join_dicts, \
 
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
-from utils.xxx import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
+from utils.mackrel import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
     _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings, \
     _agent_ids_2_pairing_id, _joint_actions_2_action_pair_aa, _ordered_agent_pairings
-class XXXMultiagentController():
+class MACKRELMultiagentController():
     """
     container object for a set of independent agents
     TODO: may need to propagate test_mode in here as well!
@@ -29,9 +29,9 @@ class XXXMultiagentController():
         self.agent_output_type = "policies"
 
 
-        self.model_level1 = mo_REGISTRY[args.xxx_agent_model_level1]
-        self.model_level2 = mo_REGISTRY[args.xxx_agent_model_level2]
-        self.model_level3 = mo_REGISTRY[args.xxx_agent_model_level3]
+        self.model_level1 = mo_REGISTRY[args.mackrel_agent_model_level1]
+        self.model_level2 = mo_REGISTRY[args.mackrel_agent_model_level2]
+        self.model_level3 = mo_REGISTRY[args.mackrel_agent_model_level3]
 
         # # Set up action selector
         if action_selector is None:
@@ -44,13 +44,13 @@ class XXXMultiagentController():
                                                 rename="past_actions_level1__sample{}".format(_i),
                                                 transforms=[("shift", dict(steps=1)),
                                                             ("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))], # DEBUG
-                                                switch=self.args.xxx_agent_level1_use_past_actions)
+                                                switch=self.args.mackrel_agent_level1_use_past_actions)
                                              for _i in range(_n_agent_pair_samples(self.n_agents))],
-                                           dict(name="xxx_epsilons_central_level1",
+                                           dict(name="mackrel_epsilons_central_level1",
                                                 scope="episode"),
                                            dict(name="observations",
                                                 select_agent_ids=list(range(self.n_agents)))
-                                           if not self.args.xxx_use_obs_intersections else
+                                           if not self.args.mackrel_use_obs_intersections else
                                            dict(name="obs_intersection_all")
                                            ])
 
@@ -65,24 +65,24 @@ class XXXMultiagentController():
                                                                                   rename="past_actions_level2",
                                                                                   transforms=[("shift", dict(steps=1)),
                                                                                               ("one_hot_pairwise", dict(range=(0, self.n_actions-1)))],
-                                                                                  switch=self.args.xxx_agent_level2_use_past_actions),
+                                                                                  switch=self.args.mackrel_agent_level2_use_past_actions),
                                                                              *[dict(name="actions_level1__sample{}".format(_i),
                                                                                  transforms=[("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))],
-                                                                                 switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                                 switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                                                                                for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                                              dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
-                                                                             dict(name="xxx_epsilons_central_level2",
+                                                                             dict(name="mackrel_epsilons_central_level2",
                                                                                   scope="episode"),
                                                                              dict(name="avail_actions",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2]),
                                                                              dict(name="observations",
                                                                                   select_agent_ids=[_agent_id1, _agent_id2],
-                                                                                  switch=not self.args.xxx_use_obs_intersections),
+                                                                                  switch=not self.args.mackrel_use_obs_intersections),
                                                                              dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                                                  switch=self.args.xxx_use_obs_intersections),
+                                                                                  switch=self.args.mackrel_use_obs_intersections),
                                                                              dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                                                  switch=self.args.xxx_use_obs_intersections),
-                                                                             dict(name="xxx_epsilons_central_level2",
+                                                                                  switch=self.args.mackrel_use_obs_intersections),
+                                                                             dict(name="mackrel_epsilons_central_level2",
                                                                                   scope="episode"),
                                                                              ])
 
@@ -96,20 +96,20 @@ class XXXMultiagentController():
                                                                      select_agent_ids=[_agent_id],
                                                                      transforms=[("shift", dict(steps=1)),
                                                                                  ("one_hot", dict(range=(0, self.n_actions)))], # includes no-op actions
-                                                                     switch=self.args.xxx_agent_level3_use_past_actions),
+                                                                     switch=self.args.mackrel_agent_level3_use_past_actions),
                                                                 dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id]),
                                                                 dict(name="actions_level2",
                                                                      transforms=[("one_hot_pairwise", dict(range=(0, self.n_actions*self.n_actions + 2)))],
                                                                      select_agent_ids=[_i for _i in range(_n_agent_pairings(self.n_agents)) if _agent_id in _ordered_agent_pairings(self.n_agents)[_i]],
-                                                                     switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                     switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                                                                ,
                                                                 * [dict(name="actions_level1__sample{}".format(_i),
                                                                         transforms=[("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))],
-                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                        switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                                                                    for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
-                                                                dict(name="xxx_epsilons_central_level3", scope="episode"),
+                                                                dict(name="mackrel_epsilons_central_level3", scope="episode"),
                                                                 dict(name="avail_actions", select_agent_ids=[_agent_id]),
-                                                                dict(name="xxx_epsilons_central_level3",
+                                                                dict(name="mackrel_epsilons_central_level3",
                                                                      scope="episode"),
                                                                 ])
 
@@ -143,14 +143,14 @@ class XXXMultiagentController():
         self.input_columns_level1["agent_input_level1"] = {}
         self.input_columns_level1["agent_input_level1"]["main"] = \
             Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))
-                        if not self.args.xxx_use_obs_intersections else
+                        if not self.args.mackrel_use_obs_intersections else
                     dict(name="obs_intersection_all"),
                     *[dict(name="past_actions_level1__sample{}".format(_i),
-                          switch=self.args.xxx_agent_level1_use_past_actions)
+                          switch=self.args.mackrel_agent_level1_use_past_actions)
                       for _i in range(_n_agent_pair_samples(self.n_agents))]
                   ])
         self.input_columns_level1["agent_input_level1"]["epsilons_central_level1"] = \
-            Scheme([dict(name="xxx_epsilons_central_level1",
+            Scheme([dict(name="mackrel_epsilons_central_level1",
                          scope="episode")])
 
         # level 2
@@ -159,26 +159,26 @@ class XXXMultiagentController():
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = {}
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["main"] = \
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])
-                        if not self.args.xxx_use_obs_intersections else
+                        if not self.args.mackrel_use_obs_intersections else
                         dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2),self.n_agents))),
                         dict(name="past_actions_level2",
-                             switch=self.args.xxx_agent_level2_use_past_actions),
+                             switch=self.args.mackrel_agent_level2_use_past_actions),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2]),
                         *[dict(name="actions_level1__sample{}".format(_i),
-                               switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                               switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                           for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                         ])
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["epsilons_central_level2"] = \
-                Scheme([dict(name="xxx_epsilons_central_level2",
+                Scheme([dict(name="mackrel_epsilons_central_level2",
                              scope="episode")])
 
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id1"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id1])])
             self.input_columns_level2[
                 "agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["avail_actions_id2"] = Scheme([dict(name="avail_actions", select_agent_ids=[_agent_id2])])
-            if self.args.xxx_use_obs_intersections:
+            if self.args.mackrel_use_obs_intersections:
                 self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] \
                                             ["avail_actions_pair"] = Scheme([dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                        switch=self.args.xxx_use_obs_intersections)])
+                                                        switch=self.args.mackrel_use_obs_intersections)])
 
         # level 3
         self.input_columns_level3 = {}
@@ -188,22 +188,22 @@ class XXXMultiagentController():
                 Scheme([dict(name="observations", select_agent_ids=[_agent_id]),
                         dict(name="past_actions_level3",
                              select_agent_ids=[_agent_id],
-                             switch=self.args.xxx_agent_level3_use_past_actions),
+                             switch=self.args.mackrel_agent_level3_use_past_actions),
                         dict(name="agent_id", select_agent_ids=[_agent_id]),
                         dict(name="actions_level2",
                              select_agent_ids=[_i for _i in range(_n_agent_pairings(self.n_agents)) if _agent_id in _ordered_agent_pairings(self.n_agents)[_i]],
-                             switch=self.args.xxx_agent_level3_use_past_actions_level2),
+                             switch=self.args.mackrel_agent_level3_use_past_actions_level2),
                           #for _i in range(_n_agent_pair_samples(
                           #      self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples) if (_agent_id in _pairing_id_2_agent_ids(_i, self.n_agents))],
                         *[dict(name="actions_level1__sample{}".format(_i),
-                               switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                               switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                           for _i in range(_n_agent_pair_samples(
                                 self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)]
                           #for _i in range(_n_agent_pair_samples(
                           #      self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)),
                         ])
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["epsilons_central_level3"] = \
-                Scheme([dict(name="xxx_epsilons_central_level3",
+                Scheme([dict(name="mackrel_epsilons_central_level3",
                              scope="episode")])
 
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["avail_actions"] = \

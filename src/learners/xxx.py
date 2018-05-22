@@ -17,14 +17,14 @@ from components.transforms import _adim, _bsdim, _tdim, _vdim, \
 from components.losses import EntropyRegularisationLoss
 from components.transforms import _to_batch, \
     _from_batch, _naninfmean
-from utils.xxx import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids, _n_agent_pair_samples, _agent_ids_2_pairing_id
+from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids, _n_agent_pair_samples, _agent_ids_2_pairing_id
 
 from .basic import BasicLearner
 
-class XXXPolicyLoss(nn.Module):
+class MACKRELPolicyLoss(nn.Module):
 
     def __init__(self):
-        super(XXXPolicyLoss, self).__init__()
+        super(MACKRELPolicyLoss, self).__init__()
 
     def forward(self, policies, advantages, actions, tformat):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
@@ -47,10 +47,10 @@ class XXXPolicyLoss(nn.Module):
 
         return loss_mean, output_tformat
 
-class XXXCriticLoss(nn.Module):
+class MACKRELCriticLoss(nn.Module):
 
     def __init__(self):
-        super(XXXCriticLoss, self).__init__()
+        super(MACKRELCriticLoss, self).__init__()
     def forward(self, input, target, tformat):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
@@ -75,7 +75,7 @@ class XXXCriticLoss(nn.Module):
         output_tformat = "s" # scalar
         return ret, output_tformat
 
-class XXXLearner(BasicLearner):
+class MACKRELLearner(BasicLearner):
 
     def __init__(self, multiagent_controller, logging_struct=None, args=None):
         self.args = args
@@ -92,9 +92,9 @@ class XXXLearner(BasicLearner):
         # self.n_critic_learner_reps = args.n_critic_learner_reps
         self.logging_struct = logging_struct
 
-        self.critic_level1 = mo_REGISTRY[self.args.xxx_critic_level1]
-        self.critic_level2 = mo_REGISTRY[self.args.xxx_critic_level2]
-        self.critic_level3 = mo_REGISTRY[self.args.xxx_critic_level3]
+        self.critic_level1 = mo_REGISTRY[self.args.mackrel_critic_level1]
+        self.critic_level2 = mo_REGISTRY[self.args.mackrel_critic_level2]
+        self.critic_level3 = mo_REGISTRY[self.args.mackrel_critic_level3]
 
         self.critic_level1_scheme = Scheme([dict(name="obs_intersection_all"),
                                             dict(name="actions",
@@ -102,13 +102,13 @@ class XXXLearner(BasicLearner):
                                                  select_agent_ids=list(range(self.n_agents)),
                                                  transforms=[("shift", dict(steps=1)),
                                                              ("one_hot", dict(range=(0, self.n_actions-1)))],
-                                                 switch=self.args.xxx_critic_level1_use_past_actions),
+                                                 switch=self.args.mackrel_critic_level1_use_past_actions),
                                             *[dict(name="actions_level1__sample{}".format(_i),
                                                    rename="past_actions_level1__sample{}".format(_i),
                                                    transforms=[("shift", dict(steps=1)),
                                                                ("one_hot", dict(range=(0, self.n_actions - 1)))
                                                                ],
-                                                   switch=self.args.xxx_critic_level2_use_past_actions_level1)
+                                                   switch=self.args.mackrel_critic_level2_use_past_actions_level1)
                                                 for _i in range(_n_agent_pair_samples(self.n_agents))],
                                             *[dict(name="actions_level1__sample{}".format(_i),
                                                    rename="agent_actions__sample{}".format(_i))
@@ -126,7 +126,7 @@ class XXXLearner(BasicLearner):
                                                         select_agent_ids=[_agent_id1, _agent_id2],),
                                                    dict(name="obs_intersection__pair{}".format(
                                                        _agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                        switch=self.args.xxx_use_obs_intersections),
+                                                        switch=self.args.mackrel_use_obs_intersections),
                                                    dict(name="actions_level2",
                                                         rename="other_agent_actions_level2",
                                                         select_agent_ids=[_i for _i in range(0, _n_agent_pairings(self.n_agents)) if
@@ -147,7 +147,7 @@ class XXXLearner(BasicLearner):
                                                    *[dict(name="actions_level1__sample{}".format(_i),
                                                           transforms=[("one_hot", dict(
                                                               range=(0, _n_agent_pairings(self.n_agents))))],
-                                                          switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                          switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                                                      for _i in range(_n_agent_pair_samples(
                                                            self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                    dict(name="agent_id", rename="agent_id__flat", select_agent_ids=[_agent_id1, _agent_id2]),
@@ -188,13 +188,13 @@ class XXXLearner(BasicLearner):
                                                                  *[dict(name="actions_level2__sample{}".format(_i),
                                                                         transforms=[("one_hot_pairwise", dict(range=(
                                                                         0, self.n_actions * self.n_actions + 2)))],
-                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                        switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                                                                    for _i in range(_n_agent_pair_samples(
                                                                          self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                                  *[dict(name="actions_level1__sample{}".format(_i),
                                                                         transforms=[("one_hot", dict(range=(
                                                                         0, _n_agent_pairings(self.n_agents))))],
-                                                                        switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                        switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                                                                    for _i in range(_n_agent_pair_samples(
                                                                          self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                                  dict(name="state"),
@@ -264,9 +264,9 @@ class XXXLearner(BasicLearner):
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2]),
                         dict(name="obs_intersection__pair{}".format(
                             _agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                             switch=self.args.xxx_use_obs_intersections),
+                             switch=self.args.mackrel_use_obs_intersections),
                         *[dict(name="actions_level1__sample{}".format(_i),
-                               switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                               switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                           for _i in range(_n_agent_pair_samples(
                                 self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                         ])
@@ -285,10 +285,10 @@ class XXXLearner(BasicLearner):
                                                                                                           dict(name="agent_id", select_agent_ids=[_agent_id]),
                                                                                                           dict(name="past_actions", select_agent_ids=list(range(self.n_agents))),
                                                                                                          *[dict(name="actions_level2__sample{}".format(_i),
-                                                                                                                switch=self.args.xxx_agent_level3_use_past_actions_level2)
+                                                                                                                switch=self.args.mackrel_agent_level3_use_past_actions_level2)
                                                                                                            for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                                                                          *[dict(name="actions_level1__sample{}".format(_i),
-                                                                                                                switch=self.args.xxx_agent_level3_use_past_actions_level1)
+                                                                                                                switch=self.args.mackrel_agent_level3_use_past_actions_level1)
                                                                                                            for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples)],
                                                                                                          ]).agent_flatten()
             self.input_columns_level3["critic_level3__agent{}".format(_agent_id)]["agent_action"] = Scheme([dict(name="agent_action", select_agent_ids=[_agent_id])]).agent_flatten()
@@ -407,7 +407,7 @@ class XXXLearner(BasicLearner):
         self.joint_scheme_dict_level2 = _join_dicts(self.schemes_level2, self.multiagent_controller.joint_scheme_dict_level2)
         self.joint_scheme_dict_level3 = _join_dicts(self.schemes_level3, self.multiagent_controller.joint_scheme_dict_level3)
 
-        self.args_sanity_check() # conduct XXX sanity check on arg parameters
+        self.args_sanity_check() # conduct MACKREL sanity check on arg parameters
         pass
 
     def args_sanity_check(self):
@@ -421,7 +421,7 @@ class XXXLearner(BasicLearner):
               T_env=None):
 
         # -------------------------------------------------------------------------------
-        # |  We follow the algorithmic description of XXX as supplied in Algorithm 1   |
+        # |  We follow the algorithmic description of MACKREL as supplied in Algorithm 1   |
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)         |
         # |  Note: Instead of for-looping backwards through the sample, we just run     |
         # |  repetitions of the optimization procedure sampling from the same batch     |
@@ -457,21 +457,21 @@ class XXXLearner(BasicLearner):
 
 
         # do single forward pass in critic
-        xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level1,
+        mackrel_model_inputs, mackrel_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level1,
                                                                          inputs=data_inputs,
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True,
                                                                          stack=False)
         # pimp up to agent dimension 1
-        xxx_model_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in xxx_model_inputs.items()}
-        xxx_model_inputs_tformat = "a*bs*t*v"
+        mackrel_model_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in mackrel_model_inputs.items()}
+        mackrel_model_inputs_tformat = "a*bs*t*v"
 
         #data_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in data_inputs.items()}
         #data_inputs_tformat = "a*bs*t*v"
 
         self._optimize(batch_history=batch_history,
-                       xxx_model_inputs=xxx_model_inputs,
-                       xxx_model_inputs_tformat=xxx_model_inputs_tformat,
+                       mackrel_model_inputs=mackrel_model_inputs,
+                       mackrel_model_inputs_tformat=mackrel_model_inputs_tformat,
                        data_inputs=data_inputs,
                        data_inputs_tformat=data_inputs_tformat,
                        agent_optimiser=self.agent_level1_optimiser,
@@ -480,8 +480,8 @@ class XXXLearner(BasicLearner):
                        critic_parameters=self.critic_level1_parameters,
                        critic=self.critic_models["level1"],
                        target_critic=self.target_critic_models["level1"],
-                       xxx_critic_use_sampling=self.args.xxx_critic_level1_use_sampling,
-                       xxx_critic_sample_size=self.args.xxx_critic_level1_sample_size,
+                       mackrel_critic_use_sampling=self.args.mackrel_critic_level1_use_sampling,
+                       mackrel_critic_sample_size=self.args.mackrel_critic_level1_sample_size,
                        T_critic_str="T_critic_level1",
                        T_policy_str="T_policy_level1",
                        T_env=T_env,
@@ -502,14 +502,14 @@ class XXXLearner(BasicLearner):
         actions = actions.unsqueeze(0)
 
         # do single forward pass in critic
-        xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level2,
+        mackrel_model_inputs, mackrel_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level2,
                                                                          inputs=data_inputs,
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True)
 
         self._optimize(batch_history,
-                       xxx_model_inputs,
-                       xxx_model_inputs_tformat,
+                       mackrel_model_inputs,
+                       mackrel_model_inputs_tformat,
                        data_inputs,
                        data_inputs_tformat,
                        agent_optimiser=self.agent_level2_optimiser,
@@ -518,8 +518,8 @@ class XXXLearner(BasicLearner):
                        critic_parameters=self.critic_level2_parameters,
                        critic=self.critic_models["level2_0:1"],
                        target_critic=self.target_critic_models["level2_0:1"],
-                       xxx_critic_use_sampling=self.args.xxx_critic_level2_use_sampling,
-                       xxx_critic_sample_size=self.args.xxx_critic_level2_sample_size,
+                       mackrel_critic_use_sampling=self.args.mackrel_critic_level2_use_sampling,
+                       mackrel_critic_sample_size=self.args.mackrel_critic_level2_sample_size,
                        T_critic_str="T_critic_level2",
                        T_policy_str="T_policy_level2",
                        T_env=T_env,
@@ -539,14 +539,14 @@ class XXXLearner(BasicLearner):
                                                          agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
         # do single forward pass in critic
-        xxx_model_inputs, xxx_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level3,
+        mackrel_model_inputs, mackrel_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level3,
                                                                          inputs=data_inputs,
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True)
 
         self._optimize(batch_history,
-                       xxx_model_inputs,
-                       xxx_model_inputs_tformat,
+                       mackrel_model_inputs,
+                       mackrel_model_inputs_tformat,
                        data_inputs,
                        data_inputs_tformat,
                        agent_optimiser=self.agent_level3_optimiser,
@@ -555,8 +555,8 @@ class XXXLearner(BasicLearner):
                        critic_parameters=self.critic_level3_parameters,
                        critic=self.critic_models["level3_0"],
                        target_critic=self.target_critic_models["level3_0"],
-                       xxx_critic_use_sampling=self.args.xxx_critic_level3_use_sampling,
-                       xxx_critic_sample_size=self.args.xxx_critic_level3_sample_size,
+                       mackrel_critic_use_sampling=self.args.mackrel_critic_level3_use_sampling,
+                       mackrel_critic_sample_size=self.args.mackrel_critic_level3_sample_size,
                        T_critic_str="T_critic_level3",
                        T_policy_str="T_policy_level3",
                        T_env=T_env,
@@ -566,8 +566,8 @@ class XXXLearner(BasicLearner):
 
     def _optimize(self,
                   batch_history,
-                  xxx_model_inputs,
-                  xxx_model_inputs_tformat,
+                  mackrel_model_inputs,
+                  mackrel_model_inputs_tformat,
                   data_inputs,
                   data_inputs_tformat,
                   agent_optimiser,
@@ -576,8 +576,8 @@ class XXXLearner(BasicLearner):
                   critic_parameters,
                   critic,
                   target_critic,
-                  xxx_critic_use_sampling,
-                  xxx_critic_sample_size,
+                  mackrel_critic_use_sampling,
+                  mackrel_critic_sample_size,
                   T_critic_str,
                   T_policy_str,
                   T_env,
@@ -592,15 +592,15 @@ class XXXLearner(BasicLearner):
 
         def _optimize_critic(**kwargs):
             level = kwargs["level"]
-            inputs_critic= kwargs["xxx_model_inputs"]["critic_level{}".format(level)]
-            inputs_target_critic=kwargs["xxx_model_inputs"]["target_critic_level{}".format(level)]
+            inputs_critic= kwargs["mackrel_model_inputs"]["critic_level{}".format(level)]
+            inputs_target_critic=kwargs["mackrel_model_inputs"]["target_critic_level{}".format(level)]
             inputs_critic_tformat=kwargs["tformat"]
             inputs_target_critic_tformat = kwargs["tformat"]
 
             # construct target-critic targets and carry out necessary forward passes
             # same input scheme for both target critic and critic!
             output_target_critic, output_target_critic_tformat = target_critic.forward(inputs_target_critic,
-                                                                                       tformat=xxx_model_inputs_tformat)
+                                                                                       tformat=mackrel_model_inputs_tformat)
 
 
 
@@ -615,11 +615,11 @@ class XXXLearner(BasicLearner):
                                                                        to_cuda=self.args.use_cuda)
 
             # sample!!
-            if xxx_critic_use_sampling:
+            if mackrel_critic_use_sampling:
                 critic_shape = inputs_critic[list(inputs_critic.keys())[0]].shape
                 sample_ids = randint(critic_shape[_bsdim(inputs_target_critic_tformat)] \
                                         * critic_shape[_tdim(inputs_target_critic_tformat)],
-                                     size = xxx_critic_sample_size)
+                                     size = mackrel_critic_sample_size)
                 sampled_ids_tensor = th.from_numpy(sample_ids).long().cuda() if inputs_critic[list(inputs_critic.keys())[0]].is_cuda else th.from_numpy(sample_ids).long()
                 _inputs_critic = {}
                 for _k, _v in inputs_critic.items():
@@ -644,11 +644,11 @@ class XXXLearner(BasicLearner):
                 qtargets = target_critic_td_targets
 
             output_critic, output_critic_tformat = critic.forward(_inputs_critic,
-                                                                       tformat=xxx_model_inputs_tformat)
+                                                                       tformat=mackrel_model_inputs_tformat)
 
 
             critic_loss, \
-            critic_loss_tformat = XXXCriticLoss()(input=output_critic["qvalue"],
+            critic_loss_tformat = MACKRELCriticLoss()(input=output_critic["qvalue"],
                                                    target=Variable(qtargets, requires_grad=False),
                                                    tformat=target_critic_td_targets_tformat)
 
@@ -678,18 +678,18 @@ class XXXLearner(BasicLearner):
 
         # optimize the critic as often as necessary to get the critic loss down reliably
         for _i in range(getattr(self.args, "n_critic_level{}_learner_reps".format(level))): #self.n_critic_learner_reps):
-            _ = _optimize_critic(xxx_model_inputs=xxx_model_inputs,
-                                 tformat=xxx_model_inputs_tformat,
+            _ = _optimize_critic(mackrel_model_inputs=mackrel_model_inputs,
+                                 tformat=mackrel_model_inputs_tformat,
                                  actions=actions,
                                  level=level)
 
         # get advantages
-        output_critic, output_critic_tformat = critic.forward(xxx_model_inputs["critic_level{}".format(level)],
-                                                              tformat=xxx_model_inputs_tformat)
+        output_critic, output_critic_tformat = critic.forward(mackrel_model_inputs["critic_level{}".format(level)],
+                                                              tformat=mackrel_model_inputs_tformat)
         advantages = output_critic["advantage"]
 
         # only train the policy once in order to stay on-policy!
-        policy_loss_function = partial(XXXPolicyLoss(),
+        policy_loss_function = partial(MACKRELPolicyLoss(),
                                        actions=Variable(actions),
                                        advantages=advantages)
 
@@ -705,18 +705,18 @@ class XXXLearner(BasicLearner):
                                                                                  avail_actions=None,
                                                                                  test_mode=False,
                                                                                  batch_history=batch_history)
-        XXX_loss = agent_controller_output["losses"]
-        XXX_loss = XXX_loss.mean()
+        MACKREL_loss = agent_controller_output["losses"]
+        MACKREL_loss = MACKREL_loss.mean()
 
-        if self.args.xxx_use_entropy_regularizer:
-            XXX_loss += self.args.xxx_entropy_loss_regularization_factor * \
+        if self.args.mackrel_use_entropy_regularizer:
+            MACKREL_loss += self.args.mackrel_entropy_loss_regularization_factor * \
                          EntropyRegularisationLoss()(policies=agent_controller_output["policies"],
                                                      tformat="a*bs*t*v").sum()
 
         # carry out optimization for agents
 
         agent_optimiser.zero_grad()
-        XXX_loss.backward()
+        MACKREL_loss.backward()
 
         #if self.args.debug_mode:
         #    _check_nan(agent_parameters)
@@ -737,7 +737,7 @@ class XXXLearner(BasicLearner):
         advantage_mean = _naninfmean(output_critic["advantage"])
         self._add_stat("advantage_mean_level{}".format(level), advantage_mean, T_env=T_env)
         self._add_stat("policy_grad_norm_level{}".format(level), policy_grad_norm, T_env=T_env)
-        self._add_stat("policy_loss_level{}".format(level), XXX_loss.data.cpu().numpy(), T_env=T_env)
+        self._add_stat("policy_loss_level{}".format(level), MACKREL_loss.data.cpu().numpy(), T_env=T_env)
         self._add_stat("critic_loss_level{}".format(level), np.mean(critic_loss_arr), T_env=T_env)
         self._add_stat("critic_mean_level{}".format(level), np.mean(critic_mean_arr), T_env=T_env)
         self._add_stat("target_critic_mean_level{}".format(level), np.mean(target_critic_mean_arr), T_env=T_env)

@@ -43,18 +43,18 @@ from .qmix import QMIXMixingNetwork, QMIXMixer
 REGISTRY["qmix_mixing_network"] = QMIXMixingNetwork
 REGISTRY["qmix_mixer"] = VDNMixer
 
-from .xxx import XXXCriticLevel1, XXXCriticLevel2, XXXCriticLevel3
-REGISTRY["xxx_critic_level1"] = XXXCriticLevel1
-REGISTRY["xxx_critic_level2"] = XXXCriticLevel2
-REGISTRY["xxx_critic_level3"] = XXXCriticLevel3
-from .xxx import XXXRecurrentAgentLevel1, XXXRecurrentAgentLevel2, XXXRecurrentAgentLevel3
-REGISTRY["xxx_recurrent_agent_level1"] = XXXRecurrentAgentLevel1
-REGISTRY["xxx_recurrent_agent_level2"] = XXXRecurrentAgentLevel2
-REGISTRY["xxx_recurrent_agent_level3"] = XXXRecurrentAgentLevel3
-from .xxx import XXXNonRecurrentAgentLevel1, XXXNonRecurrentAgentLevel2, XXXNonRecurrentAgentLevel3
-REGISTRY["xxx_nonrecurrent_agent_level1"] = XXXNonRecurrentAgentLevel1
-REGISTRY["xxx_nonrecurrent_agent_level2"] = XXXNonRecurrentAgentLevel2
-REGISTRY["xxx_nonrecurrent_agent_level3"] = XXXNonRecurrentAgentLevel3
+from .mackrel import MACKRELCriticLevel1, MACKRELCriticLevel2, MACKRELCriticLevel3
+REGISTRY["mackrel_critic_level1"] = MACKRELCriticLevel1
+REGISTRY["mackrel_critic_level2"] = MACKRELCriticLevel2
+REGISTRY["mackrel_critic_level3"] = MACKRELCriticLevel3
+from .mackrel import MACKRELRecurrentAgentLevel1, MACKRELRecurrentAgentLevel2, MACKRELRecurrentAgentLevel3
+REGISTRY["mackrel_recurrent_agent_level1"] = MACKRELRecurrentAgentLevel1
+REGISTRY["mackrel_recurrent_agent_level2"] = MACKRELRecurrentAgentLevel2
+REGISTRY["mackrel_recurrent_agent_level3"] = MACKRELRecurrentAgentLevel3
+from .mackrel import MACKRELNonRecurrentAgentLevel1, MACKRELNonRecurrentAgentLevel2, MACKRELNonRecurrentAgentLevel3
+REGISTRY["mackrel_nonrecurrent_agent_level1"] = MACKRELNonRecurrentAgentLevel1
+REGISTRY["mackrel_nonrecurrent_agent_level2"] = MACKRELNonRecurrentAgentLevel2
+REGISTRY["mackrel_nonrecurrent_agent_level3"] = MACKRELNonRecurrentAgentLevel3
 
 
 

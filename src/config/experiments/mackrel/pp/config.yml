@@ -5,7 +5,7 @@ mackrel_critic_level2_use_sampling: True
 mackrel_critic_level2_sample_size: 1620
 mackrel_critic_level3_use_sampling: True
 mackrel_critic_level3_sample_size: 1620
-defaults: default xxx predator_prey
+defaults: default mackrel predator_prey
 env_args:
   n_agents: 3
   predator_prey_shape:
@@ -22,4 +22,4 @@ env_args:
 lr_critic: 0.0
 use_replay_buffer: False
 mackrel_agent_level3_use_past_actions_level2: True
-defaults: xxx
+defaults: mackrel

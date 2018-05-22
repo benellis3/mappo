@@ -6,14 +6,14 @@ import torch.nn.functional as F
 
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _check_nan
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
-from utils.xxx import _n_agent_pairings
+from utils.mackrel import _n_agent_pairings
 
-class XXXQFunctionLevel1(nn.Module):
+class MACKRELQFunctionLevel1(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, input_shapes, n_agents, output_shapes={}, layer_args={}, args=None):
 
-        super(XXXQFunctionLevel1, self).__init__()
+        super(MACKRELQFunctionLevel1, self).__init__()
 
         self.args = args
         self.n_agents = n_agents
@@ -58,12 +58,12 @@ class XXXQFunctionLevel1(nn.Module):
         qvalues = self.fc2(x)
         return _from_batch(qvalues, params, tformat)
 
-class XXXQFunctionLevel2(nn.Module):
+class MACKRELQFunctionLevel2(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
 
-        super(XXXQFunctionLevel2, self).__init__()
+        super(MACKRELQFunctionLevel2, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -108,12 +108,12 @@ class XXXQFunctionLevel2(nn.Module):
         qvalues = self.fc2(x)
         return _from_batch(qvalues, params, tformat)
 
-class XXXQFunctionLevel3(nn.Module):
+class MACKRELQFunctionLevel3(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
 
-        super(XXXQFunctionLevel3, self).__init__()
+        super(MACKRELQFunctionLevel3, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -159,14 +159,14 @@ class XXXQFunctionLevel3(nn.Module):
         return _from_batch(qvalues, params, tformat)
 
 
-class XXXAdvantage(nn.Module):
+class MACKRELAdvantage(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
     def __init__(self, n_actions, input_shapes, output_shapes={}, layer_args={}, args=None):
         """
         This model contains no network layers
         """
-        super(XXXAdvantage, self).__init__()
+        super(MACKRELAdvantage, self).__init__()
         self.args = args
         self.n_actions = n_actions
 
@@ -193,7 +193,7 @@ class XXXAdvantage(nn.Module):
         agent_policy, params_ap, tformat_ap = _to_batch(inputs.get("agent_policy"), tformat)
 
         if baseline:
-        # Fuse to XXX advantage
+        # Fuse to MACKREL advantage
             a = agent_policy.unsqueeze(1)
             b = qvalues.unsqueeze(2)
             baseline = th.bmm(
@@ -212,10 +212,10 @@ class XXXAdvantage(nn.Module):
         return _from_batch(A, params_qv, tformat_qv), _from_batch(Q, params_qv, tformat_qv), tformat
 
 
-class XXXCriticLevel1(nn.Module):
+class MACKRELCriticLevel1(nn.Module):
 
     """
-    Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
+    Concats MACKRELQFunction and MACKRELAdvantage together to an advantage and qvalue function
     """
 
     def __init__(self, input_shapes, n_actions, n_agents, output_shapes={}, layer_args={}, args=None):
@@ -223,7 +223,7 @@ class XXXCriticLevel1(nn.Module):
         This model contains no network layers but only sub-models
         """
 
-        super(XXXCriticLevel1, self).__init__()
+        super(MACKRELCriticLevel1, self).__init__()
         self.args = args
         self.n_agents = n_agents
         self.n_actions = n_actions
@@ -244,14 +244,14 @@ class XXXCriticLevel1(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunction = XXXQFunctionLevel1(input_shapes={"main":self.input_shapes["qfunction"]},
+        self.MACKRELQFunction = MACKRELQFunctionLevel1(input_shapes={"main":self.input_shapes["qfunction"]},
                                                output_shapes={},
                                                layer_args={"main":self.layer_args["qfunction"]},
                                                n_agents = self.n_agents,
                                                args=self.args)
 
-        self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
-                                                       "qvalues":self.XXXQFunction.output_shapes["qvalues"],
+        self.MACKRELAdvantage = MACKRELAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
+                                                       "qvalues":self.MACKRELQFunction.output_shapes["qvalues"],
                                                        "agent_action":self.input_shapes["agent_action"],
                                                        "agent_policy":self.input_shapes["agent_policy"]},
                                          output_shapes={},
@@ -270,10 +270,10 @@ class XXXCriticLevel1(nn.Module):
     def forward(self, inputs, tformat, baseline=True):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
-        qvalues = self.XXXQFunction(inputs={"main":inputs["qfunction"]},
+        qvalues = self.MACKRELQFunction(inputs={"main":inputs["qfunction"]},
                                     tformat=tformat)
 
-        advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":qvalues.clone().fill_(1.0),
+        advantage, qvalue, _ = self.MACKRELAdvantage(inputs={"avail_actions":qvalues.clone().fill_(1.0),
                                                          # critic level1 has all actions available forever
                                                          "qvalues":qvalues,
                                                          "agent_action":inputs["agent_action"],
@@ -282,10 +282,10 @@ class XXXCriticLevel1(nn.Module):
                                                  baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
 
-class XXXCriticLevel2(nn.Module):
+class MACKRELCriticLevel2(nn.Module):
 
     """
-    Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
+    Concats MACKRELQFunction and MACKRELAdvantage together to an advantage and qvalue function
     """
 
     def __init__(self, input_shapes, n_actions, output_shapes={}, layer_args={}, args=None):
@@ -293,7 +293,7 @@ class XXXCriticLevel2(nn.Module):
         This model contains no network layers but only sub-models
         """
 
-        super(XXXCriticLevel2, self).__init__()
+        super(MACKRELCriticLevel2, self).__init__()
         self.args = args
         self.n_actions = n_actions
 
@@ -312,14 +312,14 @@ class XXXCriticLevel2(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunction = XXXQFunctionLevel2(input_shapes={"main":self.input_shapes["qfunction"]},
+        self.MACKRELQFunction = MACKRELQFunctionLevel2(input_shapes={"main":self.input_shapes["qfunction"]},
                                                        output_shapes={},
                                                        layer_args={"main":self.layer_args["qfunction"]},
                                                        n_actions = self.n_actions,
                                                        args=self.args)
 
-        self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":(1 + self.input_shapes["avail_actions_id1"]*self.input_shapes["avail_actions_id2"]),
-                                                         "qvalues":self.XXXQFunction.output_shapes["qvalues"],
+        self.MACKRELAdvantage = MACKRELAdvantage(input_shapes={"avail_actions":(1 + self.input_shapes["avail_actions_id1"]*self.input_shapes["avail_actions_id2"]),
+                                                         "qvalues":self.MACKRELQFunction.output_shapes["qvalues"],
                                                          "agent_action":self.input_shapes["agent_action"],
                                                          "agent_policy":self.input_shapes["policies_level2"]},
                                          output_shapes={},
@@ -338,7 +338,7 @@ class XXXCriticLevel2(nn.Module):
     def forward(self, inputs, tformat, baseline=True):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
-        qvalues = self.XXXQFunction(inputs={"main":inputs["qfunction"]},
+        qvalues = self.MACKRELQFunction(inputs={"main":inputs["qfunction"]},
                                      tformat=tformat)
 
         #
@@ -352,7 +352,7 @@ class XXXCriticLevel2(nn.Module):
         pairwise_avail_actions = th.cat([delegation_avails, other_avails], dim=1)
         pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
 
-        advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":pairwise_avail_actions,
+        advantage, qvalue, _ = self.MACKRELAdvantage(inputs={"avail_actions":pairwise_avail_actions,
                                                           "qvalues":qvalues,
                                                           "agent_action":inputs["agent_action"],
                                                           "agent_policy":inputs["policies_level2"]},
@@ -360,10 +360,10 @@ class XXXCriticLevel2(nn.Module):
                                                   baseline=baseline)
         return {"advantage": advantage, "qvalue": qvalue}, tformat
 
-class XXXCriticLevel3(nn.Module):
+class MACKRELCriticLevel3(nn.Module):
 
     """
-    Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
+    Concats MACKRELQFunction and MACKRELAdvantage together to an advantage and qvalue function
     """
 
     def __init__(self, input_shapes, n_actions, output_shapes={}, layer_args={}, args=None):
@@ -371,7 +371,7 @@ class XXXCriticLevel3(nn.Module):
         This model contains no network layers but only sub-models
         """
 
-        super(XXXCriticLevel3, self).__init__()
+        super(MACKRELCriticLevel3, self).__init__()
         self.args = args
         self.n_actions = n_actions
 
@@ -390,14 +390,14 @@ class XXXCriticLevel3(nn.Module):
         self.layer_args["qfunction"] = {}
         self.layer_args.update(layer_args)
 
-        self.XXXQFunction = XXXQFunctionLevel3(input_shapes={"main":self.input_shapes["qfunction"]},
+        self.MACKRELQFunction = MACKRELQFunctionLevel3(input_shapes={"main":self.input_shapes["qfunction"]},
                                            output_shapes={},
                                            layer_args={"main":self.layer_args["qfunction"]},
                                            n_actions = self.n_actions,
                                            args=self.args)
 
-        self.XXXAdvantage = XXXAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
-                                                         "qvalues":self.XXXQFunction.output_shapes["qvalues"],
+        self.MACKRELAdvantage = MACKRELAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
+                                                         "qvalues":self.MACKRELQFunction.output_shapes["qvalues"],
                                                          "agent_action":self.input_shapes["agent_action"],
                                                          "agent_policy":self.input_shapes["agent_policy"]},
                                          output_shapes={},
@@ -416,10 +416,10 @@ class XXXCriticLevel3(nn.Module):
     def forward(self, inputs, tformat, baseline=True):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
-        qvalues = self.XXXQFunction(inputs={"main":inputs["qfunction"]},
+        qvalues = self.MACKRELQFunction(inputs={"main":inputs["qfunction"]},
                                     tformat=tformat)
 
-        advantage, qvalue, _ = self.XXXAdvantage(inputs={"avail_actions":inputs["avail_actions"],
+        advantage, qvalue, _ = self.MACKRELAdvantage(inputs={"avail_actions":inputs["avail_actions"],
                                                           "qvalues":qvalues,
                                                           "agent_action":inputs["agent_action"],
                                                           "agent_policy":inputs["agent_policy"]},
@@ -459,7 +459,7 @@ class MLPEncoder(nn.Module):
         return _from_batch(x, n_seq, tformat), tformat
 
 
-class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
+class MACKRELNonRecurrentAgentLevel1(NonRecurrentAgent):
 
     def forward(self, inputs, n_agents, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
@@ -479,10 +479,10 @@ class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
         # throw debug warning if second masking was necessary
         if th.sum(second_mask) > 0:
             if self.args.debug_verbose:
-                print('Warning in XXXNonRecurrentAgentLevel1.forward(): some sum during the softmax has been 0!')
+                print('Warning in MACKRELNonRecurrentAgentLevel1.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
-        if self.args.xxx_exploration_mode_level1 in ["softmax"] and not test_mode:
+        if self.args.mackrel_exploration_mode_level1 in ["softmax"] and not test_mode:
             epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
             epsilons, _, _ = _to_batch(epsilons, tformat)
             x = epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
@@ -494,10 +494,10 @@ class XXXNonRecurrentAgentLevel1(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevel1(nn.Module):
+class MACKRELRecurrentAgentLevel1(nn.Module):
 
     def __init__(self, input_shapes, n_agents, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
-        super(XXXRecurrentAgentLevel1, self).__init__()
+        super(MACKRELRecurrentAgentLevel1, self).__init__()
 
         self.args = args
         self.n_agents = n_agents
@@ -570,7 +570,7 @@ class XXXRecurrentAgentLevel1(nn.Module):
             # throw debug warning if second masking was necessary
             if th.sum(second_mask.data) > 0:
                 if self.args.debug_verbose:
-                    print('Warning in XXXRecurrentAgentLevel1.forward(): some sum during the softmax has been 0!')
+                    print('Warning in MACKRELRecurrentAgentLevel1.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
@@ -578,7 +578,7 @@ class XXXRecurrentAgentLevel1(nn.Module):
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # add softmax exploration (if switched on)
-            if self.args.xxx_exploration_mode_level1 in ["softmax"] and not test_mode:
+            if self.args.mackrel_exploration_mode_level1 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
                epsilons, _, _ = _to_batch(epsilons, tformat)
                x =  epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
@@ -598,7 +598,7 @@ class XXXRecurrentAgentLevel1(nn.Module):
                loss, \
                tformat
 
-class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
+class MACKRELNonRecurrentAgentLevel2(NonRecurrentAgent):
 
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
@@ -625,7 +625,7 @@ class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
         # throw debug warning if second masking was necessary
         if th.sum(second_mask) > 0:
             if self.args.debug_verbose:
-                print('Warning in XXXNonRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
+                print('Warning in MACKRELNonRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
@@ -640,10 +640,10 @@ class XXXNonRecurrentAgentLevel2(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevel2(nn.Module):
+class MACKRELRecurrentAgentLevel2(nn.Module):
 
     def __init__(self, input_shapes, n_actions, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
-        super(XXXRecurrentAgentLevel2, self).__init__()
+        super(MACKRELRecurrentAgentLevel2, self).__init__()
 
         self.args = args
         self.n_actions = n_actions
@@ -731,8 +731,8 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
             # mask policy elements corresponding to unavailable actions
             n_available_actions = avail_actions.sum(dim=1, keepdim=True)
-            if self.args.xxx_logit_bias != 0:
-                x = th.cat([x[:, 0:1] + self.args.xxx_logit_bias, x[:, 1:]], dim=1)
+            if self.args.mackrel_logit_bias != 0:
+                x = th.cat([x[:, 0:1] + self.args.mackrel_logit_bias, x[:, 1:]], dim=1)
                 x = th.exp(x)
                 x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
                 x[:, 0] = th.div(x[:, 0].clone(), 1.0 + x[:, 0])
@@ -757,7 +757,7 @@ class XXXRecurrentAgentLevel2(nn.Module):
             # throw debug warning if second masking was necessary
             #if th.sum(second_mask.data) > 0:
             #    if self.args.debug_verbose:
-            #        print('Warning in XXXRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
+            #        print('Warning in MACKRELRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
@@ -767,13 +767,13 @@ class XXXRecurrentAgentLevel2(nn.Module):
 
 
             # add softmax exploration (if switched on)
-            if self.args.xxx_exploration_mode_level2 in ["softmax"] and not test_mode:
+            if self.args.mackrel_exploration_mode_level2 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
                epsilons, _, _ = _to_batch(epsilons, tformat)
                n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
-               x = th.cat([epsilons * self.args.xxx_delegation_probability_bias,
+               x = th.cat([epsilons * self.args.mackrel_delegation_probability_bias,
                            avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
-                                       1 - self.args.xxx_delegation_probability_bias)], dim=1) \
+                                       1 - self.args.mackrel_delegation_probability_bias)], dim=1) \
                    + x * (1 - epsilons)
                if self.args.debug_mode:
                    _check_nan(x)
@@ -799,7 +799,7 @@ class XXXRecurrentAgentLevel2(nn.Module):
                loss, \
                tformat
 
-class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
+class MACKRELNonRecurrentAgentLevel3(NonRecurrentAgent):
 
     def __init__(self, input_shapes, n_actions, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
         super().__init__(input_shapes,
@@ -830,7 +830,7 @@ class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
         # throw debug warning if second masking was necessary
         if th.sum(second_mask.data) > 0:
             if self.args.debug_verbose:
-                print('Warning in XXXNonRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
+                print('Warning in MACKRELNonRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
         if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
@@ -845,7 +845,7 @@ class XXXNonRecurrentAgentLevel3(NonRecurrentAgent):
 
         return x, hidden_states, losses, tformat
 
-class XXXRecurrentAgentLevel3(RecurrentAgent):
+class MACKRELRecurrentAgentLevel3(RecurrentAgent):
 
     def __init__(self, input_shapes, n_actions, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
         super().__init__(input_shapes,
@@ -900,7 +900,7 @@ class XXXRecurrentAgentLevel3(RecurrentAgent):
             # throw debug warning if second masking was necessary
             if th.sum(second_mask.data) > 0:
                 if self.args.debug_verbose:
-                    print('Warning in XXXRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
+                    print('Warning in MACKRELRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
             # Alternative variant
             #x = th.nn.functional.softmax(x).clone()
@@ -908,7 +908,7 @@ class XXXRecurrentAgentLevel3(RecurrentAgent):
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # add softmax exploration (if switched on)
-            if self.args.xxx_exploration_mode_level3 in ["softmax"] and not test_mode:
+            if self.args.mackrel_exploration_mode_level3 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat))
                epsilons, _, _ = _to_batch(epsilons, tformat)
                x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)

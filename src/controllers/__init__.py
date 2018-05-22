@@ -24,5 +24,5 @@ REGISTRY["vdn_mac"] = VDNMultiagentController
 from .qmix_agents import QMIXMultiagentController
 REGISTRY["qmix_mac"] = QMIXMultiagentController
 
-from .xxx_agents import XXXMultiagentController
-REGISTRY["xxx_mac"] = XXXMultiagentController
+from .mackrel_agents import MACKRELMultiagentController
+REGISTRY["mackrel_mac"] = MACKRELMultiagentController

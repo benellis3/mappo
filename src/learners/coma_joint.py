@@ -17,7 +17,7 @@ from components.losses import EntropyRegularisationLoss
 from components.transforms import _to_batch, _from_batch, _naninfmean
 from models.coma_joint import COMAJointCritic
 
-from utils.xxx import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids, _n_agent_pair_samples, _agent_ids_2_pairing_id
+from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids, _n_agent_pair_samples, _agent_ids_2_pairing_id
 
 from .basic import BasicLearner
 

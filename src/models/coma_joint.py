@@ -92,7 +92,7 @@ class COMAJointAdvantage(nn.Module):
         agent_policy, params_ap, tformat_ap = _to_batch(inputs.get("agent_policy"), tformat)
 
         if baseline:
-        # Fuse to XXX advantage
+        # Fuse to MACKREL advantage
             baseline = th.bmm(
                 agent_policy.unsqueeze(1),
                 qvalues.unsqueeze(2)).squeeze(2)
@@ -111,7 +111,7 @@ class COMAJointAdvantage(nn.Module):
 class COMAJointCritic(nn.Module):
 
     """
-    Concats XXXQFunction and XXXAdvantage together to an advantage and qvalue function
+    Concats MACKRELQFunction and MACKRELAdvantage together to an advantage and qvalue function
     """
 
     def __init__(self, input_shapes, n_actions, output_shapes={}, layer_args={}, args=None):

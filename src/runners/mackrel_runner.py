@@ -8,11 +8,11 @@ from torch.distributions import Normal
 
 from components.epsilon_schedules import FlatThenDecaySchedule
 from runners import REGISTRY as r_REGISTRY
-from utils.xxx import _n_agent_pair_samples, _n_agent_pairings, _ordered_agent_pairings, _n_agent_pairings
+from utils.mackrel import _n_agent_pair_samples, _n_agent_pairings, _ordered_agent_pairings, _n_agent_pairings
 
 NStepRunner = r_REGISTRY["nstep"]
 
-class XXXRunner(NStepRunner):
+class MACKRELRunner(NStepRunner):
 
     def _setup_data_scheme(self, data_scheme):
 
@@ -88,29 +88,29 @@ class XXXRunner(NStepRunner):
                             shape=(1,),
                             dtype=np.bool,
                             missing=False),
-                       # dict(name="xxx_epsilons_level1",
+                       # dict(name="mackrel_epsilons_level1",
                        #      shape=(1,),
                        #      dtype=np.float32,
                        #      missing=float("nan")),
-                       # dict(name="xxx_epsilons_level2",
+                       # dict(name="mackrel_epsilons_level2",
                        #      shape=(1,),
                        #      dtype=np.float32,
                        #      missing=float("nan")),
-                       # dict(name="xxx_epsilons_level3",
+                       # dict(name="mackrel_epsilons_level3",
                        #      shape=(1,),
                        #      dtype=np.float32,
                        #      missing=float("nan")),
-                       dict(name="xxx_epsilons_central_level1",
+                       dict(name="mackrel_epsilons_central_level1",
                             scope="episode",
                             shape=(1,),
                             dtype=np.float32,
                             missing=float("nan")),
-                       dict(name="xxx_epsilons_central_level2",
+                       dict(name="mackrel_epsilons_central_level2",
                             scope="episode",
                             shape=(1,),
                             dtype=np.float32,
                             missing=float("nan")),
-                       dict(name="xxx_epsilons_central_level3",
+                       dict(name="mackrel_epsilons_central_level3",
                             scope="episode",
                             shape=(1,),
                             dtype=np.float32,
@@ -120,7 +120,7 @@ class XXXRunner(NStepRunner):
 
 
         #self.env_state_size if self.args.env_args["intersection_global_view"] else self.n_agents * self.env_obs_size,
-        if self.args.xxx_use_obs_intersections:
+        if self.args.mackrel_use_obs_intersections:
             obs_intersect_pair_size = self.env_setup_info[0]["obs_intersect_pair_size"]
             obs_intersect_all_size = self.env_setup_info[0]["obs_intersect_all_size"]
             scheme_list.extend([dict(name="obs_intersection_all",
@@ -197,37 +197,37 @@ class XXXRunner(NStepRunner):
         # if no test_mode, calculate fresh set of epsilons/epsilon seeds and update epsilon variance
         if not self.test_mode:
             ttype = th.cuda.FloatTensor if self.episode_buffer.is_cuda else th.FloatTensor
-            # calculate XXX_epsilon_schedules
-            if not hasattr(self, "xxx_epsilon_decay_schedule_level1"):
-                 self.xxx_epsilon_decay_schedule_level1 = FlatThenDecaySchedule(start=self.args.xxx_epsilon_start_level1,
-                                                                                finish=self.args.xxx_epsilon_finish_level1,
-                                                                                time_length=self.args.xxx_epsilon_time_length_level1,
-                                                                                decay=self.args.xxx_epsilon_decay_mode_level1)
+            # calculate MACKREL_epsilon_schedules
+            if not hasattr(self, "mackrel_epsilon_decay_schedule_level1"):
+                 self.mackrel_epsilon_decay_schedule_level1 = FlatThenDecaySchedule(start=self.args.mackrel_epsilon_start_level1,
+                                                                                finish=self.args.mackrel_epsilon_finish_level1,
+                                                                                time_length=self.args.mackrel_epsilon_time_length_level1,
+                                                                                decay=self.args.mackrel_epsilon_decay_mode_level1)
 
-            epsilons = ttype(self.batch_size, 1).fill_(self.xxx_epsilon_decay_schedule_level1.eval(self.T_env))
-            self.episode_buffer.set_col(col="xxx_epsilons_central_level1",
+            epsilons = ttype(self.batch_size, 1).fill_(self.mackrel_epsilon_decay_schedule_level1.eval(self.T_env))
+            self.episode_buffer.set_col(col="mackrel_epsilons_central_level1",
                                         scope="episode",
                                         data=epsilons)
 
-            if not hasattr(self, "xxx_epsilon_decay_schedule_level2"):
-                 self.xxx_epsilon_decay_schedule_level2 = FlatThenDecaySchedule(start=self.args.xxx_epsilon_start_level2,
-                                                                                finish=self.args.xxx_epsilon_finish_level2,
-                                                                                time_length=self.args.xxx_epsilon_time_length_level2,
-                                                                                decay=self.args.xxx_epsilon_decay_mode_level2)
+            if not hasattr(self, "mackrel_epsilon_decay_schedule_level2"):
+                 self.mackrel_epsilon_decay_schedule_level2 = FlatThenDecaySchedule(start=self.args.mackrel_epsilon_start_level2,
+                                                                                finish=self.args.mackrel_epsilon_finish_level2,
+                                                                                time_length=self.args.mackrel_epsilon_time_length_level2,
+                                                                                decay=self.args.mackrel_epsilon_decay_mode_level2)
 
-            epsilons = ttype(self.batch_size, 1).fill_(self.xxx_epsilon_decay_schedule_level2.eval(self.T_env))
-            self.episode_buffer.set_col(col="xxx_epsilons_central_level2",
+            epsilons = ttype(self.batch_size, 1).fill_(self.mackrel_epsilon_decay_schedule_level2.eval(self.T_env))
+            self.episode_buffer.set_col(col="mackrel_epsilons_central_level2",
                                         scope="episode",
                                         data=epsilons)
 
-            if not hasattr(self, "xxx_epsilon_decay_schedule_level3"):
-                 self.xxx_epsilon_decay_schedule_level3 = FlatThenDecaySchedule(start=self.args.xxx_epsilon_start_level3,
-                                                                         finish=self.args.xxx_epsilon_finish_level3,
-                                                                         time_length=self.args.xxx_epsilon_time_length_level3,
-                                                                         decay=self.args.xxx_epsilon_decay_mode_level3)
+            if not hasattr(self, "mackrel_epsilon_decay_schedule_level3"):
+                 self.mackrel_epsilon_decay_schedule_level3 = FlatThenDecaySchedule(start=self.args.mackrel_epsilon_start_level3,
+                                                                         finish=self.args.mackrel_epsilon_finish_level3,
+                                                                         time_length=self.args.mackrel_epsilon_time_length_level3,
+                                                                         decay=self.args.mackrel_epsilon_decay_mode_level3)
 
-            epsilons = ttype(self.batch_size, 1).fill_(self.xxx_epsilon_decay_schedule_level3.eval(self.T_env))
-            self.episode_buffer.set_col(col="xxx_epsilons_central_level3",
+            epsilons = ttype(self.batch_size, 1).fill_(self.mackrel_epsilon_decay_schedule_level3.eval(self.T_env))
+            self.episode_buffer.set_col(col="mackrel_epsilons_central_level3",
                                         scope="episode",
                                         data=epsilons)
 
@@ -240,9 +240,9 @@ class XXXRunner(NStepRunner):
         self._stats = deepcopy(stats)
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
-            log_str += ", XXX_epsilon_level1={:g}".format(self.xxx_epsilon_decay_schedule_level1.eval(self.T_env))
-            log_str += ", XXX_epsilon_level2={:g}".format(self.xxx_epsilon_decay_schedule_level2.eval(self.T_env))
-            log_str += ", XXX_epsilon_level3={:g}".format(self.xxx_epsilon_decay_schedule_level3.eval(self.T_env))
+            log_str += ", MACKREL_epsilon_level1={:g}".format(self.mackrel_epsilon_decay_schedule_level1.eval(self.T_env))
+            log_str += ", MACKREL_epsilon_level2={:g}".format(self.mackrel_epsilon_decay_schedule_level2.eval(self.T_env))
+            log_str += ", MACKREL_epsilon_level3={:g}".format(self.mackrel_epsilon_decay_schedule_level3.eval(self.T_env))
             log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate"]))
             log_str += ", policies_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
             for _i in range(_n_agent_pair_samples(self.n_agents)):
@@ -292,7 +292,7 @@ class XXXRunner(NStepRunner):
                             episode_limit=_env.episode_limit,
                             n_agents = _env.n_agents,
                             n_actions=_env.get_total_actions())
-            if args.xxx_use_obs_intersections:
+            if args.mackrel_use_obs_intersections:
                 env_dict["obs_intersect_pair_size"]= _env.get_obs_intersect_pair_size()
                 env_dict["obs_intersect_all_size"] = _env.get_obs_intersect_all_size()
             # Send results back
@@ -316,7 +316,7 @@ class XXXRunner(NStepRunner):
                 ret_dict["avail_actions__agent{}".format(_i)] = avail_actions[_i]
 
             # handle observation intersections
-            if args.xxx_use_obs_intersections:
+            if args.mackrel_use_obs_intersections:
                 ret_dict["obs_intersection_all"], _ = _env.get_obs_intersection(tuple(range(_env.n_agents)))
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
                     ret_dict["obs_intersection__pair{}".format(_i)], \
@@ -363,7 +363,7 @@ class XXXRunner(NStepRunner):
             for _i, _obs in enumerate(observations):
                 ret_dict["avail_actions__agent{}".format(_i)] = avail_actions[_i]
 
-            if args.xxx_use_obs_intersections:
+            if args.mackrel_use_obs_intersections:
                 # handle observation intersections
                 ret_dict["obs_intersection_all"], _= _env.get_obs_intersection(tuple(range(_env.n_agents)))
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):

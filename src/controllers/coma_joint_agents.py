@@ -8,7 +8,7 @@ from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
 from models import REGISTRY as m_REGISTRY
-from utils.xxx import _n_agent_pair_samples, _joint_actions_2_action_pair
+from utils.mackrel import _n_agent_pair_samples, _joint_actions_2_action_pair
 
 class COMAJointMultiAgentController():
     """
