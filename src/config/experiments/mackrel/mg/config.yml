@@ -1,0 +1,23 @@
+batch_size: 32
+mackrel_critic_level1_use_sampling: True
+mackrel_critic_level1_sample_size: 1620
+mackrel_critic_level2_use_sampling: True
+mackrel_critic_level2_sample_size: 1620
+mackrel_critic_level3_use_sampling: True
+mackrel_critic_level3_sample_size: 1620
+defaults: default xxx matrix_game
+env_args:
+  episode_limit: 1
+  n_agents: 2
+  p_common: 0.9
+  p_observation: 0.5
+  intersection_global_view: True
+  intersection_id_coded: True
+  get_obs_intersection: True
+lr_critic: 0.0
+use_replay_buffer: False
+mackrel_use_obs_intersections: False
+test_interval: 10
+test_nepisode: 30
+mackrel_agent_level3_use_past_actions_level2: True
+defaults: xxx
