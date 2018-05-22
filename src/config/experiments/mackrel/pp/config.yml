@@ -1,0 +1,25 @@
+batch_size: 32
+mackrel_critic_level1_use_sampling: True
+mackrel_critic_level1_sample_size: 1620
+mackrel_critic_level2_use_sampling: True
+mackrel_critic_level2_sample_size: 1620
+mackrel_critic_level3_use_sampling: True
+mackrel_critic_level3_sample_size: 1620
+defaults: default mackrel predator_prey
+env_args:
+  n_agents: 3
+  predator_prey_shape:
+    - 3
+    - 3
+  prey_movement: "escape"
+  nagent_capture_enabled: True
+  predator_prey_toroidal: True
+  reward_almost_capture: 1.0
+  reward_capture: 50
+  reward_collision: 0.0
+  reward_scare: 0.0
+  reward_time: -0.1
+lr_critic: 0.0
+use_replay_buffer: False
+mackrel_agent_level3_use_past_actions_level2: True
+defaults: mackrel

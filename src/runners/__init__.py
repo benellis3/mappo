@@ -27,5 +27,5 @@ REGISTRY["vdn"] = VDNRunner
 from .qmix_runner import QMIXRunner
 REGISTRY["qmix"] = QMIXRunner
 
-from .xxx_runner import XXXRunner
-REGISTRY["xxx"] = XXXRunner
+from .mackrel_runner import MACKRELRunner
+REGISTRY["mackrel"] = MACKRELRunner

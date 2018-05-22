@@ -34,12 +34,12 @@ TODO: Fine tune the reward to allow fast learning.
 '''
 
 
-if torch.cuda.is_available():
-    Tensor = torch.cuda.FloatTensor
-    lTensor = torch.cuda.LongTensor
-else:
-    Tensor = torch.FloatTensor
-    lTensor = torch.LongTensor
+# if torch.cuda.is_available():
+#     Tensor = torch.cuda.FloatTensor
+#     lTensor = torch.cuda.LongTensor
+# else:
+Tensor = torch.FloatTensor
+lTensor = torch.LongTensor
 
 
 class CoopBoxPushing(MultiAgentEnv):
@@ -87,9 +87,9 @@ class CoopBoxPushing(MultiAgentEnv):
         self.collision_reward = 0.0 #-0.1
         self.scare_off_reward = 0.0
         #self.capture_rewards = [20, 1]
-        self.r_small = 1
-        self.r_big = 10
-        self.r_fail = -0.5
+        self.r_small = args.small_box # 1
+        self.r_big = args.big_box # 10
+        self.r_fail = args.big_box_fail # -0.5
 
         # Define the internal state
         self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)

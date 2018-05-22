@@ -3,7 +3,7 @@ import torch as th
 
 from torch.autograd import Variable
 
-from utils.xxx import _joint_actions_2_action_pair
+from utils.mackrel import _joint_actions_2_action_pair
 
 
 def _has_gradient(tensor):

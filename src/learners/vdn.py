@@ -88,6 +88,9 @@ class VDNLearner(BasicLearner):
         # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)        |
         # ------------------------------------------------------------------------------
 
+        a = batch_history.to_pd()
+        b = False
+
         # Update target if necessary
         if (self.T_q - self.last_target_update_T) / self.target_update_interval > 1.0:
             self.update_target_nets()
