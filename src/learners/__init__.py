@@ -24,3 +24,6 @@ REGISTRY["coma_joint"] = COMAJointLearner
 
 from .mackrel import MACKRELLearner
 REGISTRY["mackrel"] = MACKRELLearner
+
+from .mackrel_v import MACKRELVLearner
+REGISTRY["mackrel_v"] = MACKRELVLearner

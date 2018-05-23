@@ -94,7 +94,6 @@ class BatchEpisodeBuffer():
 
         #fill in special elements, such as agent_ids
         for _col, _vals in self.columns._transition.items():
-            a = _col[:8]
             if _col[:8] == "agent_id":
                 self.data._transition[:,:,_vals[0]:_vals[1]] = float(_col.split("__agent")[1])
 
@@ -553,8 +552,6 @@ class BatchEpisodeBuffer():
         def _align_right(tensor, h, lengths):
             for _i, _l in enumerate(lengths):
                 if _l < h + 1 and _l > 0:
-                    # a = tensor[:, _i, -_l:, :]
-                    # b = tensor[:, _i, :_l, :]
                     tensor[:, _i, -_l:, :] = tensor[:, _i, :_l, :].clone() # clone is super important as otherwise, cyclical reference!
                     tensor[:, _i, :(h + 1 - _l), :] = float("nan")  # not strictly necessary as will shift back anyway later...
             return tensor
@@ -574,14 +571,8 @@ class BatchEpisodeBuffer():
         G_buffer[:, :, h - 1, :] = R_tensor[:, :, h, :]
         G_buffer[:, :, h - 1:h, :] += gamma * V_tensor[:, :, h:, :] * truncated_tensor
 
-        # a =  R_tensor[:, :, h, :]
-        # b = G_buffer[:, :, h - 1:h, :]
-        # c = V_tensor[:, :, h:, :]
-        # d = truncated_tensor
         for t in range(h - 1, 0, -1):
-            # delta_tm1 = R_tensor[:, :, t, :] + gamma * V_tensor[:, :, t, :]
             new_G = gamma * td_lambda * G_buffer[:, :, t, :] + gamma*(1-td_lambda) * V_tensor[:, :, t, :] + R_tensor[:, :, t, :]
-            #(G_buffer[:, :, t, :] - V_tensor[:, :, t, :]) + delta_tm1
             G_buffer[:, :, t - 1, :] = new_G
 
         G_buffer = _align_left(G_buffer, h, seq_lens)

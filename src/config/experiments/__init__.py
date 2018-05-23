@@ -20,7 +20,6 @@ for root, dirs, files in os.walk(ntpath.dirname(__file__)):
             else:
                 if path != "":
                     folders.append(path)
-
                 break
         folders.reverse()
         REGISTRY["/".join(folders)] = importlib.import_module(".{}.config".format(".".join(folders)), package="config.experiments").get_cfg

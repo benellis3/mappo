@@ -214,8 +214,12 @@ def _check_nan(input):
             for _k2, _v2 in _v1.items():
                 if th.sum(_v2.data != _v2.data) > 0.0:
                     assert False, "NaNs in {}:{}".format(_k1, _k2)
-    elif issubclass(type(input), th.Tensor):
+    elif isinstance(input, (th.FloatTensor, th.DoubleTensor, th.HalfTensor, th.ByteTensor, th.CharTensor, th.ShortTensor, th.IntTensor, th.LongTensor,
+                                  th.cuda.FloatTensor, th.cuda.DoubleTensor, th.cuda.HalfTensor, th.cuda.ByteTensor, th.cuda.CharTensor,
+                                  th.cuda.ShortTensor, th.cuda.IntTensor, th.cuda.LongTensor)):
         assert th.sum(input != input) == 0, "NaNs in tensor!"
+    elif isinstance(input, th.autograd.Variable):
+        assert th.sum(input.data != input.data) == 0, "NaNs in Variable!"
     elif issubclass(type(input), nn.Module):
         for i, p in enumerate(input.parameters()):
             print("grad:", p.grad)

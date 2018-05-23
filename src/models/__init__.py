@@ -56,6 +56,9 @@ REGISTRY["mackrel_nonrecurrent_agent_level1"] = MACKRELNonRecurrentAgentLevel1
 REGISTRY["mackrel_nonrecurrent_agent_level2"] = MACKRELNonRecurrentAgentLevel2
 REGISTRY["mackrel_nonrecurrent_agent_level3"] = MACKRELNonRecurrentAgentLevel3
 
+from .mackrel_v import MACKRELV
+REGISTRY["mackrel_v"] = MACKRELV
+
 
 
 

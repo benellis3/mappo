@@ -11,7 +11,6 @@ REGISTRY = {}
 for root, dirs, files in os.walk(ntpath.dirname(__file__)):
     path = root.split(os.sep)
     if "config.py" in files:
-        print(root)
         folders = []
         path = os.path.relpath(root, ntpath.dirname(__file__))
         while 1:

@@ -1,0 +1,73 @@
+action_selector: multinomial
+agent: mackrel_recursive_ac
+agent_model: mackrel_recursive
+agent_output_type: policies
+agent_level1_share_params: True
+agent_level2_share_params: True
+agent_level3_share_params: True
+batch_size: 32
+batch_size_run: 32
+lr_agent_level1: 5e-4
+lr_agent_level2: 5e-4
+lr_agent_level3: 5e-4
+lr_V: 5e-4
+mackrel_agent_model_level1: mackrel_recurrent_agent_level1
+mackrel_agent_model_level2: mackrel_recurrent_agent_level2
+mackrel_agent_model_level3: mackrel_recurrent_agent_level3
+mackrel_agent_level1_use_past_actions: True
+mackrel_agent_level2_use_past_actions: True
+mackrel_agent_level3_use_past_actions_level2: True
+mackrel_agent_level3_use_past_actions: True
+mackrel_agent_level3_use_past_actions_level1: True
+mackrel_V: mackrel_v
+mackrel_V_use_sampling: True
+mackrel_epsilon_start_level1: 0.5
+mackrel_epsilon_start_level2: 0.5
+mackrel_epsilon_start_level3: 0.5
+mackrel_epsilon_finish_level1: 0.05
+mackrel_epsilon_finish_level2: 0.05
+mackrel_epsilon_finish_level3: 0.05
+mackrel_epsilon_time_length_level1: 20000
+mackrel_epsilon_time_length_level2: 20000
+mackrel_epsilon_time_length_level3: 20000
+mackrel_epsilon_decay_mode_level1: "exp"
+mackrel_epsilon_decay_mode_level2: "exp"
+mackrel_epsilon_decay_mode_level3: "exp"
+mackrel_exploration_mode_level1: "softmax"
+mackrel_exploration_mode_level2: "softmax"
+mackrel_exploration_mode_level3: "softmax"
+mackrel_use_entropy_regularizer: False
+mackrel_use_obs_intersections: True
+mackrel_entropy_loss_regularization_factor: 0.000005
+mackrel_delegation_probability_bias: 0.5
+gamma: 0.99
+learner: mackrel_v
+multiagent_controller: mackrel_mac
+n_critic_learner_reps: 54
+n_pair_samples: ~
+obs_last_action: True
+runner: mackrel
+target_V_update_interval: 661500
+td_lambda: 0.8
+use_replay_buffer: False
+mackrel_logit_bias: 1.5
+use_batch_norm: True
+env: pred_prey
+env_args:
+    agent_obs: [1, 1]
+    episode_limit: 50
+    intersection_global_view: True
+    intersection_id_coded: True
+    n_agents: 3
+    n_prey: 1
+    predator_prey_shape: [4,4]
+    predator_prey_toroidal: False
+    reward_almost_capture: 0.0
+    reward_capture: 50
+    reward_collision: 0.0
+    reward_scare: 0.0
+    reward_time: -0.1
+defaults: default mackrel_v
+mackrel_V_use_sampling: False
+mackrel_V_sample_size: 1600
+
