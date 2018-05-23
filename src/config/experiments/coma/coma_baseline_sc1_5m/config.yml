@@ -12,7 +12,7 @@ env_args:
   map_name: m5v5_c_far
   hostname: localhost
   port: 11111
-  step_mul: 1
+  step_mul: 8
   episode_limit: 800
 env_stats_aggregator: sc1
 n_critic_learner_reps: 4
