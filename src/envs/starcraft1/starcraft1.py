@@ -60,8 +60,8 @@ class SC1(MultiAgentEnv):
         self.hostname = args.hostname
         self.port = args.port + self.bs_id
         self.port_in_use = False
-        self.debug_inputs = False
-        self.debug_rewards = False
+        self.debug_inputs = True
+        self.debug_rewards = True
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
@@ -279,32 +279,34 @@ class SC1(MultiAgentEnv):
 
         # Update what we know about units
         self._obs = self.controller.recv()
-        self.update_units()
+        game_ended = self.update_units()
 
         terminated = False
-        reward = self.reward_battle()
+        if game_ended != 0:
+            self.reward = self.reward_battle()
         info = {}
 
-        if len(self._obs.units[0]) == 0 or len(self._obs.units[1]) == 0:
+        if game_ended is not None:
             # Battle is over
             terminated = True
             self.battles_game += 1
-            if len(self._obs.units[0]) > 0:
+            if game_ended == 1:
                 self.battles_won += 1
-                reward += self.reward_win
+                self.reward += self.reward_win
 
         elif self.episode_limit > 0 and self._episode_steps >= self.episode_limit:
             # Episode limit reached
             terminated = True
             info["episode_limit"] = True
+            # info["episode_limit"] = False
             self.battles_game += 1
             self.timeouts += 1
 
         if self.debug_inputs or self.debug_rewards:
-            print("Total Reward = %.f \n ---------------------" % reward)
+            print("Total Reward = %.f \n ---------------------" % self.reward)
 
         if self.reward_scale:
-            reward /= (self.max_reward / self.reward_scale_rate)
+            self.reward /= (self.max_reward / self.reward_scale_rate)
 
         # if reward > 0:
         #     print(reward)
@@ -312,7 +314,7 @@ class SC1(MultiAgentEnv):
         #     print(terminated)
         #     print(reward)
 
-        return reward, terminated, info
+        return self.reward, terminated, info
 
     def get_agent_action(self, a_id, action):
         unit = self.get_unit_by_id(a_id)

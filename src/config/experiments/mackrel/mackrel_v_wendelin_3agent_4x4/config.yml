@@ -10,7 +10,6 @@ batch_size_run: 32
 lr_agent_level1: 5e-4
 lr_agent_level2: 5e-4
 lr_agent_level3: 5e-4
-lr_V: 5e-4
 mackrel_agent_model_level1: mackrel_recurrent_agent_level1
 mackrel_agent_model_level2: mackrel_recurrent_agent_level2
 mackrel_agent_model_level3: mackrel_recurrent_agent_level3
@@ -19,8 +18,6 @@ mackrel_agent_level2_use_past_actions: True
 mackrel_agent_level3_use_past_actions_level2: True
 mackrel_agent_level3_use_past_actions: True
 mackrel_agent_level3_use_past_actions_level1: True
-mackrel_V: mackrel_v
-mackrel_V_use_sampling: True
 mackrel_epsilon_start_level1: 0.5
 mackrel_epsilon_start_level2: 0.5
 mackrel_epsilon_start_level3: 0.5
@@ -41,7 +38,6 @@ mackrel_use_obs_intersections: True
 mackrel_entropy_loss_regularization_factor: 0.000005
 mackrel_delegation_probability_bias: 0.5
 gamma: 0.99
-learner: mackrel_v
 multiagent_controller: mackrel_mac
 n_critic_learner_reps: 54
 n_pair_samples: ~
@@ -67,7 +63,11 @@ env_args:
     reward_collision: 0.0
     reward_scare: 0.0
     reward_time: -0.1
-defaults: default mackrel_v
+mackrel_V: mackrel_v
 mackrel_V_use_sampling: False
 mackrel_V_sample_size: 1600
+lr_V: 5e-4
+learner: mackrel_v
+defaults: default mackrel_v
+
 
