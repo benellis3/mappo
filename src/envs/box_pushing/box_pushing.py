@@ -191,7 +191,7 @@ class CoopBoxPushing(MultiAgentEnv):
         # Move the agents sequentially in random order
         for b in range(self.batch_size):
             for a in np.random.permutation(self.n_agents):
-                pos = self.agents[a, b, :]
+                pos = np.copy(self.agents[a, b, :])
                 action_id = actions[a, b]
                 move_pos = self._env_bounds(pos + self.actions[action_id])
 
@@ -200,21 +200,20 @@ class CoopBoxPushing(MultiAgentEnv):
                     # try to move big box
                     if self.grid[b, pos[0], pos[1], 0] == self.n_agents and (actions[:, b] == action_id).all():
                         # all pushing same big box same way
-                        for a_ in np.arange(0, self.n_agents):
-                            box_move_pos = self._env_bounds(move_pos + self.actions[action_id])
-
-                            if sum(self.grid[b, box_move_pos[0], box_move_pos[1], :]) > 0:
-                                # box move is blocked
-                                break
-                            else:
+                        box_move_pos = self._env_bounds(move_pos + self.actions[action_id])
+                        if sum(self.grid[b, box_move_pos[0], box_move_pos[1], :]) > 0:
+                            # box move is blocked
+                            break
+                        else:
+                            for a_ in np.arange(0, self.n_agents):
                                 self.agents[a_, b, :] = move_pos
                                 self.grid[b, pos[0], pos[1], 0] -= 1
                                 self.grid[b, move_pos[0], move_pos[1], 0] += 1
                                 self.big_boxes[bb_id, b, :] = box_move_pos
                                 self.grid[b, move_pos[0], move_pos[1], 2] = 0
                                 self.grid[b, box_move_pos[0], box_move_pos[1], 2] = bb_id + 1
-                        # have resolved all actions now, so break main agent loop
-                        break
+                            # have resolved all actions now, so break main agent loop
+                            break
                     else:
                         reward[b] += self.r_fail
 
@@ -497,8 +496,8 @@ class CoopBoxPushing(MultiAgentEnv):
         """ Return a bounded observation for other agents' locations and targets, the size specified by observation
             shape, centered on the agent. Values outside the bounds of the grid are set to [-1, 0]. """
         # Create the empty observation grid
-        agent_obs = np.zeros((2 * self.agent_obs[0] + 1, 2 * self.agent_obs[1] + 1, 3), dtype=float_type)
-        agent_obs[:, :, 0] = -1
+        agent_obs = np.zeros((2 * self.agent_obs[0] + 1, 2 * self.agent_obs[1] + 1, 3), dtype=float_type) - 1
+        # agent_obs[:, :, 0] = -1
         # Determine the unbounded limits of the agent's observation
         ul = self.agents[agent_id, batch, :] - self.agent_obs
         lr = self.agents[agent_id, batch, :] + self.agent_obs
@@ -512,6 +511,7 @@ class CoopBoxPushing(MultiAgentEnv):
         # Copy the bounded observations
         agent_obs[aoy[0]:(aoy[1] + 1), aox[0]:(aox[1] + 1), :] = grid[batch, bul[0]:(blr[0] + 1),
                                                                  bul[1]:(blr[1] + 1), :]
+        agent_obs[:,:,1:] = agent_obs[:,:,1:] > 0
         return np.reshape(agent_obs, self.obs_size)
 
     def _get_obs_from_grid_troidal(self, grid, agent_id, batch=0):
