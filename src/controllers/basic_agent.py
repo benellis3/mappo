@@ -30,13 +30,16 @@ class BasicAgentController():
                                                             #switch=self.args.obs_agent_id),
                                                        dict(name="observations",
                                                             rename="agent_observation",
-                                                            select_agent_ids=[_agent_id]),
+                                                            select_agent_ids=[_agent_id],
+                                                            switch=not self.args.use_full_observability),
                                                        dict(name="actions",
                                                             rename="past_action",
                                                             select_agent_ids=[_agent_id],
                                                             transforms=[("shift", dict(steps=1)),
                                                                         ("one_hot", dict(range=(0, self.n_actions-1)))], # DEBUG!
                                                             switch=self.args.obs_last_action),
+                                                       dict(name="state",
+                                                            switch=self.args.use_full_observability)
                                                       ]).agent_flatten()
         else:
             self.scheme_fn = scheme_fn
@@ -50,7 +53,10 @@ class BasicAgentController():
             self.input_columns["main"] = {}
             # if args.agent_model in ["DQN", "RNN"]:
             self.input_columns["main"]["main"] = Scheme([dict(name="agent_id", select_agent_ids=[self.agent_id]),
-                                                         dict(name="agent_observation", select_agent_ids=[self.agent_id]),
+                                                         dict(name="agent_observation",
+                                                              select_agent_ids=[self.agent_id],
+                                                              switch=not self.args.use_full_observability),
+                                                         dict(name="state", switch=self.args.use_full_observability),
                                                          dict(name="past_action",
                                                               select_agent_ids=[self.agent_id],
                                                               switch=self.args.obs_last_action)]).agent_flatten()

@@ -27,7 +27,7 @@ class COMAAgentController(BasicAgentController):
                                               dict(name="avail_actions",
                                                    select_agent_ids=[_agent_id]),
                                               dict(name="state",
-                                                   switch=self.args.use_full_observability)
+                                                   switch=args.use_full_observability)
                                              ]).agent_flatten()
 
         input_columns = {}
@@ -36,10 +36,12 @@ class COMAAgentController(BasicAgentController):
         input_columns["main"]["epsilons"] = Scheme([dict(name="epsilons", scope="episode")]).agent_flatten()
         input_columns["main"]["main"] = \
             Scheme([dict(name="agent_id", select_agent_ids=[agent_id]),
-                    dict(name="agent_observation", select_agent_ids=[agent_id]),
+                    dict(name="agent_observation", select_agent_ids=[agent_id], switch=not args.use_full_observability),
                     dict(name="past_action",
                          select_agent_ids=[agent_id],
                          switch=args.obs_last_action),
+                    dict(name="state",
+                         switch=args.use_full_observability)
                     ]).agent_flatten()
 
         if model is not None:

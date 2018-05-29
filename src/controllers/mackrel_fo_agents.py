@@ -51,7 +51,7 @@ class MACKRELMultiagentController():
                                            #dict(name="observations",
                                            #     select_agent_ids=list(range(self.n_agents)))
                                            #if not self.args.mackrel_use_obs_intersections else
-                                           dict(name="obs_intersection_all"),
+                                           #dict(name="obs_intersection_all"),
                                            dict(name="state")
                                            ])
 
@@ -146,9 +146,10 @@ class MACKRELMultiagentController():
         self.input_columns_level1 = {}
         self.input_columns_level1["agent_input_level1"] = {}
         self.input_columns_level1["agent_input_level1"]["main"] = \
-            Scheme([dict(name="observations", select_agent_ids=list(range(self.n_agents)))
-                        if not self.args.mackrel_use_obs_intersections else
-                    dict(name="obs_intersection_all"),
+            Scheme([#dict(name="observations", select_agent_ids=list(range(self.n_agents)))
+                    #    if not self.args.mackrel_use_obs_intersections else
+                    #dict(name="obs_intersection_all"),
+                    dict(name="state"),
                     *[dict(name="past_actions_level1__sample{}".format(_i),
                           switch=self.args.mackrel_agent_level1_use_past_actions)
                       for _i in range(_n_agent_pair_samples(self.n_agents))]
@@ -162,9 +163,10 @@ class MACKRELMultiagentController():
         for _agent_id1, _agent_id2 in sorted(combinations(list(range(self.n_agents)), 2)):
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] = {}
             self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["main"] = \
-                Scheme([dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])
-                        if not self.args.mackrel_use_obs_intersections else
-                        dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2),self.n_agents))),
+                Scheme([#dict(name="observations", select_agent_ids=[_agent_id1, _agent_id2])
+                        #if not self.args.mackrel_use_obs_intersections else
+                        #dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2),self.n_agents))),
+                        dict(name="state"),
                         dict(name="past_actions_level2",
                              switch=self.args.mackrel_agent_level2_use_past_actions),
                         dict(name="agent_ids", select_agent_ids=[_agent_id1, _agent_id2]),
@@ -189,7 +191,8 @@ class MACKRELMultiagentController():
         for _agent_id in range(self.n_agents):
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)] = {}
             self.input_columns_level3["agent_input_level3__agent{}".format(_agent_id)]["main"] = \
-                Scheme([dict(name="observations", select_agent_ids=[_agent_id]),
+                Scheme([#dict(name="observations", select_agent_ids=[_agent_id]),
+                        dict(name="state"),
                         dict(name="past_actions_level3",
                              select_agent_ids=[_agent_id],
                              switch=self.args.mackrel_agent_level3_use_past_actions),
