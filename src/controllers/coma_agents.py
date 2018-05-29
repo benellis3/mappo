@@ -13,7 +13,8 @@ class COMAAgentController(BasicAgentController):
                                                    #switch=self.args.obs_agent_id),
                                               dict(name="observations",
                                                    rename="agent_observation",
-                                                   select_agent_ids=[_agent_id]),
+                                                   select_agent_ids=[_agent_id],
+                                                   switch=not self.args.use_full_observability),
                                               dict(name="actions",
                                                    rename="past_action",
                                                    select_agent_ids=[_agent_id],
@@ -24,7 +25,9 @@ class COMAAgentController(BasicAgentController):
                                                    rename="epsilons",
                                                    scope="episode"),
                                               dict(name="avail_actions",
-                                                   select_agent_ids=[_agent_id])
+                                                   select_agent_ids=[_agent_id]),
+                                              dict(name="state",
+                                                   switch=self.args.use_full_observability)
                                              ]).agent_flatten()
 
         input_columns = {}
