@@ -28,3 +28,6 @@ from .mackrel_agents import MACKRELMultiagentController
 from .mackrel_fo_agents import MACKRELMultiagentController as MACKRELFOMultiagentController
 REGISTRY["mackrel_mac"] = MACKRELMultiagentController
 REGISTRY["mackrel_fo_mac"] = MACKRELFOMultiagentController
+
+from .flounderl_agents import FLOUNDERLMultiagentController
+REGISTRY["flounderl_mac"] = FLOUNDERLMultiagentController

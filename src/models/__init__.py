@@ -59,6 +59,19 @@ REGISTRY["mackrel_nonrecurrent_agent_level3"] = MACKRELNonRecurrentAgentLevel3
 from .mackrel_v import MACKRELV
 REGISTRY["mackrel_v"] = MACKRELV
 
+from .flounderl import FLOUNDERLCritic
+REGISTRY["flounderl_critic"] = FLOUNDERLCritic
+from .flounderl import FLOUNDERLAgent
+REGISTRY["flounderl_agent"] = FLOUNDERLAgent
+from .flounderl import FLOUNDERLRecurrentAgentLevel1, FLOUNDERLRecurrentAgentLevel2, FLOUNDERLRecurrentAgentLevel3
+REGISTRY["flounderl_recurrent_agent_level1"] = FLOUNDERLRecurrentAgentLevel1
+REGISTRY["flounderl_recurrent_agent_level2"] = FLOUNDERLRecurrentAgentLevel2
+REGISTRY["flounderl_recurrent_agent_level3"] = FLOUNDERLRecurrentAgentLevel3
+from .flounderl import FLOUNDERLNonRecurrentAgentLevel1, FLOUNDERLNonRecurrentAgentLevel2, FLOUNDERLNonRecurrentAgentLevel3
+REGISTRY["flounderl_nonrecurrent_agent_level1"] = MACKRELNonRecurrentAgentLevel1
+REGISTRY["flounderl_nonrecurrent_agent_level2"] = MACKRELNonRecurrentAgentLevel2
+REGISTRY["flounderl_nonrecurrent_agent_level3"] = MACKRELNonRecurrentAgentLevel3
+
 
 
 

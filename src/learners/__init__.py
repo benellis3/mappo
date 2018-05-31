@@ -27,3 +27,6 @@ REGISTRY["mackrel"] = MACKRELLearner
 
 from .mackrel_v import MACKRELVLearner
 REGISTRY["mackrel_v"] = MACKRELVLearner
+
+from .flounderl import FLOUNDERLLearner
+REGISTRY["flounderl"] = FLOUNDERLLearner

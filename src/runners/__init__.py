@@ -29,3 +29,6 @@ REGISTRY["qmix"] = QMIXRunner
 
 from .mackrel_runner import MACKRELRunner
 REGISTRY["mackrel"] = MACKRELRunner
+
+from .flounderl_runner import FLOUNDERLRunner
+REGISTRY["flounderl"] = FLOUNDERLRunner
