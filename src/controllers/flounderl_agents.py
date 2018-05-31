@@ -224,7 +224,7 @@ class FLOUNDERLMultiagentController():
         self.model = self.model_class(input_shapes=dict(level1=self.input_shapes_level1["agent_input_level1"],
                                                         level2=self.input_shapes_level2["agent_input_level2__agent0"],
                                                         level3=self.input_shapes_level3["agent_input_level3__agent0"]),
-                                      n_agents=self.n_actions,
+                                      n_agents=self.n_agents,
                                       n_actions=self.n_actions,
                                       model_classes=dict(level1=mo_REGISTRY[self.args.flounderl_agent_model_level1],
                                                          level2=mo_REGISTRY[self.args.flounderl_agent_model_level2],

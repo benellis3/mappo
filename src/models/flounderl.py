@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _check_nan
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
-from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id
+from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id, _ordered_agent_pairings
 
 class FLOUNDERLQFunctionLevel1(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
@@ -875,7 +875,25 @@ class FLOUNDERLAgent(nn.Module):
                                                                                                             tformat=tformat["level3"],
                                                                                                             **kwargs)
 
+        # for each agent pair (a,b), calculate p_a_b = p(u_a, u_b|tau_a tau_b CK_ab) = p(u_d|CK_ab)*pi(u_a|tau_a)*pi(u_b|tau_b) + p(u_ab|CK_ab)
+        # output dim of p_a_b is (n_agents choose 2) x bs x t x n_actions**2
+        p_d = out_level2[:,:,:,0:1]
+        p_ab = out_level2[:, :, :, 1:]
 
+        tmp_list = []
+        for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
+            x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
+            y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
+            z = th.bmm(x.unsqueeze(2), y.unsqueeze(1)).view(x.shape[0], -1) # TODO: Check the flattening is correct order!!!
+            u = _from_batch(z, params_x, tformat_x)
+            tmp_list.append(u)
+
+        pi_a_cross_pi_b = th.cat(tmp_list, dim=0)
+        p_a_b = p_d * pi_a_cross_pi_b + p_ab
+
+        # next, calculate 
+
+        #p_a_b = p_d * pi_a * pi_b + p_ab
 
         # gather input for pair probability modules
 
