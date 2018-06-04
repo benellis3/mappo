@@ -263,9 +263,9 @@ class FLOUNDERLMultiagentController():
                 sampled_pair_ids.fill_(0.0)
 
                 # sample which pairs should be selected
-                self.actions_level1 = sampled_pair_ids.clone()
-                self.selected_actions_format = selected_actions_format_level1
-                self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
+            self.actions_level1 = sampled_pair_ids.clone()
+            self.selected_actions_format = selected_actions_format_level1
+            self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
 
             inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
                                                                        inputs,
@@ -326,12 +326,12 @@ class FLOUNDERLMultiagentController():
 
             pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents, "a*bs*t*v") # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
 
-            avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
-                _adim(inputs_level3_tformat), Variable(pair_id1.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
-                    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
-            avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
-                _adim(inputs_level3_tformat), Variable(pair_id2.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
-                    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+            avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"]#.gather(
+                #_adim(inputs_level3_tformat), Variable(pair_id1.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                #    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+            avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"]#.gather(
+                #_adim(inputs_level3_tformat), Variable(pair_id2.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                #    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
 
             actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1, avail_actions2)
 
@@ -358,6 +358,7 @@ class FLOUNDERLMultiagentController():
                                                                                                                        hidden_states=hidden_states["level3"],
                                                                                                                        loss_fn=None,
                                                                                                                        tformat=inputs_level3_tformat,
+                                                                                                                       test_mode=test_mode,
                                                                                                                        **kwargs)
             # extract available actions
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"]

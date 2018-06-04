@@ -125,6 +125,7 @@ class FLOUNDERLLearner(BasicLearner):
 
 
         self.last_target_update_T_critic = 0
+        self.T_critic = 0
         pass
 
 
@@ -192,14 +193,14 @@ class FLOUNDERLLearner(BasicLearner):
                                                               bs_ids=None,
                                                               fill_zero=True)
 
-        self.train(batch_history, data_inputs, data_inputs_tformat, T_env)
+        self._train(batch_history, data_inputs, data_inputs_tformat, T_env)
         pass
 
-    def train(self, batch_history, data_inputs, data_inputs_tformat, T_env):
+    def _train(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
-        if (self.T_critic_level1 - self.last_target_update_T_critic_level1) / self.args.T_target_critic_level1_update_interval > 1.0:
+        if (self.T_critic - self.last_target_update_T_critic) / self.args.T_target_critic_update_interval > 1.0:
             self.update_target_nets(level=1)
-            self.last_target_update_T_critic_level1 = self.T_critic_level1
+            self.last_target_update_T_critic_level1 = self.T_critic
             print("updating target net!")
 
         # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
@@ -212,7 +213,7 @@ class FLOUNDERLLearner(BasicLearner):
 
 
         # do single forward pass in critic
-        flounderl_model_inputs, flounderl_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level1,
+        flounderl_model_inputs, flounderl_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns,
                                                                          inputs=data_inputs,
                                                                          inputs_tformat=data_inputs_tformat,
                                                                          to_variable=True,
@@ -229,19 +230,19 @@ class FLOUNDERLLearner(BasicLearner):
                        flounderl_model_inputs_tformat=flounderl_model_inputs_tformat,
                        data_inputs=data_inputs,
                        data_inputs_tformat=data_inputs_tformat,
-                       agent_optimiser=self.agent_level1_optimiser,
-                       agent_parameters=self.agent_level1_parameters,
-                       critic_optimiser=self.critic_level1_optimiser,
-                       critic_parameters=self.critic_level1_parameters,
-                       critic=self.critic_models["level1"],
-                       target_critic=self.target_critic_models["level1"],
-                       flounderl_critic_use_sampling=self.args.flounderl_critic_level1_use_sampling,
-                       flounderl_critic_sample_size=self.args.flounderl_critic_level1_sample_size,
-                       T_critic_str="T_critic_level1",
-                       T_policy_str="T_policy_level1",
+                       agent_optimiser=self.agent_optimiser,
+                       agent_parameters=self.agent_parameters,
+                       critic_optimiser=self.critic_optimiser,
+                       critic_parameters=self.critic_parameters,
+                       critic=self.critic_model,
+                       target_critic=self.target_critic_model,
+                       flounderl_critic_use_sampling=self.args.flounderl_critic_use_sampling,
+                       flounderl_critic_sample_size=self.args.flounderl_critic_sample_size,
+                       T_critic_str="T_critic",
+                       T_policy_str="T_policy",
                        T_env=T_env,
                        level=1,
-                       actions=actions_level1)
+                       actions=actions)
         pass
 
     def _optimize(self,
