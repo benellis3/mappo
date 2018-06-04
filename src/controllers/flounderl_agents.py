@@ -14,7 +14,7 @@ from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
 from utils.mackrel import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
     _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings, \
-    _agent_ids_2_pairing_id, _joint_actions_2_action_pair_aa, _ordered_agent_pairings
+    _agent_ids_2_pairing_id, _joint_actions_2_action_pair_aa, _ordered_agent_pairings, _excluded_pair_ids
 class FLOUNDERLMultiagentController():
     """
     container object for a set of independent agents
@@ -182,21 +182,281 @@ class FLOUNDERLMultiagentController():
     def get_parameters(self):
         return list(self.model.parameters())
 
-    def select_actions(self, inputs, avail_actions, tformat, info, test_mode=False):
+    def select_actions(self, inputs, avail_actions, tformat, info, hidden_states=None, test_mode=False, **kwargs):
+        """
+        sample from the FLOUNDERL tree
+        """
 
-        selected_actions_list = []
-        selected_actions_list += [dict(name="actions",
-                                       select_agent_ids=list(range(self.n_agents)),
-                                       data=self.final_actions)]
+        if self.args.agent_level1_share_params:
 
-        modified_inputs_list = []
-        modified_inputs_list += [dict(name="policies",
-                                      data=self.policies)]
-        modified_inputs_list += [dict(name="avail_actions",
-                                      select_agent_ids=list(range(self.n_agents)),
-                                      data=self.avail_actions)]
+            # # Step 1: Sample non-overlapping pairs of agents
+            # inputs_level1, inputs_level1_tformat = _build_model_inputs(self.input_columns_level1,
+            #                                                            inputs,
+            #                                                            inputs_tformat=tformat,
+            #                                                            to_variable=True)
+            #
+            # out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model.model_level1(inputs=inputs_level1["agent_input_level1"],
+            #                                                                                           hidden_states=hidden_states["level1"],
+            #                                                                                           loss_fn=None,
+            #                                                                                           tformat=inputs_level1_tformat,
+            #                                                                                           test_mode=test_mode,
+            #                                                                                           n_agents=self.n_agents,
+            #                                                                                           **kwargs)
+            #
+            # pairings = _ordered_agent_pairings(5)
+            # a = [pairings[_x] for _x in _excluded_pair_ids(5, [1])]
+            # # successively sample from each pair
+            # ttype = th.LongTensor if not out_level1.is_cuda else th.cuda.LongTensor
+            # pair_probabilities, params_pp, tformat_pp = _to_batch(out_level1.clone(), tformat_level1)
+            # # nr_t_bs = out_level1.shape[_bsdim(tformat_level1)] * out_level1.shape[_tdim(tformat_level1)]
+            # pair_ids_chosen = ttype(pair_probabilities.shape[0], self.n_agents // 2)
+            # for _c in range(self.n_agents // 2):
+            #     sampled_pair_ids, modified_inputs_level1, selected_actions_format_level1 = self.action_selector.select_action({"policies":out_level1},
+            #                                                                                                                   avail_actions=None,
+            #                                                                                                                   tformat=tformat_level1,
+            #                                                                                                                   test_mode=test_mode)
+            #     sampled_pair_ids, _, _ = _to_batch(sampled_pair_ids, selected_actions_format_level1)
+            #     # set excluded probabilities over excluded tuples to zero
+            #     pair_ids_chosen[:, _c:_c+1] = sampled_pair_ids
+            #     b = pair_ids_chosen[0, :_c+1].tolist()
+            #     c = _excluded_pair_ids(3, [0])
+            #     a = _excluded_pair_ids(self.n_agents, pair_ids_chosen[0, :_c+1].tolist())
+            #     excluded_pair_ids = [ _excluded_pair_ids(self.n_agents, pair_ids_chosen[_b, :_c+1].tolist()) for _b in range(pair_ids_chosen.shape[0]) ]
+            #     pair_probabilities.scatter_(1, excluded_pair_ids, 0.0)
+            #     # update pair_ids_chosen
 
-        return selected_actions_list, modified_inputs_list, self.selected_actions_format
+            # top level: aa' ~ Pi_c sample which pair to coordinate
+            # second level: pick up correct pair (given aa'), sample u^a, u^a' from the pair coordinator
+            # either decode u^a, u^a' from the sampled action, or refer to level
+
+            # --------------------- LEVEL 1
+
+            inputs_level1, inputs_level1_tformat = _build_model_inputs(self.input_columns_level1,
+                                                                       inputs,
+                                                                       to_variable=True,
+                                                                       inputs_tformat=tformat)
+            if self.args.debug_mode:
+                _check_nan(inputs_level1)
+            out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model.model_level1(inputs_level1["agent_input_level1"],
+                                                                                                                        hidden_states=hidden_states["level1"],
+                                                                                                                        loss_fn=None,
+                                                                                                                        tformat=inputs_level1_tformat,
+                                                                                                                        n_agents=self.n_agents,
+                                                                                                                        test_mode=test_mode,
+                                                                                                                        **kwargs)
+            if self.args.debug_mode:
+                _check_nan(inputs_level1)
+
+
+            sampled_pair_ids, modified_inputs_level1, selected_actions_format_level1 = self.action_selector.select_action({"policies":out_level1},
+                                                                                                                           avail_actions=None,
+                                                                                                                           tformat=tformat_level1,
+                                                                                                                           test_mode=test_mode)
+            _check_nan(sampled_pair_ids)
+
+            if self.args.debug_mode in ["level2_actions_fixed_pair"]:
+                """
+                DEBUG MODE: LEVEL2 ACTIONS FIXED PAIR
+                Here we pick level2 actions from a fixed agent pair (0,1) and the third action from IQL
+                """
+                assert self.n_agents == 3, "only makes sense in n_agents=3 scenario"
+                sampled_pair_ids.fill_(0.0)
+
+                # sample which pairs should be selected
+                self.actions_level1 = sampled_pair_ids.clone()
+                self.selected_actions_format = selected_actions_format_level1
+                self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
+
+            inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
+                                                                       inputs,
+                                                                       to_variable=True,
+                                                                       inputs_tformat=tformat,
+                                                                       )
+
+            assert self.args.agent_level2_share_params, "not implemented!"
+
+
+            if "avail_actions_pair" in inputs_level2["agent_input_level2"]:
+                pairwise_avail_actions = inputs_level2["agent_input_level2"]["avail_actions_pair"]
+            else:
+                avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id1"], inputs_level2_tformat)
+                avail_actions2, params_aa2, _ = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id2"], inputs_level2_tformat)
+                pairwise_avail_actions = th.bmm(avail_actions1.unsqueeze(2), avail_actions2.unsqueeze(1))
+                pairwise_avail_actions = _from_batch(pairwise_avail_actions, params_aa2, tformat_aa1)
+
+            ttype = th.cuda.FloatTensor if pairwise_avail_actions.is_cuda else th.FloatTensor
+            delegation_avails = Variable(ttype(pairwise_avail_actions.shape[0],
+                                               pairwise_avail_actions.shape[1],
+                                               pairwise_avail_actions.shape[2], 1).fill_(1.0), requires_grad=False)
+            pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=_vdim(tformat))
+
+            mask = pairwise_avail_actions.data.clone().fill_(0.0)
+            mask[:,:,:,-1] = 1.0
+            mask.scatter_(_adim(inputs_level2_tformat), sampled_pair_ids.repeat(1,1,1,pairwise_avail_actions.shape[-1]).long(), pairwise_avail_actions.data)
+            pairwise_avail_actions = Variable(mask, requires_grad=False)
+
+            out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.model.models["level2_{}".format(0)](inputs_level2["agent_input_level2"],
+                                                                                                                        hidden_states=hidden_states["level2"],
+                                                                                                                        loss_fn=None,
+                                                                                                                        tformat=inputs_level2_tformat,
+                                                                                                                        sampled_pair_ids=sampled_pair_ids,
+                                                                                                                        pairwise_avail_actions=pairwise_avail_actions,
+                                                                                                                        test_mode=test_mode,
+                                                                                                                        **kwargs)
+
+
+            pair_sampled_actions, \
+            modified_inputs_level2, \
+            selected_actions_format_level2 = self.action_selector.select_action({"policies":out_level2},
+                                                                                avail_actions=pairwise_avail_actions.data,
+                                                                                tformat=tformat_level2,
+                                                                                test_mode=test_mode)
+
+            self.actions_level2 = pair_sampled_actions.clone()
+            self.actions_level2_sampled = pair_sampled_actions.gather(0, sampled_pair_ids.long())
+            self.selected_actions_format_level2 = selected_actions_format_level2
+            self.policies_level2 = modified_inputs_level2.clone()
+
+
+            inputs_level3, inputs_level3_tformat = _build_model_inputs(self.input_columns_level3,
+                                                                       inputs,
+                                                                       to_variable=True,
+                                                                       inputs_tformat=tformat,
+                                                                       )
+
+            pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents, "a*bs*t*v") # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
+
+            avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
+                _adim(inputs_level3_tformat), Variable(pair_id1.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+            avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
+                _adim(inputs_level3_tformat), Variable(pair_id2.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+
+
+            actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1, avail_actions2)
+
+            # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
+
+            ttype = th.cuda.FloatTensor if self.args.use_cuda else th.FloatTensor
+            action_matrix = ttype(self.n_agents,
+                                  pair_sampled_actions.shape[_bsdim(tformat)]*
+                                  pair_sampled_actions.shape[_tdim(tformat)]).fill_(float("nan"))
+
+            action_matrix.scatter_(0, pair_id1.squeeze(-1).view(pair_id1.shape[0],-1), actions1.squeeze(-1).view(actions1.shape[0],-1))
+            action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0],-1), actions2.squeeze(-1).view(actions2.shape[0],-1))
+
+
+            avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
+            active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], -1).unsqueeze(2).clone()
+            active[active == active] = 1.0
+            active[active != active] = 0.0
+            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0] = avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0].fill_(0.0)  # DEBUG
+            avail_actions_level3[:, :, :, -1:] = active
+            inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3, requires_grad=False)
+
+            out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.model.models["level3_{}".format(0)](inputs_level3["agent_input_level3"],
+                                                                                                                       hidden_states=hidden_states["level3"],
+                                                                                                                       loss_fn=None,
+                                                                                                                       tformat=inputs_level3_tformat,
+                                                                                                                       **kwargs)
+            # extract available actions
+            avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"]
+
+            individual_actions, \
+            modified_inputs_level3, \
+            selected_actions_format_level3 = self.action_selector.select_action({"policies":out_level3},
+                                                                                avail_actions=avail_actions_level3.data,
+                                                                                tformat=tformat_level3,
+                                                                                test_mode=test_mode)
+
+            # fill into action matrix all the actions that are not NaN
+            individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
+            self.actions_level3 = individual_actions_sq.view(individual_actions.shape[_adim(tformat_level3)],
+                                                             individual_actions.shape[_bsdim(tformat_level3)],
+                                                             individual_actions.shape[_tdim(tformat_level3)],
+                                                             1)
+
+            action_matrix[action_matrix != action_matrix] = individual_actions_sq[action_matrix != action_matrix]
+
+            if self.args.debug_mode in ["level3_actions_only"]:
+                """
+                DEBUG MODE: LEVEL3 ACTIONS ONLY
+                Here we just pick actions from level3 - should therefore just correspond to vanilla COMA!
+                """
+                action_matrix  = individual_actions_sq
+
+            self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)], # self.n_agents, #
+                                                    individual_actions.shape[_bsdim(tformat_level3)],
+                                                    individual_actions.shape[_tdim(tformat_level3)],
+                                                    1)
+
+            #self.actions_level3 = individual_actions.clone()
+            self.selected_actions_format_level3 = selected_actions_format_level3
+            self.policies_level3 = modified_inputs_level3.clone()
+            self.avail_actions = avail_actions_level3.data
+
+
+            selected_actions_list = []
+            for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples): #_n_agent_pair_samples(self.n_agents)):
+                selected_actions_list += [dict(name="actions_level1__sample{}".format(_i),
+                                               data=self.actions_level1[_i])]
+            for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples):
+                selected_actions_list += [dict(name="actions_level2__sample{}".format(_i),
+                                               data=self.actions_level2_sampled[_i])] # TODO: BUG!?
+            selected_actions_list += [dict(name="actions_level2",
+                                           select_agent_ids=list(range(_n_agent_pairings(self.n_agents))),
+                                           data=self.actions_level2)]
+            selected_actions_list += [dict(name="actions_level3",
+                                           select_agent_ids=list(range(self.n_agents)),
+                                           data=self.actions_level3)]
+            selected_actions_list += [dict(name="actions",
+                                           select_agent_ids=list(range(self.n_agents)),
+                                           data=self.final_actions)]
+
+            modified_inputs_list = []
+            modified_inputs_list += [dict(name="policies_level1",
+                                          data=self.policies_level1)]
+            for _i in range(_n_agent_pair_samples(self.n_agents)):
+                modified_inputs_list += [dict(name="policies_level2__sample{}".format(_i),
+                                              data=self.policies_level2[_i])]
+            modified_inputs_list += [dict(name="policies_level3",
+                                          select_agent_ids=list(range(self.n_agents)),
+                                          data=self.policies_level3)]
+            modified_inputs_list += [dict(name="avail_actions",
+                                          select_agent_ids=list(range(self.n_agents)),
+                                          data=self.avail_actions)]
+
+            hidden_states = dict(level1=hidden_states_level1,
+                                 level2=hidden_states_level2,
+                                 level3=hidden_states_level3)
+
+            return hidden_states, selected_actions_list, modified_inputs_list, self.selected_actions_format
+
+
+        #return dict(hidden_states = dict(level1=hidden_states_level1,
+        #                                 level2=hidden_states_level2,
+        #                                 level3=hidden_states_level3),
+        #            losses = None), tformat_level3
+
+            pass
+
+        else:
+            assert False, "Not implemented"
+
+        #selected_actions_list = []
+        #selected_actions_list += [dict(name="actions",
+        #                               select_agent_ids=list(range(self.n_agents)),
+        #                               data=self.final_actions)]
+
+        #modified_inputs_list = []
+        #modified_inputs_list += [dict(name="policies",
+        #                              data=self.policies)]
+        #modified_inputs_list += [dict(name="avail_actions",
+        #                              select_agent_ids=list(range(self.n_agents)),
+        #                              data=self.avail_actions)]
+
+        #return selected_actions_list, modified_inputs_list, self.selected_actions_format
 
     def create_model(self, transition_scheme):
 
@@ -255,7 +515,10 @@ class FLOUNDERLMultiagentController():
         assert False, "TODO"
         pass
 
-    def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, loss_level=None, **kwargs):
+    def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, actions=None, loss_level=None, **kwargs):
+
+        if loss_fn is None or actions is None:
+            assert False, "not implemented - always need loss function and selected actions!"
 
         avail_actions = kwargs["avail_actions"]
         test_mode = kwargs["test_mode"]

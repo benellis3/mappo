@@ -9,6 +9,11 @@ def _n_agent_pair_samples(n_agents):
 def _ordered_agent_pairings(n_agents):
     return sorted(combinations(list(range(n_agents)), 2))
 
+def _excluded_pair_ids(n_agents, sampled_pair_ids):
+    pairings = _ordered_agent_pairings(n_agents)
+    tmp = [_i for _i, _pair in enumerate(pairings) if not any([{*pairings[_s]} & {*_pair} for _s in sampled_pair_ids ])]
+    return tmp
+
 def _n_agent_pairings(n_agents):
     return int((n_agents * (n_agents-1)) / 2)
 
@@ -25,7 +30,7 @@ def _joint_actions_2_action_pair(joint_action, n_actions,use_delegate_action=Tru
         _action2 = (joint_action) % n_actions
     return _action1, _action2
 
-def _joint_actions_2_action_pair_aa(joint_action, n_actions,avail_actions1,avail_actions2, use_delegate_action=True):
+def _joint_actions_2_action_pair_aa(joint_action, n_actions, avail_actions1, avail_actions2, use_delegate_action=True):
     if use_delegate_action:
         mask = (joint_action == 0.0)
         joint_action[mask] = 1.0
@@ -42,7 +47,7 @@ def _joint_actions_2_action_pair_aa(joint_action, n_actions,avail_actions1,avail
     _action1[aa_m1 ] = 0
     _action2[aa_m2] = 0
     aa1 = avail_actions1.data.gather(-1, (_action1.long() ))
-    aa2 = avail_actions2.data.gather(-1, ( _action2.long() ))
+    aa2 = avail_actions2.data.gather(-1, (_action2.long() ))
     _action1[aa1 == 0] = float("nan")
     _action1[aa2 == 0] = float("nan")
     _action1[aa_m1] = float("nan")

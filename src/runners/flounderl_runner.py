@@ -163,6 +163,144 @@ class FLOUNDERLRunner(NStepRunner):
 
         pass
 
+    def run(self, test_mode):
+        self.test_mode = test_mode
+
+        # don't reset at initialization as don't have access to hidden state size then
+        self.reset()
+
+        terminated = False
+        while not terminated:
+            # increase episode time counter
+            self.t_episode += 1
+
+            # retrieve ids of all envs that have not yet terminated.
+            # NOTE: for efficiency reasons, will perform final action selection in terminal state
+            ids_envs_not_terminated = [_b for _b in range(self.batch_size) if not self.envs_terminated[_b]]
+            ids_envs_not_terminated_tensor = th.cuda.LongTensor(ids_envs_not_terminated) \
+                                                if self.episode_buffer.is_cuda \
+                                                else th.LongTensor(ids_envs_not_terminated)
+
+
+            if self.t_episode > 0:
+
+                # flush transition buffer before next step
+                self.transition_buffer.flush()
+
+                # get selected actions from last step
+                selected_actions, selected_actions_tformat = self.episode_buffer.get_col(col="actions",
+                                                                                         t=self.t_episode-1,
+                                                                                         agent_ids=list(range(self.n_agents))
+                                                                                         )
+
+                ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
+                                                             if selected_actions.is_cuda else ids_envs_not_terminated_tensor.cpu(), :, :],
+                                ids=ids_envs_not_terminated)
+
+                # retrieve ids of all envs that have not yet terminated.
+                # NOTE: for efficiency reasons, will perform final action selection in terminal state
+                ids_envs_not_terminated = [_b for _b in range(self.batch_size) if not self.envs_terminated[_b]]
+                ids_envs_not_terminated_tensor = th.cuda.LongTensor(ids_envs_not_terminated) \
+                    if self.episode_buffer.is_cuda \
+                    else th.LongTensor(ids_envs_not_terminated)
+
+                # update which envs have terminated
+                for _id, _v in ret.items():
+                    self.envs_terminated[_id] = _v["terminated"]
+
+                # insert new data in transition_buffer into episode buffer (NOTE: there's a good reason for why processes
+                # don't write directly into the episode buffer)
+                self.episode_buffer.insert(self.transition_buffer,
+                                           bs_ids=list(range(self.batch_size)),
+                                           t_ids=self.t_episode,
+                                           bs_empty=[_i for _i in range(self.batch_size) if _i not in ids_envs_not_terminated])
+
+                # update episode time counter
+                if not self.test_mode:
+                    self.T_env += len(ids_envs_not_terminated)
+
+
+            # generate multiagent_controller inputs for policy forward pass
+            action_selection_inputs, \
+            action_selection_inputs_tformat = self.episode_buffer.view(dict_of_schemes=self.multiagent_controller.joint_scheme_dict,
+                                                                       to_cuda=self.args.use_cuda,
+                                                                       to_variable=True,
+                                                                       bs_ids=ids_envs_not_terminated,
+                                                                       t_id=self.t_episode,
+                                                                       fill_zero=True, # TODO: DEBUG!!!
+                                                                       )
+
+            # retrieve avail_actions from episode_buffer
+            avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,
+                                                                              col="avail_actions",
+                                                                              t = self.t_episode,
+                                                                              agent_ids=list(range(self.n_agents)))
+
+
+            # select actions and retrieve related objects
+            if isinstance(self.hidden_states, dict):
+                hidden_states = {_k:_v[:, ids_envs_not_terminated_tensor, :, :] for _k, _v in self.hidden_states.items()}
+            else:
+                hidden_states = self.hidden_states[:, ids_envs_not_terminated_tensor, :,:]
+
+
+            hidden_states, selected_actions, action_selector_outputs, selected_actions_format = \
+                self.multiagent_controller.select_actions(inputs=action_selection_inputs,
+                                                          avail_actions=avail_actions,
+                                                          #tformat=avail_actions_format,
+                                                          tformat=action_selection_inputs_tformat,
+                                                          info=dict(T_env=self.T_env),
+                                                          hidden_states=hidden_states,
+                                                          test_mode=test_mode)
+
+            if isinstance(hidden_states, dict):
+                for _k, _v in hidden_states.items():
+                    self.hidden_states[_k][:, ids_envs_not_terminated_tensor, :, :] = _v
+            else:
+                self.hidden_states[:, ids_envs_not_terminated_tensor, :, :] = hidden_states
+
+            for _sa in action_selector_outputs:
+                self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                        col=_sa["name"],
+                                        t=self.t_episode,
+                                        agent_ids=_sa.get("select_agent_ids", None),
+                                        data=_sa["data"])
+
+            # write selected actions to episode_buffer
+            if isinstance(selected_actions, list):
+               for _sa in selected_actions:
+                   self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                               col=_sa["name"],
+                                               t=self.t_episode,
+                                               agent_ids=_sa.get("select_agent_ids", None),
+                                               data=_sa["data"])
+            else:
+                self.episode_buffer.set_col(bs=ids_envs_not_terminated,
+                                            col="actions",
+                                            t=self.t_episode,
+                                            agent_ids=list(range(self.n_agents)),
+                                            data=selected_actions)
+
+            # keep a copy of selected actions explicitely in transition_buffer device context
+            #self.selected_actions = selected_actions.cuda() if self.transition_buffer.is_cuda else selected_actions.cpu()
+
+            #Check for termination conditions
+            #Check for runner termination conditions
+            if self.t_episode == self.max_t_episode:
+                terminated = True
+            # Check whether all envs have terminated
+            if all(self.envs_terminated):
+                terminated = True
+            # Check whether envs may have failed to terminate
+            if self.t_episode == self.env_episode_limit+1 and not terminated:
+                assert False, "Envs seem to have failed returning terminated=True, thus not respecting their own episode_limit. Please fix envs."
+
+            pass
+
+        # calculate episode statistics
+        self._add_episode_stats(T_env=self.T_env)
+        #a = self.episode_buffer.to_pd()
+        return self.episode_buffer
 
 
     def log(self, log_directly=True):

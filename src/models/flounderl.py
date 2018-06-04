@@ -891,7 +891,7 @@ class FLOUNDERLAgent(nn.Module):
         pi_a_cross_pi_b = th.cat(tmp_list, dim=0)
         p_a_b = p_d * pi_a_cross_pi_b + p_ab
 
-        # next, calculate 
+        # next, calculate
 
         #p_a_b = p_d * pi_a * pi_b + p_ab
 
