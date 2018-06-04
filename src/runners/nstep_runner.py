@@ -629,6 +629,7 @@ class NStepRunner():
                 if not self.test_mode:
                     self.T_env += len(ids_envs_not_terminated)
 
+            #a = self.episode_buffer.to_pd()
             # generate multiagent_controller inputs for policy forward pass
             multiagent_controller_inputs, \
             multiagent_controller_inputs_tformat = self.episode_buffer.view(dict_of_schemes=self.multiagent_controller.joint_scheme_dict,
@@ -724,7 +725,7 @@ class NStepRunner():
 
         # calculate episode statistics
         self._add_episode_stats(T_env=self.T_env)
-        #a = self.episode_buffer.to_pd()
+        # a = self.episode_buffer.to_pd()
         return self.episode_buffer
 
     def _add_episode_stats(self, T_env):

@@ -449,7 +449,7 @@ class MACKRELLearner(BasicLearner):
 
         # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
         actions, actions_tformat = batch_history.get_col(bs=None,
-                                                         col="actions_level1__sample{}".format(0),
+                                                         col="actions_level1__sample0".format(0),
                                                          # agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
         actions_level1 = actions.unsqueeze(0)
@@ -498,14 +498,15 @@ class MACKRELLearner(BasicLearner):
 
         assert self.n_agents <= 3 or self.args.n_pair_samples == 1 , "only implemented for 3 or fewer agents, or if n_pair_samples == 1"
         actions, actions_tformat = batch_history.get_col(bs=None,
-                                                         col="actions_level2__sample{}".format(0))
-        actions = actions.unsqueeze(0)
+                                                         col="actions_level2",
+                                                         agent_ids=list(range(0, _n_agent_pairings(self.n_agents))))
+        # actions = actions.unsqueeze(0)
 
         # do single forward pass in critic
         mackrel_model_inputs, mackrel_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns_level2,
-                                                                         inputs=data_inputs,
-                                                                         inputs_tformat=data_inputs_tformat,
-                                                                         to_variable=True)
+                                                                                 inputs=data_inputs,
+                                                                                 inputs_tformat=data_inputs_tformat,
+                                                                                 to_variable=True)
 
         self._optimize(batch_history,
                        mackrel_model_inputs,

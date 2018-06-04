@@ -197,7 +197,11 @@ class BatchEpisodeBuffer():
                 col_slice = slice(self.columns._transition[_col][0], self.columns._transition[_col][1])
                 if not isinstance(bs, (tuple, list)):
                     assert bs_slice.stop <= self.data._transition.shape[0] and t_slice.stop <= self.data._transition.shape[1], "indices out of range!"
-                    self.data._transition[bs_slice, t_slice, col_slice] = _data
+                    try:
+                        self.data._transition[bs_slice, t_slice, col_slice] = _data
+                    except Exception as e:
+                        pass
+
                     # modify sequence lengths
                     for _bs in range(bs_slice.start, bs_slice.stop):
                         self.seq_lens[_bs] = max(self.seq_lens[_bs], t_slice.stop)

@@ -333,7 +333,6 @@ class FLOUNDERLMultiagentController():
                 _adim(inputs_level3_tformat), Variable(pair_id2.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
                     "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
 
-
             actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1, avail_actions2)
 
             # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions

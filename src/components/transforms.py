@@ -453,7 +453,8 @@ def _one_hot_pairwise(tensor, **kwargs):
     one_hot_action1 = _one_hot(action1, range=rng)
     one_hot_action2 = _one_hot(action2, range=rng)
     assert tensor.dim() == 3, "wrong tensor dim"
-    return th.cat([one_hot_action1, one_hot_action2], dim=0)
+    tmp = th.cat([one_hot_action1, one_hot_action2], dim=-1) # DEBUG
+    return tmp
 
 
 def _mask(tensor, **kwargs):
