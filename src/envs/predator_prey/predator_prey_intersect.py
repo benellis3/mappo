@@ -77,7 +77,8 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.n_prey = args.n_prey
         self.agent_obs = args.agent_obs
         self.agent_obs_dim = np.asarray(self.agent_obs, dtype=int_type)
-        self.obs_size = 2*(2*args.agent_obs[0]+1)*(2*args.agent_obs[1]+1)
+        self.fully_observable = args.fully_observable
+        self.obs_size = self.state_size if self.fully_observable else 2*(2*args.agent_obs[0]+1)*(2*args.agent_obs[1]+1)
 
         # Define the episode and rewards
         self.episode_limit = args.episode_limit
@@ -355,7 +356,15 @@ class PredatorPreyCapture(MultiAgentEnv):
 
     # ---------- OBSERVATION METHODS -----------------------------------------------------------------------------------
     def get_obs_agent(self, agent_id, batch=0):
-        return self._get_obs_from_grid(self.grid, agent_id, batch)
+        if self.fully_observable:
+            s = self.grid[0, :, :, :].copy()
+            a_x, a_y = self.agents[agent_id, batch, :]
+            s[a_x, a_y, 0] = 2.0
+            # a = s[:, :, 0]
+            # b = s[:, :, 1]
+            return s.reshape(self.state_size)
+        else:
+            return self._get_obs_from_grid(self.grid, agent_id, batch)
 
     def get_obs(self):
         agents_obs = [self.get_obs_agent(i) for i in range(self.n_agents)]
