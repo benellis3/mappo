@@ -858,9 +858,8 @@ class FLOUNDERLAgent(nn.Module):
         pass
 
 
-    def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
+    def forward(self, inputs, actions, hidden_states, tformat, loss_fn=None, **kwargs):
         # TODO: How do we handle the loss propagation for recurrent layers??
-
 
         # generate level 1-3 outputs
         out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model_level1(inputs=inputs["level1"]["agent_input_level1"],
@@ -898,14 +897,19 @@ class FLOUNDERLAgent(nn.Module):
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
-            z = th.bmm(x.unsqueeze(2), y.unsqueeze(1)).view(x.shape[0], -1) # TODO: Check the flattening is correct order!!!
+            _actions_x, _actions_params, _actions_tformat = _to_batch(actions[_a:_a+1], tformat["level3"])
+            _actions_y, _actions_params, _actions_tformat = _to_batch(actions[_b:_b+1], tformat["level3"])
+            _x = x.gather(1, _actions_x.long())
+            _y = y.gather(1, _actions_y.long())
+            # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
+            z = _x * _y
             u = _from_batch(z, params_x, tformat_x)
             tmp_list.append(u)
 
         pi_a_cross_pi_b = th.cat(tmp_list, dim=0)
         p_a_b = p_d * pi_a_cross_pi_b + p_ab
 
-        # next, calculate
+        # next, calculate p_a_b * prod(-a-b)
         a = 5
 
         # gather input for pair probability modules

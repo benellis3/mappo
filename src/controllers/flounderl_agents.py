@@ -551,6 +551,7 @@ class FLOUNDERLMultiagentController():
                                                                           level2=inputs_level2_tformat,
                                                                           level3=inputs_level3_tformat),
                                                              n_agents=self.n_agents,
+                                                             actions=actions,
                                                              **kwargs)
 
             ret_dict = dict(hidden_states = hidden_states,
