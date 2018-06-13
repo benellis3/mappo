@@ -12,12 +12,13 @@ from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id, _ordered_a
 class FLOUNDERLQFunctionLevel1(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
 
-    def __init__(self, input_shapes, n_agents, output_shapes={}, layer_args={}, args=None):
+    def __init__(self, input_shapes, n_agents, n_actions, output_shapes={}, layer_args={}, args=None):
 
         super(FLOUNDERLQFunctionLevel1, self).__init__()
 
         self.args = args
         self.n_agents = n_agents
+        self.n_actions = n_actions
 
         # Set up input regions automatically if required (if sensible)
         self.input_shapes = {}
@@ -27,7 +28,7 @@ class FLOUNDERLQFunctionLevel1(nn.Module):
 
         # Set up output_shapes automatically if required
         self.output_shapes = {}
-        self.output_shapes["qvalues"] = _n_agent_pairings(self.n_agents) # qvals
+        self.output_shapes["qvalues"] = self.n_actions # qvals
         self.output_shapes.update(output_shapes)
 
         # Set up layer_args automatically if required
@@ -54,10 +55,21 @@ class FLOUNDERLQFunctionLevel1(nn.Module):
     def forward(self, inputs, tformat):
         # _check_inputs_validity(inputs, self.input_shapes, tformat, allow_nonseq=True)
 
-        main, params, tformat = _to_batch(inputs.get("main"), tformat)
+        main, params, m_tformat = _to_batch(inputs.get("main"), tformat)
+        actions, params, a_tformat = _to_batch(inputs.get("actions"), tformat)
+        mask = (actions != actions)
+        actions[mask] = 0
         x = F.relu(self.fc1(main))
         qvalues = self.fc2(x)
-        return _from_batch(qvalues, params, tformat)
+        try:
+            qvalue = qvalues.gather(1, actions.long())
+        except Exception as e:
+            pass
+        qvalue[mask] = np.nan
+        vvalue, _ = th.max(qvalues, dim=1)
+        return _from_batch(qvalues, params, m_tformat),\
+               _from_batch(qvalue, params, m_tformat),\
+               _from_batch(vvalue, params, m_tformat)
 
 class FLOUNDERLQFunctionLevel2(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
@@ -249,6 +261,7 @@ class FLOUNDERLCritic(nn.Module):
                                                output_shapes={},
                                                layer_args={"main":self.layer_args["qfunction"]},
                                                n_agents = self.n_agents,
+                                               n_actions = self.n_actions,
                                                args=self.args)
 
         # self.FLOUNDERLAdvantage = FLOUNDERLAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
@@ -268,11 +281,12 @@ class FLOUNDERLCritic(nn.Module):
         pass
 
 
-    def forward(self, inputs, tformat, baseline=True):
+    def forward(self, inputs, actions, tformat, baseline=True):
         #_check_inputs_validity(inputs, self.input_shapes, tformat)
 
-        qvalues = self.FLOUNDERLQFunction(inputs={"main":inputs["qfunction"]},
-                                    tformat=tformat)
+        qvalues, qvalue, vvalue = self.FLOUNDERLQFunction(inputs={"main":inputs["qfunction"],
+                                                                  "actions":actions,},
+                                                          tformat=tformat)
 
         # advantage, qvalue, _ = self.FLOUNDERLAdvantage(inputs={"avail_actions":qvalues.clone().fill_(1.0),
         #                                                  # critic level1 has all actions available forever
@@ -281,7 +295,7 @@ class FLOUNDERLCritic(nn.Module):
         #                                                  "agent_policy":inputs["agent_policy"]},
         #                                          tformat=tformat,
         #                                          baseline=baseline)
-        return {"qvalues": qvalues}, tformat
+        return {"qvalues": qvalues, "qvalue": qvalue, "vvalue":vvalue}, tformat
 
 class MLPEncoder(nn.Module):
     def __init__(self, input_shapes, output_shapes={}, layer_args={}, args=None):
@@ -851,7 +865,7 @@ class FLOUNDERLAgent(nn.Module):
         # generate level 1-3 outputs
         out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model_level1(inputs=inputs["level1"]["agent_input_level1"],
                                                                                             hidden_states=hidden_states["level1"],
-                                                                                            loss_fn=loss_fn,
+                                                                                            loss_fn=None, #loss_fn,
                                                                                             tformat=tformat["level1"],
                                                                                             #n_agents=self.n_agents,
                                                                                             **kwargs)
@@ -864,7 +878,7 @@ class FLOUNDERLAgent(nn.Module):
         pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=_vdim(tformat["level2"]))
         out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.models["level2_{}".format(0)](inputs=inputs["level2"]["agent_input_level2"],
                                                                                                             hidden_states=hidden_states["level2"],
-                                                                                                            loss_fn=loss_fn,
+                                                                                                            loss_fn=None, #loss_fn,
                                                                                                             tformat=tformat["level2"],
                                                                                                             pairwise_avail_actions=pairwise_avail_actions,
                                                                                                             **kwargs)
@@ -892,8 +906,7 @@ class FLOUNDERLAgent(nn.Module):
         p_a_b = p_d * pi_a_cross_pi_b + p_ab
 
         # next, calculate
-
-        #p_a_b = p_d * pi_a * pi_b + p_ab
+        a = 5
 
         # gather input for pair probability modules
 

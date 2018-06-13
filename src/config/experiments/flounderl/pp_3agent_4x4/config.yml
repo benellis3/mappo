@@ -13,6 +13,7 @@ env_args:
     reward_collision: 0.0
     reward_scare: 0.0
     reward_time: -0.1
+    fully_observable: False
 defaults: default flounderl
 batch_size: 32
 batch_size_run: 32

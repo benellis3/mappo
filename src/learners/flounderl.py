@@ -107,8 +107,9 @@ class FLOUNDERLLearner(BasicLearner):
         # Set up schemes
         self.scheme = {}
         # level 1
-        self.scheme["critic"] = self.critic_scheme
-        self.scheme["target_critic"] = self.critic_scheme
+        for _i in range(self.n_agents):
+            self.scheme["critic__agent{}".format(_i)] = self.critic_scheme
+            self.scheme["target_critic__agent{}".format(_i)] = self.critic_scheme
 
         # create joint scheme from the critic scheme
         self.joint_scheme_dict = _join_dicts(self.scheme,
@@ -116,12 +117,13 @@ class FLOUNDERLLearner(BasicLearner):
 
         # construct model-specific input regions
         self.input_columns = {}
-        self.input_columns = {"critic": {"qfunction":Scheme([{"name":"state"},
-                                                             {"name":"past_actions",
-                                                              "select_agent_ids":list(range(self.n_agents))}])}
-                             }
+        for _i in range(self.n_agents):
+            self.input_columns["critic__agent{}".format(_i)] = {"qfunction":Scheme([{"name":"state"},
+                                                                                    {"name":"past_actions",
+                                                                                     "select_agent_ids":list(range(self.n_agents))}])}
 
-        self.input_columns["target_critic"] = self.input_columns["critic"]
+        for _i in range(self.n_agents):
+            self.input_columns["target_critic__agent{}".format(_i)] = self.input_columns["critic__agent{}".format(_i)]
 
 
         self.last_target_update_T_critic = 0
@@ -139,7 +141,7 @@ class FLOUNDERLLearner(BasicLearner):
 
 
         # set up critic model
-        self.critic_model = self.critic_class(input_shapes=self.input_shapes["critic"],
+        self.critic_model = self.critic_class(input_shapes=self.input_shapes["critic__agent0"],
                                               n_agents=self.n_agents,
                                               n_actions=self.n_actions,
                                               args=self.args)
@@ -205,21 +207,21 @@ class FLOUNDERLLearner(BasicLearner):
 
         # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
         actions, actions_tformat = batch_history.get_col(bs=None,
-                                                         col="actions_level1__sample{}".format(0),
-                                                         # agent_ids=list(range(0, self.n_agents)),
+                                                         col="actions",
+                                                         agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
-        actions_level1 = actions.unsqueeze(0)
+        # actions = actions.unsqueeze(0)
         #th.stack(actions_level1)
 
 
         # do single forward pass in critic
         flounderl_model_inputs, flounderl_model_inputs_tformat = _build_model_inputs(column_dict=self.input_columns,
-                                                                         inputs=data_inputs,
-                                                                         inputs_tformat=data_inputs_tformat,
-                                                                         to_variable=True,
-                                                                         stack=False)
+                                                                                     inputs=data_inputs,
+                                                                                     inputs_tformat=data_inputs_tformat,
+                                                                                     to_variable=True,
+                                                                                     stack=True)
         # pimp up to agent dimension 1
-        flounderl_model_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in flounderl_model_inputs.items()}
+        #flounderl_model_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in flounderl_model_inputs.items()}
         flounderl_model_inputs_tformat = "a*bs*t*v"
 
         #data_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in data_inputs.items()}
@@ -273,18 +275,19 @@ class FLOUNDERLLearner(BasicLearner):
 
         def _optimize_critic(**kwargs):
             level = kwargs["level"]
-            inputs_critic= kwargs["flounderl_model_inputs"]["critic_level{}".format(level)]
-            inputs_target_critic=kwargs["flounderl_model_inputs"]["target_critic_level{}".format(level)]
+            inputs_critic= kwargs["flounderl_model_inputs"]["critic"]
+            inputs_target_critic=kwargs["flounderl_model_inputs"]["target_critic"]
             inputs_critic_tformat=kwargs["tformat"]
             inputs_target_critic_tformat = kwargs["tformat"]
 
             # construct target-critic targets and carry out necessary forward passes
             # same input scheme for both target critic and critic!
             output_target_critic, output_target_critic_tformat = target_critic.forward(inputs_target_critic,
+                                                                                       actions=actions,
                                                                                        tformat=flounderl_model_inputs_tformat)
 
 
-
+            # values = th.max(output_target_critic["qvalue"], dim=)
             target_critic_td_targets, \
             target_critic_td_targets_tformat = batch_history.get_stat("td_lambda_targets",
                                                                        bs_ids=None,
@@ -325,13 +328,14 @@ class FLOUNDERLLearner(BasicLearner):
                 qtargets = target_critic_td_targets
 
             output_critic, output_critic_tformat = critic.forward(_inputs_critic,
-                                                                       tformat=flounderl_model_inputs_tformat)
+                                                                  actions = actions,
+                                                                  tformat=flounderl_model_inputs_tformat)
 
 
             critic_loss, \
             critic_loss_tformat = FLOUNDERLCriticLoss()(input=output_critic["qvalue"],
-                                                   target=Variable(qtargets, requires_grad=False),
-                                                   tformat=target_critic_td_targets_tformat)
+                                                        target=Variable(qtargets, requires_grad=False),
+                                                        tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
             critic_optimiser.zero_grad()
@@ -358,16 +362,17 @@ class FLOUNDERLLearner(BasicLearner):
         output_critic = None
 
         # optimize the critic as often as necessary to get the critic loss down reliably
-        for _i in range(getattr(self.args, "n_critic_level{}_learner_reps".format(level))): #self.n_critic_learner_reps):
+        for _i in range(getattr(self.args, "n_critic_learner_reps".format(level))): #self.n_critic_learner_reps):
             _ = _optimize_critic(flounderl_model_inputs=flounderl_model_inputs,
                                  tformat=flounderl_model_inputs_tformat,
                                  actions=actions,
                                  level=level)
 
         # get advantages
-        output_critic, output_critic_tformat = critic.forward(flounderl_model_inputs["critic_level{}".format(level)],
+        output_critic, output_critic_tformat = critic.forward(flounderl_model_inputs["critic"],
+                                                              actions=actions,
                                                               tformat=flounderl_model_inputs_tformat)
-        advantages = output_critic["advantage"]
+        advantages = output_critic["qvalue"] - output_critic["vvalue"] # Q-V
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(FLOUNDERLPolicyLoss(),
@@ -385,6 +390,7 @@ class FLOUNDERLLearner(BasicLearner):
                                                                                  tformat=data_inputs_tformat,
                                                                                  avail_actions=None,
                                                                                  test_mode=False,
+                                                                                 actions=actions,
                                                                                  batch_history=batch_history)
         FLOUNDERL_loss = agent_controller_output["losses"]
         FLOUNDERL_loss = FLOUNDERL_loss.mean()
