@@ -30,7 +30,7 @@ class FLOUNDERLPolicyLoss(nn.Module):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
         policy_mask = (policies == 0.0)
-        log_policies = th.log(policies)
+        log_policies = th.log(policies.masked_fill(policy_mask, 1.0))
         log_policies = log_policies.masked_fill(policy_mask, 0.0)
         log_policies[log_policies!=log_policies] = 0.0 # just take out of final loss product
 
@@ -443,7 +443,7 @@ class FLOUNDERLLearner(BasicLearner):
         policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
         try:
             _check_nan(agent_parameters)
-            agent_optimiser.step()
+            # agent_optimiser.step() # DEBUG
         except:
             print("NaN in gradient or model!")
             for p in agent_parameters:
