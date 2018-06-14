@@ -840,10 +840,10 @@ class FLOUNDERLAgent(nn.Module):
         # output dim of p_a_b is (n_agents choose 2) x bs x t x n_actions**2
         p_d = out_level2[:,:,:,0:1]
         p_ab = out_level2[:, :, :, 1:]
-        try:
-            pi_actions_selected = out_level3.gather(_vdim(tformat_level3), actions.long()).clone()
-        except Exception as e:
-            pass
+        _actions = actions.clone()
+        _actions[actions != actions] = 0.0
+        pi_actions_selected = out_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
+        pi_actions_selected[actions != actions] = float("nan")
 
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
@@ -852,8 +852,10 @@ class FLOUNDERLAgent(nn.Module):
             # calculate pi_a_cross_pi_b
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
-            _actions_x, _actions_params, _actions_tformat = _to_batch(actions[_a:_a+1], tformat["level3"])
-            _actions_y, _actions_params, _actions_tformat = _to_batch(actions[_b:_b+1], tformat["level3"])
+            actions_masked = actions.clone()
+            actions_masked[actions!=actions] = 0.0
+            _actions_x, _actions_params, _actions_tformat = _to_batch(actions_masked[_a:_a+1], tformat["level3"])
+            _actions_y, _actions_params, _actions_tformat = _to_batch(actions_masked[_b:_b+1], tformat["level3"])
             _x = x.gather(1, _actions_x.long())
             _y = y.gather(1, _actions_y.long())
             z = _x * _y
@@ -862,11 +864,12 @@ class FLOUNDERLAgent(nn.Module):
             # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1]
-            joint_actions = _action_pair_2_joint_actions((actions[_a:_a+1], actions[_b:_b+1]), self.n_actions)
+            joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             pi_ab_list.append(_z)
             # calculate pi_c_prod
             _pi_actions_selected = pi_actions_selected.clone()
+            #_pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 1.0 # mask shit
             _pi_actions_selected[_a:_a+1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
             _k = th.prod(pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
@@ -890,4 +893,4 @@ class FLOUNDERLAgent(nn.Module):
                         }
 
         loss = loss_fn(policies=p_a_b_c, tformat=tformat_level3)
-        return p_a_b_c, hidden_states, loss, tformat_level3
+        return p_a_b_c, hidden_states, loss, tformat_level3 # note: policies can have NaNs in it!!

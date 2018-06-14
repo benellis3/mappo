@@ -32,6 +32,7 @@ class FLOUNDERLPolicyLoss(nn.Module):
         policy_mask = (policies == 0.0)
         log_policies = th.log(policies)
         log_policies = log_policies.masked_fill(policy_mask, 0.0)
+        log_policies[log_policies!=log_policies] = 0.0 # just take out of final loss product
 
         _adv = advantages.unsqueeze(0).clone().detach()
         _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
@@ -58,9 +59,9 @@ class FLOUNDERLCriticLoss(nn.Module):
 
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         # target = target.detach()
-        nans = (target != target)
-        target[nans] = 0.0
-        input[nans] = 0.0
+        target_nans = (target != target)
+        target[target_nans] = 0.0
+        input[target_nans] = 0.0
 
         # calculate mean-square loss
         ret = (input - target.detach())**2
@@ -445,6 +446,9 @@ class FLOUNDERLLearner(BasicLearner):
             agent_optimiser.step()
         except:
             print("NaN in gradient or model!")
+            for p in agent_parameters:
+                print(p.grad)
+            a = 5
 
         #for p in self.agent_level1_parameters:
         #    print('===========\ngradient:\n----------\n{}'.format(p.grad))
