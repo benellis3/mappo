@@ -925,8 +925,11 @@ class FLOUNDERLAgent(nn.Module):
 
         # next, calculate p_a_b * prod(p, -a-b)
         p_prod = p_a_b * pi_c_prod
-        a = 5
 
+        # now, calculate p_a_b_c
+        _tmp =  out_level1.transpose(_adim(tformat_level1), _vdim(tformat_level1))
+        p_a_b_c = (p_prod * _tmp).sum(dim=_adim(tformat_level1), keepdim=True)
+        a = 5
 
         # gather input for pair probability modules
 
