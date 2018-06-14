@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _check_nan
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
-from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id, _ordered_agent_pairings
+from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id, _ordered_agent_pairings, _action_pair_2_joint_actions
 
 class FLOUNDERLQFunctionLevel1(nn.Module):
     # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
@@ -61,10 +61,7 @@ class FLOUNDERLQFunctionLevel1(nn.Module):
         actions[mask] = 0
         x = F.relu(self.fc1(main))
         qvalues = self.fc2(x)
-        try:
-            qvalue = qvalues.gather(1, actions.long())
-        except Exception as e:
-            pass
+        qvalue = qvalues.gather(1, actions.long())
         qvalue[mask] = np.nan
         vvalue, _ = th.max(qvalues, dim=1)
         return _from_batch(qvalues, params, m_tformat),\
@@ -893,21 +890,31 @@ class FLOUNDERLAgent(nn.Module):
         p_d = out_level2[:,:,:,0:1]
         p_ab = out_level2[:, :, :, 1:]
 
-        tmp_list = []
+        pi_a_cross_pi_b_list = []
+        pi_ab_list = []
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
+            # calculate pi_a_cross_pi_b
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
             _actions_x, _actions_params, _actions_tformat = _to_batch(actions[_a:_a+1], tformat["level3"])
             _actions_y, _actions_params, _actions_tformat = _to_batch(actions[_b:_b+1], tformat["level3"])
             _x = x.gather(1, _actions_x.long())
             _y = y.gather(1, _actions_y.long())
-            # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
             z = _x * _y
             u = _from_batch(z, params_x, tformat_x)
-            tmp_list.append(u)
+            pi_a_cross_pi_b_list.append(u)
+            # calculate p_ab_selected
+            _p_ab = p_ab[_i:_i+1]
+            joint_actions = _action_pair_2_joint_actions((actions[_a:_a+1], actions[_b:_b+1]), self.n_actions)
+            _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
+            pi_ab_list.append(_z)
+            # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
 
-        pi_a_cross_pi_b = th.cat(tmp_list, dim=0)
-        p_a_b = p_d * pi_a_cross_pi_b + p_ab
+
+
+        pi_a_cross_pi_b = th.cat(pi_a_cross_pi_b_list, dim=0)
+        pi_ab_selected = th.cat(pi_ab_list, dim=0)
+        p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected
 
         # next, calculate p_a_b * prod(-a-b)
         a = 5

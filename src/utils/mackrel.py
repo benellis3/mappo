@@ -54,7 +54,6 @@ def _joint_actions_2_action_pair_aa(joint_action, n_actions, avail_actions1, ava
     _action2[aa_m2] = float("nan")
     return _action1, _action2
 
-
 def _action_pair_2_joint_actions(action_pair, n_actions):
     return action_pair[0] * n_actions + action_pair[1]
 
