@@ -525,6 +525,17 @@ class BatchEpisodeBuffer():
                                                      gamma=gamma,
                                                      td_lambda=td_lambda)
             return stats, tformat
+        elif label in ["n_step_return"]:
+            gamma = kwargs.get("gamma")
+            n = kwargs.get("n")
+            n_agents = kwargs.get("n_agents", self.n_agents)
+            value_function_values = kwargs.get("value_function_values") # else may get weird variable sharing errors
+
+            stats, tformat = self._n_step_return(value_function_values,
+                                                 n_agents=n_agents,
+                                                 gamma=gamma,
+                                                 n=n)
+            return stats, tformat
         else:
             assert False, "Unknown batch statistic: {}".format(label)
         pass
@@ -573,6 +584,9 @@ class BatchEpisodeBuffer():
 
         G_buffer = R_tensor.clone() * float("nan")
         G_buffer[:, :, h - 1, :] = R_tensor[:, :, h, :]
+
+        a = G_buffer[:, :, h - 1:h, :]
+        b = gamma * V_tensor[:, :, h:, :] * truncated_tensor
         G_buffer[:, :, h - 1:h, :] += gamma * V_tensor[:, :, h:, :] * truncated_tensor
 
         for t in range(h - 1, 0, -1):
@@ -580,4 +594,57 @@ class BatchEpisodeBuffer():
             G_buffer[:, :, t - 1, :] = new_G
 
         G_buffer = _align_left(G_buffer, h, seq_lens)
+        return G_buffer, "a*bs*t*v"
+
+    def _n_step_return(self, value_function_values, n_agents, gamma, n):
+        """
+        uses efficient update rule for calculating consecutive G_t_n_lambda in reverse (see docs)
+        """
+
+        V_tensor = value_function_values
+        if isinstance(V_tensor, Variable):
+            V_tensor = V_tensor.data
+        V_tensor = V_tensor.clone()
+
+        R_tensor, _ = self.get_col(col="reward")
+        if isinstance(R_tensor, Variable):
+            R_tensor = R_tensor.data
+        R_tensor = R_tensor.clone().unsqueeze(0).repeat(n_agents, 1, 1, 1)
+        h = self._n_t-1 # horizon (index)
+
+        # create truncation tensor
+        truncated, _ = self.get_col(col="truncated")
+        truncated = truncated.clone() # clone this because we are de-NaNing in place
+        truncated[truncated!=truncated] = 0.0 # need to mask NaNs
+        truncated_tensor = truncated.sum(dim=1, keepdim=True).unsqueeze(0).repeat(n_agents,1,1,1)
+
+        seq_lens = self.seq_lens
+
+        # def _align_right(tensor, h, lengths):
+        #     for _i, _l in enumerate(lengths):
+        #         if _l < h + 1 and _l > 0:
+        #             tensor[:, _i, -_l:, :] = tensor[:, _i, :_l, :].clone() # clone is super important as otherwise, cyclical reference!
+        #             tensor[:, _i, :(h + 1 - _l), :] = float("nan")  # not strictly necessary as will shift back anyway later...
+        #     return tensor
+        #
+        # def _align_left(tensor, h, lengths):
+        #     for _i, _l in enumerate(lengths):
+        #         if _l < h + 1 and _l > 0:
+        #             tensor[:, _i, :_l, :] = tensor[:, _i, -_l:, :].clone() # clone is super important as otherwise, cyclical reference!
+        #             tensor[:, _i, -(h + 1 - _l):, :] = float(
+        #                 "nan")  # not strictly necessary as will shift back anyway later...
+        #     return tensor
+        #
+        # R_tensor = _align_right(R_tensor, h, seq_lens)
+        # V_tensor = _align_right(V_tensor, h, seq_lens)
+        #
+        # G_buffer = R_tensor.clone() * float("nan")
+        # G_buffer[:, :, h - 1, :] = R_tensor[:, :, h, :]
+        # G_buffer[:, :, h - 1:h, :] += gamma * V_tensor[:, :, h:, :] * truncated_tensor
+        #
+        # for t in range(h - 1, 0, -1):
+        #     new_G = gamma * td_lambda * G_buffer[:, :, t, :] + gamma*(1-td_lambda) * V_tensor[:, :, t, :] + R_tensor[:, :, t, :]
+        #     G_buffer[:, :, t - 1, :] = new_G
+        #
+        # G_buffer = _align_left(G_buffer, h, seq_lens)
         return G_buffer, "a*bs*t*v"

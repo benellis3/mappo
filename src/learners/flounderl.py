@@ -26,7 +26,7 @@ class FLOUNDERLPolicyLoss(nn.Module):
     def __init__(self):
         super(FLOUNDERLPolicyLoss, self).__init__()
 
-    def forward(self, policies, advantages, actions, tformat):
+    def forward(self, policies, advantages, tformat):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
         policy_mask = (policies == 0.0)
@@ -35,14 +35,14 @@ class FLOUNDERLPolicyLoss(nn.Module):
 
         _adv = advantages.clone().detach()
 
-        _act = actions.clone()
-        _act[_act!=_act] = 0.0 # mask NaNs in _act
+        # _act = actions.clone()
+        # _act[_act!=_act] = 0.0 # mask NaNs in _act
+        #
+        # _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
+        # _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
+        # _adv[actions != actions] = 0.0
 
-        _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
-        _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
-        _adv[actions != actions] = 0.0
-
-        loss_mean = -(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
+        loss_mean = -(log_policies.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
         output_tformat = "a*t"
 
         return loss_mean, output_tformat
@@ -94,22 +94,27 @@ class FLOUNDERLLearner(BasicLearner):
 
         self.critic_class = mo_REGISTRY[self.args.flounderl_critic]
 
-        self.critic_scheme = Scheme([dict(name="actions",
-                                          rename="past_actions",
-                                          select_agent_ids=list(range(self.n_agents)),
-                                          transforms=[("shift", dict(steps=1)),
-                                                     ("one_hot", dict(range=(0, self.n_actions-1)))],
-                                         switch=self.args.flounderl_critic_use_past_actions),
-                                    dict(name="state")
-                                  ])
+        self.critic_scheme = Scheme([#dict(name="actions",
+                                     #     rename="past_actions",
+                                     #     select_agent_ids=list(range(self.n_agents)),
+                                     #     transforms=[("shift", dict(steps=1)),
+                                     #                ("one_hot", dict(range=(0, self.n_actions-1)))],
+                                     #   switch=self.args.flounderl_critic_use_past_actions),
+                                     #dict(name="actions",
+                                     #     select_agent_ids=list(range(self.n_agents)),
+                                     #     transforms=[("one_hot", dict(range=(0, self.n_actions - 1)))]),
+                                     dict(name="state")
+                                   ])
         self.target_critic_scheme = self.critic_scheme
 
         # Set up schemes
         self.scheme = {}
         # level 1
-        for _i in range(self.n_agents):
-            self.scheme["critic__agent{}".format(_i)] = self.critic_scheme
-            self.scheme["target_critic__agent{}".format(_i)] = self.critic_scheme
+        # for _i in range(self.n_agents):
+        #     self.scheme["critic__agent{}".format(_i)] = self.critic_scheme
+        #     self.scheme["target_critic__agent{}".format(_i)] = self.critic_scheme
+        self.scheme["critic"] = self.critic_scheme
+        self.scheme["target_critic"] = self.critic_scheme
 
         # create joint scheme from the critic scheme
         self.joint_scheme_dict = _join_dicts(self.scheme,
@@ -117,13 +122,21 @@ class FLOUNDERLLearner(BasicLearner):
 
         # construct model-specific input regions
         self.input_columns = {}
-        for _i in range(self.n_agents):
-            self.input_columns["critic__agent{}".format(_i)] = {"qfunction":Scheme([{"name":"state"},
-                                                                                    {"name":"past_actions",
-                                                                                     "select_agent_ids":list(range(self.n_agents))}])}
+        self.input_columns["critic"] = {"vfunction":Scheme([{"name":"state"},
+                                                           ])}
+        self.input_columns["target_critic"] = self.input_columns["critic"]
 
-        for _i in range(self.n_agents):
-            self.input_columns["target_critic__agent{}".format(_i)] = self.input_columns["critic__agent{}".format(_i)]
+        # for _i in range(self.n_agents):
+        #     self.input_columns["critic__agent{}".format(_i)] = {"vfunction":Scheme([{"name":"state"},
+        #                                                                             #{"name":"past_actions",
+        #                                                                             # "select_agent_ids":list(range(self.n_agents))},
+        #                                                                             #{"name": "actions",
+        #                                                                             # "select_agent_ids": list(
+        #                                                                             #     range(self.n_agents))}
+        #                                                                             ])}
+        #
+        # for _i in range(self.n_agents):
+        #     self.input_columns["target_critic__agent{}".format(_i)] = self.input_columns["critic__agent{}".format(_i)]
 
 
         self.last_target_update_T_critic = 0
@@ -141,7 +154,7 @@ class FLOUNDERLLearner(BasicLearner):
 
 
         # set up critic model
-        self.critic_model = self.critic_class(input_shapes=self.input_shapes["critic__agent0"],
+        self.critic_model = self.critic_class(input_shapes=self.input_shapes["critic"],
                                               n_agents=self.n_agents,
                                               n_actions=self.n_actions,
                                               args=self.args)
@@ -222,7 +235,7 @@ class FLOUNDERLLearner(BasicLearner):
                                                                                      stack=True)
         # pimp up to agent dimension 1
         #flounderl_model_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in flounderl_model_inputs.items()}
-        flounderl_model_inputs_tformat = "a*bs*t*v"
+        flounderl_model_inputs_tformat = "bs*t*v"
 
         #data_inputs = {_k1:{_k2:_v2.unsqueeze(0) for _k2, _v2 in _v1.items()} for _k1, _v1 in data_inputs.items()}
         #data_inputs_tformat = "a*bs*t*v"
@@ -293,9 +306,9 @@ class FLOUNDERLLearner(BasicLearner):
                                                                        bs_ids=None,
                                                                        td_lambda=self.args.td_lambda,
                                                                        gamma=self.args.gamma,
-                                                                       value_function_values=output_target_critic["qvalue"].detach(),
+                                                                       value_function_values=output_target_critic["vvalue"].unsqueeze(0).detach(),
                                                                        to_variable=True,
-                                                                       n_agents=output_target_critic["qvalue"].shape[_adim(output_target_critic_tformat)],
+                                                                       n_agents=1,
                                                                        to_cuda=self.args.use_cuda)
 
             # sample!!
@@ -319,13 +332,13 @@ class FLOUNDERLLearner(BasicLearner):
                 batch_sample_qtargets = target_critic_td_targets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
                                                                       -1,
                                                                       target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])[:, sampled_ids_tensor, :]
-                qtargets = batch_sample_qtargets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
+                vtargets = batch_sample_qtargets.view(target_critic_td_targets.shape[_adim(inputs_critic_tformat)],
                                                       -1,
                                                       1,
                                                       target_critic_td_targets.shape[_vdim(inputs_critic_tformat)])
             else:
                 _inputs_critic = inputs_critic
-                qtargets = target_critic_td_targets
+                vtargets = target_critic_td_targets
 
             output_critic, output_critic_tformat = critic.forward(_inputs_critic,
                                                                   actions = actions,
@@ -333,8 +346,8 @@ class FLOUNDERLLearner(BasicLearner):
 
 
             critic_loss, \
-            critic_loss_tformat = FLOUNDERLCriticLoss()(input=output_critic["qvalue"],
-                                                        target=Variable(qtargets, requires_grad=False),
+            critic_loss_tformat = FLOUNDERLCriticLoss()(input=output_critic["vvalue"].unsqueeze(0),
+                                                        target=Variable(vtargets, requires_grad=False),
                                                         tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
@@ -345,9 +358,9 @@ class FLOUNDERLLearner(BasicLearner):
             critic_optimiser.step()
 
             # Calculate critic statistics and update
-            target_critic_mean = _naninfmean(output_target_critic["qvalue"])
+            target_critic_mean = _naninfmean(output_target_critic["vvalue"])
 
-            critic_mean = _naninfmean(output_critic["qvalue"])
+            critic_mean = _naninfmean(output_critic["vvalue"])
 
             critic_loss_arr.append(np.asscalar(critic_loss.data.cpu().numpy()))
             critic_mean_arr.append(critic_mean)
@@ -372,12 +385,20 @@ class FLOUNDERLLearner(BasicLearner):
         output_critic, output_critic_tformat = critic.forward(flounderl_model_inputs["critic"],
                                                               actions=actions,
                                                               tformat=flounderl_model_inputs_tformat)
-        advantages = output_critic["qvalue"] - output_critic["vvalue"] # Q-V
+        n_step_return, n_step_return_tformat = batch_history.get_stat("n_step_return",
+                                                                       bs_ids=None,
+                                                                       n=self.args.n_step_return_n,
+                                                                       gamma=self.args.gamma,
+                                                                       value_function_values=output_critic["vvalue"].unsqueeze(0).detach(),
+                                                                       to_variable=True,
+                                                                       n_agents=1,
+                                                                       to_cuda=self.args.use_cuda)
+
+        advantages = n_step_return - output_critic["vvalue"] # Q-V
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(FLOUNDERLPolicyLoss(),
-                                       actions=Variable(actions),
-                                       advantages=advantages)
+                                       advantages=advantages.detach())
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
             len(batch_history))
