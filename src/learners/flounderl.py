@@ -33,7 +33,8 @@ class FLOUNDERLPolicyLoss(nn.Module):
         log_policies = th.log(policies)
         log_policies = log_policies.masked_fill(policy_mask, 0.0)
 
-        _adv = advantages.clone().detach()
+        _adv = advantages.unsqueeze(0).clone().detach()
+        _adv[_adv != _adv] = 0.0 # n-step return leads to NaNs
 
         # _act = actions.clone()
         # _act[_act!=_act] = 0.0 # mask NaNs in _act
@@ -223,6 +224,7 @@ class FLOUNDERLLearner(BasicLearner):
                                                          col="actions",
                                                          agent_ids=list(range(0, self.n_agents)),
                                                          stack=True)
+        rewards, rewards_tformat = batch_history["reward"]
         # actions = actions.unsqueeze(0)
         #th.stack(actions_level1)
 
@@ -257,7 +259,9 @@ class FLOUNDERLLearner(BasicLearner):
                        T_policy_str="T_policy",
                        T_env=T_env,
                        level=1,
-                       actions=actions)
+                       actions=actions,
+                       rewards=rewards,
+                       gamma=self.args.gamma)
         pass
 
     def _optimize(self,
@@ -278,7 +282,9 @@ class FLOUNDERLLearner(BasicLearner):
                   T_policy_str,
                   T_env,
                   level,
-                  actions
+                  actions,
+                  rewards,
+                  gamma
                   ):
 
         critic_loss_arr = []
@@ -385,14 +391,17 @@ class FLOUNDERLLearner(BasicLearner):
         output_critic, output_critic_tformat = critic.forward(flounderl_model_inputs["critic"],
                                                               actions=actions,
                                                               tformat=flounderl_model_inputs_tformat)
-        n_step_return, n_step_return_tformat = batch_history.get_stat("n_step_return",
-                                                                       bs_ids=None,
-                                                                       n=self.args.n_step_return_n,
-                                                                       gamma=self.args.gamma,
-                                                                       value_function_values=output_critic["vvalue"].unsqueeze(0).detach(),
-                                                                       to_variable=True,
-                                                                       n_agents=1,
-                                                                       to_cuda=self.args.use_cuda)
+        TD = rewards.clone().zero_()
+        TD[:, :-1, :] = rewards[:, :-1, :] + gamma * output_critic["vvalue"][:, 1:, :] - output_critic["vvalue"][:, :-1, :]
+        n_step_return = TD # TODO: 1-step return so far only
+        # n_step_return, n_step_return_tformat = batch_history.get_stat("n_step_return",
+        #                                                                bs_ids=None,
+        #                                                                n=self.args.n_step_return_n,
+        #                                                                gamma=self.args.gamma,
+        #                                                                value_function_values=output_critic["vvalue"].unsqueeze(0).detach(),
+        #                                                                to_variable=True,
+        #                                                                n_agents=1,
+        #                                                                to_cuda=self.args.use_cuda)
 
         advantages = n_step_return - output_critic["vvalue"] # Q-V
 
