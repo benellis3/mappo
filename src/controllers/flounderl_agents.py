@@ -555,9 +555,9 @@ class FLOUNDERLMultiagentController():
                                                              **kwargs)
 
             ret_dict = dict(hidden_states = hidden_states,
-                            losses = None)
+                            losses = losses)
             ret_dict[self.agent_output_type] = out
-            return ret_dict #losses[loss_level] if loss_level is not None else None), tformat_level3
+            return ret_dict, tformat #losses[loss_level] if loss_level is not None else None), tformat_level3
 
             # top level: aa' ~ Pi_c sample which pair to coordinate
             # second level: pick up correct pair (given aa'), sample u^a, u^a' from the pair coordinator

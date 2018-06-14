@@ -832,7 +832,7 @@ class FLOUNDERLAgent(nn.Module):
 
         out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.models["level3_{}".format(0)](inputs["level3"]["agent_input_level3"],
                                                                                                             hidden_states=hidden_states["level3"],
-                                                                                                            loss_fn=loss_fn,
+                                                                                                            loss_fn=None,
                                                                                                             tformat=tformat["level3"],
                                                                                                             **kwargs)
 
@@ -840,7 +840,10 @@ class FLOUNDERLAgent(nn.Module):
         # output dim of p_a_b is (n_agents choose 2) x bs x t x n_actions**2
         p_d = out_level2[:,:,:,0:1]
         p_ab = out_level2[:, :, :, 1:]
-        pi_actions_selected = out_level3.gather(_vdim(tformat_level3), actions.long()).clone()
+        try:
+            pi_actions_selected = out_level3.gather(_vdim(tformat_level3), actions.long()).clone()
+        except Exception as e:
+            pass
 
         pi_a_cross_pi_b_list = []
         pi_ab_list = []

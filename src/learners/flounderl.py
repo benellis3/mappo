@@ -34,6 +34,7 @@ class FLOUNDERLPolicyLoss(nn.Module):
         log_policies = log_policies.masked_fill(policy_mask, 0.0)
 
         _adv = advantages.unsqueeze(0).clone().detach()
+        _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
         _adv[_adv != _adv] = 0.0 # n-step return leads to NaNs
 
         # _act = actions.clone()
@@ -142,6 +143,7 @@ class FLOUNDERLLearner(BasicLearner):
 
         self.last_target_update_T_critic = 0
         self.T_critic = 0
+        self.T_policy = 0
         pass
 
 
@@ -422,7 +424,7 @@ class FLOUNDERLLearner(BasicLearner):
                                                                                  test_mode=False,
                                                                                  actions=actions,
                                                                                  batch_history=batch_history)
-        FLOUNDERL_loss = agent_controller_output["losses"]
+        FLOUNDERL_loss, _ = agent_controller_output["losses"]
         FLOUNDERL_loss = FLOUNDERL_loss.mean()
 
         if self.args.flounderl_use_entropy_regularizer:
@@ -451,7 +453,7 @@ class FLOUNDERLLearner(BasicLearner):
         setattr(self, T_policy_str, getattr(self, T_policy_str) + len(batch_history) * batch_history._n_t)
 
         # Calculate policy statistics
-        advantage_mean = _naninfmean(output_critic["advantage"])
+        advantage_mean = _naninfmean(advantages)
         self._add_stat("advantage_mean_level{}".format(level), advantage_mean, T_env=T_env)
         self._add_stat("policy_grad_norm_level{}".format(level), policy_grad_norm, T_env=T_env)
         self._add_stat("policy_loss_level{}".format(level), FLOUNDERL_loss.data.cpu().numpy(), T_env=T_env)
