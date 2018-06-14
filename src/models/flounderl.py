@@ -889,9 +889,11 @@ class FLOUNDERLAgent(nn.Module):
         # output dim of p_a_b is (n_agents choose 2) x bs x t x n_actions**2
         p_d = out_level2[:,:,:,0:1]
         p_ab = out_level2[:, :, :, 1:]
+        pi_actions_selected = out_level3.gather(_vdim(tformat_level3), actions.long()).clone()
 
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
+        pi_c_prod_list = []
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
             # calculate pi_a_cross_pi_b
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
@@ -903,21 +905,28 @@ class FLOUNDERLAgent(nn.Module):
             z = _x * _y
             u = _from_batch(z, params_x, tformat_x)
             pi_a_cross_pi_b_list.append(u)
+            # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1]
             joint_actions = _action_pair_2_joint_actions((actions[_a:_a+1], actions[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             pi_ab_list.append(_z)
-            # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
-
-
+            # calculate pi_c_prod
+            _pi_actions_selected = pi_actions_selected.clone()
+            _pi_actions_selected[_a:_a+1] = 1.0
+            _pi_actions_selected[_b:_b + 1] = 1.0
+            _k = th.prod(pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
+            pi_c_prod_list.append(_k)
 
         pi_a_cross_pi_b = th.cat(pi_a_cross_pi_b_list, dim=0)
         pi_ab_selected = th.cat(pi_ab_list, dim=0)
+        pi_c_prod = th.cat(pi_c_prod_list, dim=0)
         p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected
 
-        # next, calculate p_a_b * prod(-a-b)
+        # next, calculate p_a_b * prod(p, -a-b)
+        p_prod = p_a_b * pi_c_prod
         a = 5
+
 
         # gather input for pair probability modules
 
