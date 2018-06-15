@@ -50,7 +50,7 @@ class FLOUNDERLRunner(NStepRunner):
                             dtype=np.int32,
                             missing=-1, ),
                        dict(name="avail_actions",
-                            shape=(self.n_actions,), # don't include no-op
+                            shape=(self.n_actions + 1,), # include no-op
                             select_agent_ids=range(0, self.n_agents),
                             dtype=np.int32,
                             missing=-1,),
@@ -63,21 +63,21 @@ class FLOUNDERLRunner(NStepRunner):
                             dtype=np.int32,
                             select_agent_ids=range(0, self.n_agents),
                             missing=-1),
-                       dict(name="policies_",
-                            shape=(self.n_actions+1,), # includes no-op
-                            select_agent_ids=range(0, self.n_agents),
-                            dtype=np.float32,
-                            missing=np.nan),
+                       # dict(name="policies_",
+                       #      shape=(self.n_actions+1,), # includes no-op
+                       #      select_agent_ids=range(0, self.n_agents),
+                       #      dtype=np.float32,
+                       #      missing=np.nan),
                        dict(name="policies_level1",
                             shape=(_n_agent_pairings(self.n_agents),),
                             dtype=np.float32,
                             missing=np.nan),
                        *[dict(name="policies_level2__sample{}".format(_i),
-                              shape=(1 + self.n_actions * self.n_actions,),  # includes delegation but not no-op
+                              shape=(2 + self.n_actions * self.n_actions,),  # includes delegation and no-op
                               dtype=np.int32,
                               missing=-1, ) for _i in range(_n_agent_pair_samples(self.n_agents))],
                        dict(name="policies_level3",
-                            shape=(self.n_actions,),  # does not include no-op
+                            shape=(self.n_actions+1,),  # does include no-op
                             select_agent_ids=range(0, self.n_agents),
                             dtype=np.float32,
                             missing=np.nan),
@@ -118,7 +118,7 @@ class FLOUNDERLRunner(NStepRunner):
                                  )
                                 for _i in range(_n_agent_pairings(self.n_agents))],
                                 *[dict(name="avail_actions__pair{}".format(_i),
-                                       shape=(self.n_actions*self.n_actions,), # do not include no-op
+                                       shape=(self.n_actions*self.n_actions + 1,), # do include no-op
                                        dtype=np.float32,
                                        missing=np.nan,
                                        )
@@ -292,10 +292,10 @@ class FLOUNDERLRunner(NStepRunner):
 
             for _sa in action_selector_outputs:
                 self.episode_buffer.set_col(bs=ids_envs_not_terminated,
-                                        col=_sa["name"],
-                                        t=self.t_episode,
-                                        agent_ids=_sa.get("select_agent_ids", None),
-                                        data=_sa["data"])
+                                            col=_sa["name"],
+                                            t=self.t_episode,
+                                            agent_ids=_sa.get("select_agent_ids", None),
+                                            data=_sa["data"])
 
             # write selected actions to episode_buffer
             if isinstance(selected_actions, list):
@@ -330,7 +330,7 @@ class FLOUNDERLRunner(NStepRunner):
 
         # calculate episode statistics
         self._add_episode_stats(T_env=self.T_env)
-        #a = self.episode_buffer.to_pd()
+        # a = self.episode_buffer.to_pd()
         return self.episode_buffer
 
 
@@ -407,7 +407,7 @@ class FLOUNDERLRunner(NStepRunner):
             # perform environment steps and insert into transition buffer
             observations = _env.get_obs()
             state = _env.get_state()
-            avail_actions = _env.get_avail_actions()  # add place for noop action
+            avail_actions = [_aa + [0] for _aa in _env.get_avail_actions()] #_env.get_avail_actions()  # add place for noop action
             ret_dict = dict(state=state)  # TODO: Check that env_info actually exists
             for _i, _obs in enumerate(observations):
                 ret_dict["observations__agent{}".format(_i)] = observations[_i]
@@ -420,7 +420,7 @@ class FLOUNDERLRunner(NStepRunner):
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
                     ret_dict["obs_intersection__pair{}".format(_i)], \
                     ret_dict["avail_actions__pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
-                    ret_dict["avail_actions__pair{}".format(_i)] = ret_dict["avail_actions__pair{}".format(_i)].flatten().tolist()
+                    ret_dict["avail_actions__pair{}".format(_i)] = ret_dict["avail_actions__pair{}".format(_i)].flatten().tolist() + [0]
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
@@ -449,7 +449,7 @@ class FLOUNDERLRunner(NStepRunner):
             # perform environment steps and add to transition buffer
             observations = _env.get_obs()
             state = _env.get_state()
-            avail_actions = _env.get_avail_actions()  # add place for noop action
+            avail_actions = [_aa + [0] for _aa in _env.get_avail_actions()] # _env.get_avail_actions()  # add place for noop action
             terminated = terminated
             truncated = terminated and env_info.get("episode_limit", False)
             ret_dict = dict(state=state,
@@ -468,7 +468,7 @@ class FLOUNDERLRunner(NStepRunner):
                 for _i, (_a1, _a2) in enumerate(_ordered_agent_pairings(_env.n_agents)):
                     ret_dict["obs_intersection__pair{}".format(_i)],\
                     ret_dict["avail_actions__pair{}".format(_i)] = _env.get_obs_intersection((_a1, _a2))
-                    ret_dict["avail_actions__pair{}".format(_i)] = ret_dict["avail_actions__pair{}".format(_i)].flatten().tolist()
+                    ret_dict["avail_actions__pair{}".format(_i)] = ret_dict["avail_actions__pair{}".format(_i)].flatten().tolist() + [0]
 
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
