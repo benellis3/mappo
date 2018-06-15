@@ -87,7 +87,7 @@ class IACTDError(nn.Module):
         _check_inputs_validity(inputs, self.input_shapes, tformat)
         assert tformat in ["a*bs*t*v"], "invalid input format!"
         TD = inputs["rewards"].clone().zero_()
-        TD[:, :, :-1, :] = inputs["rewards"][:, :, :-1, :] + self.gamma * inputs["vvalues"][:, :, 1:, :]  - inputs["vvalues"][:, :, :-1, :]
+        TD[:, :, :-1, :] = inputs["rewards"][:, :, 1:, :] + self.gamma * inputs["vvalues"][:, :, 1:, :]  - inputs["vvalues"][:, :, :-1, :]
         return TD, tformat
 
 
