@@ -321,35 +321,43 @@ class FLOUNDERLMultiagentController():
                                                                        inputs_tformat=tformat,
                                                                        )
 
-            pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents, "a*bs*t*v") # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
+            pair_id1, pair_id2 = _pairing_id_2_agent_ids__tensor(sampled_pair_ids, self.n_agents,
+                                                                 "a*bs*t*v")  # sampled_pair_ids.squeeze(0).squeeze(2).view(-1), self.n_agents)
 
-            avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"]#.gather(
-                #_adim(inputs_level3_tformat), Variable(pair_id1.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
-                #    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
-            avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"]#.gather(
-                #_adim(inputs_level3_tformat), Variable(pair_id2.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
-                #    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+            avail_actions1 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
+                _adim(inputs_level3_tformat), Variable(pair_id1.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
+            avail_actions2 = inputs_level3["agent_input_level3"]["avail_actions"].gather(
+                _adim(inputs_level3_tformat), Variable(pair_id2.repeat(1, 1, 1, inputs_level3["agent_input_level3"][
+                    "avail_actions"].shape[_vdim(inputs_level3_tformat)])))
 
-            actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1, avail_actions2)
+            # selected_level_2_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
+            pair_sampled_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
+
+            actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1,
+                                                                 avail_actions2)
 
             # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
-
             ttype = th.cuda.FloatTensor if self.args.use_cuda else th.FloatTensor
             action_matrix = ttype(self.n_agents,
-                                  pair_sampled_actions.shape[_bsdim(tformat)]*
+                                  pair_sampled_actions.shape[_bsdim(tformat)] *
                                   pair_sampled_actions.shape[_tdim(tformat)]).fill_(float("nan"))
 
-            action_matrix.scatter_(0, pair_id1.squeeze(-1).view(pair_id1.shape[0],-1), actions1.squeeze(-1).view(actions1.shape[0],-1))
-            action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0],-1), actions2.squeeze(-1).view(actions2.shape[0],-1))
-
+            action_matrix.scatter_(0, pair_id1.squeeze(-1).view(pair_id1.shape[0], -1),
+                                   actions1.squeeze(-1).view(actions1.shape[0], -1))
+            action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0], -1),
+                                   actions2.squeeze(-1).view(actions2.shape[0], -1))
 
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
-            active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], -1).unsqueeze(2).clone()
+            active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], -1).unsqueeze(
+                2).clone()
             active[active == active] = 1.0
             active[active != active] = 0.0
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0] = avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0].fill_(0.0)  # DEBUG
+            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0] = \
+            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0].fill_(0.0)  # DEBUG
             avail_actions_level3[:, :, :, -1:] = active
-            inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3, requires_grad=False)
+            inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3,
+                                                                            requires_grad=False)
 
             out_level3, hidden_states_level3, losses_level3, tformat_level3 = self.model.models["level3_{}".format(0)](inputs_level3["agent_input_level3"],
                                                                                                                        hidden_states=hidden_states["level3"],
