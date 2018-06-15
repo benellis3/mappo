@@ -395,7 +395,7 @@ class FLOUNDERLLearner(BasicLearner):
                                                               actions=actions,
                                                               tformat=flounderl_model_inputs_tformat)
         TD = rewards.clone().zero_()
-        TD[:, :-1, :] = rewards[:, :-1, :] + gamma * output_critic["vvalue"][:, 1:, :] - output_critic["vvalue"][:, :-1, :]
+        TD[:, :-1, :] = rewards[:, 1:, :] + gamma * output_critic["vvalue"][:, 1:, :] - output_critic["vvalue"][:, :-1, :]
         n_step_return = TD # TODO: 1-step return so far only
         # n_step_return, n_step_return_tformat = batch_history.get_stat("n_step_return",
         #                                                                bs_ids=None,
