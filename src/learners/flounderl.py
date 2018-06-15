@@ -406,7 +406,7 @@ class FLOUNDERLLearner(BasicLearner):
         #                                                                n_agents=1,
         #                                                                to_cuda=self.args.use_cuda)
 
-        advantages = n_step_return - output_critic["vvalue"] # Q-V
+        advantages = n_step_return # Q-V
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(FLOUNDERLPolicyLoss(),
