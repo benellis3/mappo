@@ -227,8 +227,9 @@ def _check_nan(input):
             assert th.sum(p.grad != p.grad) == 0, "NaNs in parameter gradient {}!".format(i)
     elif isinstance(input, list): # expect a list of parameters
         for p in input:
-            assert th.sum(p.data != p.data) == 0, "NaNs in parameter {}!".format(p)
-            assert th.sum(p.grad.data != p.grad.data) == 0, "NaNs in parameter gradient {}!".format(p)
+            if p is not None and p.grad is not None:
+                assert th.sum(p.data != p.data) == 0, "NaNs in parameter {}!".format(p)
+                assert th.sum(p.grad.data != p.grad.data) == 0, "NaNs in parameter gradient {}!".format(p)
     return
 
 

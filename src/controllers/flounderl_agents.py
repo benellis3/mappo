@@ -186,46 +186,6 @@ class FLOUNDERLMultiagentController():
 
         if self.args.agent_level1_share_params:
 
-            # # Step 1: Sample non-overlapping pairs of agents
-            # inputs_level1, inputs_level1_tformat = _build_model_inputs(self.input_columns_level1,
-            #                                                            inputs,
-            #                                                            inputs_tformat=tformat,
-            #                                                            to_variable=True)
-            #
-            # out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model.model_level1(inputs=inputs_level1["agent_input_level1"],
-            #                                                                                           hidden_states=hidden_states["level1"],
-            #                                                                                           loss_fn=None,
-            #                                                                                           tformat=inputs_level1_tformat,
-            #                                                                                           test_mode=test_mode,
-            #                                                                                           n_agents=self.n_agents,
-            #                                                                                           **kwargs)
-            #
-            # pairings = _ordered_agent_pairings(5)
-            # a = [pairings[_x] for _x in _excluded_pair_ids(5, [1])]
-            # # successively sample from each pair
-            # ttype = th.LongTensor if not out_level1.is_cuda else th.cuda.LongTensor
-            # pair_probabilities, params_pp, tformat_pp = _to_batch(out_level1.clone(), tformat_level1)
-            # # nr_t_bs = out_level1.shape[_bsdim(tformat_level1)] * out_level1.shape[_tdim(tformat_level1)]
-            # pair_ids_chosen = ttype(pair_probabilities.shape[0], self.n_agents // 2)
-            # for _c in range(self.n_agents // 2):
-            #     sampled_pair_ids, modified_inputs_level1, selected_actions_format_level1 = self.action_selector.select_action({"policies":out_level1},
-            #                                                                                                                   avail_actions=None,
-            #                                                                                                                   tformat=tformat_level1,
-            #                                                                                                                   test_mode=test_mode)
-            #     sampled_pair_ids, _, _ = _to_batch(sampled_pair_ids, selected_actions_format_level1)
-            #     # set excluded probabilities over excluded tuples to zero
-            #     pair_ids_chosen[:, _c:_c+1] = sampled_pair_ids
-            #     b = pair_ids_chosen[0, :_c+1].tolist()
-            #     c = _excluded_pair_ids(3, [0])
-            #     a = _excluded_pair_ids(self.n_agents, pair_ids_chosen[0, :_c+1].tolist())
-            #     excluded_pair_ids = [ _excluded_pair_ids(self.n_agents, pair_ids_chosen[_b, :_c+1].tolist()) for _b in range(pair_ids_chosen.shape[0]) ]
-            #     pair_probabilities.scatter_(1, excluded_pair_ids, 0.0)
-            #     # update pair_ids_chosen
-
-            # top level: aa' ~ Pi_c sample which pair to coordinate
-            # second level: pick up correct pair (given aa'), sample u^a, u^a' from the pair coordinator
-            # either decode u^a, u^a' from the sampled action, or refer to level
-
             # --------------------- LEVEL 1
 
             inputs_level1, inputs_level1_tformat = _build_model_inputs(self.input_columns_level1,
@@ -499,7 +459,7 @@ class FLOUNDERLMultiagentController():
         assert False, "TODO"
         pass
 
-    def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, actions=None, loss_level=None, **kwargs):
+    def get_outputs(self, inputs, hidden_states, tformat, loss_fn=None, actions=None, **kwargs):
 
         if loss_fn is None or actions is None:
             assert False, "not implemented - always need loss function and selected actions!"
@@ -530,7 +490,7 @@ class FLOUNDERLMultiagentController():
                                                                          level2=inputs_level2,
                                                                          level3=inputs_level3),
                                                              hidden_states=hidden_states,
-                                                             loss_fn=loss_fn if loss_level == 1 else None,
+                                                             loss_fn=loss_fn,
                                                              tformat=dict(level1=inputs_level1_tformat,
                                                                           level2=inputs_level2_tformat,
                                                                           level3=inputs_level3_tformat),

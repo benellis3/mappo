@@ -33,6 +33,7 @@ class FLOUNDERLPolicyLoss(nn.Module):
         log_policies = th.log(policies.masked_fill(policy_mask, 1.0))
         log_policies = log_policies.masked_fill(policy_mask, 0.0)
         log_policies[log_policies!=log_policies] = 0.0 # just take out of final loss product
+        # log_policies = th.log(policies)
 
         _adv = advantages.unsqueeze(0).clone().detach()
         _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
@@ -45,7 +46,8 @@ class FLOUNDERLPolicyLoss(nn.Module):
         # _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
         # _adv[actions != actions] = 0.0
 
-        loss_mean = -(log_policies.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
+        loss_mean = -(log_policies.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat))
+        # loss_mean = log_policies.mean(dim=_bsdim(tformat)) # DEBUG
         output_tformat = "a*t"
 
         return loss_mean, output_tformat
@@ -419,7 +421,6 @@ class FLOUNDERLLearner(BasicLearner):
         agent_controller_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
                                                                                  hidden_states=hidden_states,
                                                                                  loss_fn=policy_loss_function,
-                                                                                 loss_level=level,
                                                                                  tformat=data_inputs_tformat,
                                                                                  avail_actions=None,
                                                                                  test_mode=False,
@@ -428,10 +429,10 @@ class FLOUNDERLLearner(BasicLearner):
         FLOUNDERL_loss, _ = agent_controller_output["losses"]
         FLOUNDERL_loss = FLOUNDERL_loss.mean()
 
-        if self.args.flounderl_use_entropy_regularizer:
-            FLOUNDERL_loss += self.args.flounderl_entropy_loss_regularization_factor * \
-                         EntropyRegularisationLoss()(policies=agent_controller_output["policies"],
-                                                     tformat="a*bs*t*v").sum()
+        # if self.args.flounderl_use_entropy_regularizer:
+        #     FLOUNDERL_loss += self.args.flounderl_entropy_loss_regularization_factor * \
+        #                  EntropyRegularisationLoss()(policies=agent_controller_output["policies"],
+        #                                              tformat="a*bs*t*v").sum()
 
         # carry out optimization for agents
 
@@ -441,14 +442,17 @@ class FLOUNDERLLearner(BasicLearner):
         #if self.args.debug_mode:
         #    _check_nan(agent_parameters)
         policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
-        try:
-            _check_nan(agent_parameters)
-            # agent_optimiser.step() # DEBUG
-        except:
-            print("NaN in gradient or model!")
-            for p in agent_parameters:
-                print(p.grad)
-            a = 5
+
+        _check_nan(agent_parameters)
+        agent_optimiser.step() # DEBUG
+
+        #try:
+        #     print("no NaN this time..")
+        # except:
+        #     print("NaN in gradient or model!")
+        #     for p in agent_parameters:
+        #         print(p.grad)
+        #     a = 5
 
         #for p in self.agent_level1_parameters:
         #    print('===========\ngradient:\n----------\n{}'.format(p.grad))

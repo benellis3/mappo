@@ -378,6 +378,8 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
 
             # mask policy elements corresponding to unavailable actions
             #n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+
+            # DEBUG
             x = th.exp(x)
             x_sum = x.sum(dim=1, keepdim=True)
             second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*x.shape[1])
@@ -394,11 +396,10 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
             #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
-            # add softmax exploration (if switched on)
-            # if self.args.flounderl_exploration_mode_level1 in ["softmax"] and not test_mode:
-            #    epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
-            #    epsilons, _, _ = _to_batch(epsilons, tformat)
-            #    x =  epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
+            if self.args.flounderl_exploration_mode_level1 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
+               epsilons, _, _ = _to_batch(epsilons, tformat)
+               x =  epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
@@ -883,9 +884,15 @@ class FLOUNDERLAgent(nn.Module):
         # next, calculate p_a_b * prod(p, -a-b)
         p_prod = p_a_b * pi_c_prod
 
+
         # now, calculate p_a_b_c
         _tmp =  out_level1.transpose(_adim(tformat_level1), _vdim(tformat_level1))
         p_a_b_c = (p_prod * _tmp).sum(dim=_adim(tformat_level1), keepdim=True)
+
+        # DEBUG MODE HERE!
+        agent_parameters = self.get_parameters()
+        p_a_b_c.backward()
+        _check_nan(agent_parameters)
 
         hidden_states = {"level1": hidden_states_level1,
                          "level2": hidden_states_level2,
@@ -893,4 +900,11 @@ class FLOUNDERLAgent(nn.Module):
                         }
 
         loss = loss_fn(policies=p_a_b_c, tformat=tformat_level3)
+
+        # DEBUG
+        #a = out_level1.sum(dim=3, keepdim=True) / (self.n_actions**self.n_agents) # DEBUG
+        # a = out_level1[:,:,:,:1]
+        # loss = loss_fn(policies=a, tformat=tformat_level3)
+        # p_a_b_c = out_level1[:,:,:,:1]
+
         return p_a_b_c, hidden_states, loss, tformat_level3 # note: policies can have NaNs in it!!
