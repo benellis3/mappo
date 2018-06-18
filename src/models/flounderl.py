@@ -838,17 +838,20 @@ class FLOUNDERLAgent(nn.Module):
         # output dim of p_a_b is (n_agents choose 2) x bs x t x n_actions**2
 
         # Bulk NaN masking
-        out_level1[out_level1 != out_level1] = 0.0
-        out_level2[out_level2 != out_level2] = 0.0
-        out_level3[out_level3 != out_level3] = 0.0
-        actions = actions.detach()
-        actions[actions!=actions] = 0.0
+        # out_level1[out_level1 != out_level1] = 0.0
+        # out_level2[out_level2 != out_level2] = 0.0
+        # out_level3[out_level3 != out_level3] = 0.0
+        # actions = actions.detach()
+        # actions[actions!=actions] = 0.0
 
         p_d = out_level2[:, :, :, 0:1]
         p_ab = out_level2[:, :, :, 1:]
 
-        pi_actions_selected = out_level3.gather(_vdim(tformat_level3), actions.long()).clone()
-        pi_actions_selected[pi_actions_selected  != pi_actions_selected ] = 0.0 #float("nan")
+        _actions = actions.clone()
+        _actions[actions != actions] = 0.0
+        pi_actions_selected = out_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
+        # pi_actions_selected[pi_actions_selected  != pi_actions_selected ] = 0.0 #float("nan")
+        pi_actions_selected[actions != actions] = float("nan")
 
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
@@ -874,10 +877,11 @@ class FLOUNDERLAgent(nn.Module):
             pi_ab_list.append(_z)
             # calculate pi_c_prod
             _pi_actions_selected = pi_actions_selected.clone()
+            _pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 0.0
             #_pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 1.0 # mask shit
             _pi_actions_selected[_a:_a+1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
-            _k = th.prod(pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
+            _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)
 
         pi_a_cross_pi_b = th.cat(pi_a_cross_pi_b_list, dim=0)
