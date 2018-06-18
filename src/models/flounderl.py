@@ -833,18 +833,22 @@ class FLOUNDERLAgent(nn.Module):
                                                                                                             tformat=tformat["level3"],
                                                                                                             **kwargs)
 
-        _check_nan(out_level1) # DEBUG
-        _check_nan(out_level2)
-        _check_nan(out_level3)
 
         # for each agent pair (a,b), calculate p_a_b = p(u_a, u_b|tau_a tau_b CK_ab) = p(u_d|CK_ab)*pi(u_a|tau_a)*pi(u_b|tau_b) + p(u_ab|CK_ab)
         # output dim of p_a_b is (n_agents choose 2) x bs x t x n_actions**2
-        p_d = out_level2[:,:,:,0:1]
+
+        # Bulk NaN masking
+        out_level1[out_level1 != out_level1] = 0.0
+        out_level2[out_level2 != out_level2] = 0.0
+        out_level3[out_level3 != out_level3] = 0.0
+        actions = actions.detach()
+        actions[actions!=actions] = 0.0
+
+        p_d = out_level2[:, :, :, 0:1]
         p_ab = out_level2[:, :, :, 1:]
-        _actions = actions.clone()
-        _actions[actions != actions] = 0.0
-        pi_actions_selected = out_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
-        pi_actions_selected[actions != actions] = float("nan")
+
+        pi_actions_selected = out_level3.gather(_vdim(tformat_level3), actions.long()).clone()
+        pi_actions_selected[pi_actions_selected  != pi_actions_selected ] = 0.0 #float("nan")
 
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
@@ -884,15 +888,26 @@ class FLOUNDERLAgent(nn.Module):
         # next, calculate p_a_b * prod(p, -a-b)
         p_prod = p_a_b * pi_c_prod
 
-
         # now, calculate p_a_b_c
         _tmp =  out_level1.transpose(_adim(tformat_level1), _vdim(tformat_level1))
+        _tmp[_tmp!=_tmp] = 0.0
         p_a_b_c = (p_prod * _tmp).sum(dim=_adim(tformat_level1), keepdim=True)
 
         # DEBUG MODE HERE!
-        agent_parameters = self.get_parameters()
-        p_a_b_c.backward()
-        _check_nan(agent_parameters)
+        # _check_nan(pi_c_prod)
+        # _check_nan(p_d)
+        # _check_nan(pi_ab_selected)
+        # _check_nan(pi_a_cross_pi_b)
+        # _check_nan(p_a_b)
+        # _check_nan(p_a_b_c)
+
+        # agent_parameters = list(self.parameters())
+        # pi_c_prod.sum().backward(retain_graph=True) # p_prod throws NaN
+        # _check_nan(agent_parameters)
+        # p_a_b.sum().backward(retain_graph=True)
+        # _check_nan(agent_parameters)
+        # p_prod.sum().backward(retain_graph=True)
+        # _check_nan(agent_parameters)
 
         hidden_states = {"level1": hidden_states_level1,
                          "level2": hidden_states_level2,
@@ -900,11 +915,16 @@ class FLOUNDERLAgent(nn.Module):
                         }
 
         loss = loss_fn(policies=p_a_b_c, tformat=tformat_level3)
+        # loss = p_a_b_c.sum(), "a*bs*t*v"
+        #loss[0].sum().backward(retain_graph=True)
+        # loss[0].backward(retain_graph=True)
 
-        # DEBUG
-        #a = out_level1.sum(dim=3, keepdim=True) / (self.n_actions**self.n_agents) # DEBUG
-        # a = out_level1[:,:,:,:1]
-        # loss = loss_fn(policies=a, tformat=tformat_level3)
-        # p_a_b_c = out_level1[:,:,:,:1]
+        # try:
+        #     _check_nan(agent_parameters)
+        # except Exception as e:
+        #     for a, b in self.named_parameters():
+        #         print("{}:{}".format(a, b.grad))
+        #     a = 5
+        #     pass
 
         return p_a_b_c, hidden_states, loss, tformat_level3 # note: policies can have NaNs in it!!

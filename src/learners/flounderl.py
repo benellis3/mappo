@@ -29,11 +29,19 @@ class FLOUNDERLPolicyLoss(nn.Module):
     def forward(self, policies, advantages, tformat):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
-        policy_mask = (policies == 0.0)
-        log_policies = th.log(policies.masked_fill(policy_mask, 1.0))
-        log_policies = log_policies.masked_fill(policy_mask, 0.0)
-        log_policies[log_policies!=log_policies] = 0.0 # just take out of final loss product
+
+        #policy_mask = (policies == 0.0)
+        #log_policies = th.log(policies.masked_fill(policy_mask, 1.0))
+        #log_policies = log_policies.masked_fill(policy_mask, 0.0)
+        #log_policies[log_policies!=log_policies] = 0.0 # just take out of final loss product
         # log_policies = th.log(policies)
+
+
+        policies = policies.clone()
+        # policies[policies == 0.0] = 1.0
+        policies[policies < 10**(-40)] = 1.0
+        log_policies = th.log(policies)
+        #log_policies[policies < 10**(-40)] = 0.0
 
         _adv = advantages.unsqueeze(0).clone().detach()
         _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
@@ -46,8 +54,10 @@ class FLOUNDERLPolicyLoss(nn.Module):
         # _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
         # _adv[actions != actions] = 0.0
 
-        loss_mean = -(log_policies.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat))
+        # loss_mean = -(log_policies.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat))
         # loss_mean = log_policies.mean(dim=_bsdim(tformat)) # DEBUG
+        #loss_mean = -(log_policies[:, :, :-1, :].squeeze(_vdim(tformat)) * _adv[:, :, :-1, :].squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat))
+        loss_mean = - (log_policies * _adv).mean()
         output_tformat = "a*t"
 
         return loss_mean, output_tformat
@@ -500,25 +510,25 @@ class FLOUNDERLLearner(BasicLearner):
         stats = self.get_stats()
         logging_dict = {}
         logging_str = ""
-        for _i in range(1,4):
-            logging_dict.update({"advantage_mean_level{}".format(_i): _seq_mean(stats["advantage_mean_level{}".format(_i)]),
-                                 "critic_grad_norm_level{}".format(_i): _seq_mean(stats["critic_grad_norm_level{}".format(_i)]),
-                                 "critic_loss_level{}".format(_i):_seq_mean(stats["critic_loss_level{}".format(_i)]),
-                                 "policy_grad_norm_level{}".format(_i): _seq_mean(stats["policy_grad_norm_level{}".format(_i)]),
-                                 "policy_loss_level{}".format(_i): _seq_mean(stats["policy_loss_level{}".format(_i)]),
-                                 "target_critic_mean_level{}".format(_i): _seq_mean(stats["target_critic_mean_level{}".format(_i)]),
-                                 "T_critic_level{}".format(_i): getattr(self, "T_critic_level{}".format(_i)),
-                                 "T_policy_level{}".format(_i): getattr(self, "T_policy_level{}".format(_i))}
-                                )
-            logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format(_i)],
-                                                                                  _i, logging_dict["T_critic_level{}".format(_i)])
-
-        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_policy_level1",
-                                                                          "T_critic_level1",
-                                                                          "T_policy_level2",
-                                                                          "T_critic_level2",
-                                                                          "T_policy_level3",
-                                                                          "T_critic_level3"]))
+        # for _i in range(1,4):
+        #     logging_dict.update({"advantage_mean_level{}".format(_i): _seq_mean(stats["advantage_mean_level{}".format(_i)]),
+        #                          "critic_grad_norm_level{}".format(_i): _seq_mean(stats["critic_grad_norm_level{}".format(_i)]),
+        #                          "critic_loss_level{}".format(_i):_seq_mean(stats["critic_loss_level{}".format(_i)]),
+        #                          "policy_grad_norm_level{}".format(_i): _seq_mean(stats["policy_grad_norm_level{}".format(_i)]),
+        #                          "policy_loss_level{}".format(_i): _seq_mean(stats["policy_loss_level{}".format(_i)]),
+        #                          "target_critic_mean_level{}".format(_i): _seq_mean(stats["target_critic_mean_level{}".format(_i)]),
+        #                          "T_critic_level{}".format(_i): getattr(self, "T_critic_level{}".format(_i)),
+        #                          "T_policy_level{}".format(_i): getattr(self, "T_policy_level{}".format(_i))}
+        #                         )
+        #     logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format(_i)],
+        #                                                                           _i, logging_dict["T_critic_level{}".format(_i)])
+        #
+        # logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_policy_level1",
+        #                                                                   "T_critic_level1",
+        #                                                                   "T_policy_level2",
+        #                                                                   "T_critic_level2",
+        #                                                                   "T_policy_level3",
+        #                                                                   "T_critic_level3"]))
 
         if log_directly:
             self.logging_struct.py_logger.info("{} LEARNER INFO: {}".format(self.args.learner.upper(), logging_str))

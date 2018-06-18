@@ -331,7 +331,7 @@ class FLOUNDERLRunner(NStepRunner):
         # calculate episode statistics
         self._add_episode_stats(T_env=self.T_env)
         # a = self.episode_buffer.to_pd()
-        print("TENV: ". self.T_env)
+        #print("TENV: ", self.T_env)
         return self.episode_buffer
 
 
@@ -340,14 +340,14 @@ class FLOUNDERLRunner(NStepRunner):
         self._stats = deepcopy(stats)
         log_str, log_dict = super().log(log_directly=False)
         if not self.test_mode:
-            log_str += ", MACKREL_epsilon_level1={:g}".format(self.flounderl_epsilon_decay_schedule_level1.eval(self.T_env))
-            log_str += ", MACKREL_epsilon_level2={:g}".format(self.flounderl_epsilon_decay_schedule_level2.eval(self.T_env))
-            log_str += ", MACKREL_epsilon_level3={:g}".format(self.flounderl_epsilon_decay_schedule_level3.eval(self.T_env))
-            log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate"]))
-            log_str += ", policies_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
-            for _i in range(_n_agent_pair_samples(self.n_agents)):
-                log_str += ", policies_level2_entropy_sample{}={:g}".format(_i, _seq_mean(stats["policy_level2_entropy_sample{}".format(_i)]))
-            log_str += ", policies_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
+            # log_str += ", MACKREL_epsilon_level1={:g}".format(self.flounderl_epsilon_decay_schedule_level1.eval(self.T_env))
+            # log_str += ", MACKREL_epsilon_level2={:g}".format(self.flounderl_epsilon_decay_schedule_level2.eval(self.T_env))
+            # log_str += ", MACKREL_epsilon_level3={:g}".format(self.flounderl_epsilon_decay_schedule_level3.eval(self.T_env))
+            # log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate"]))
+            # log_str += ", policies_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
+            # for _i in range(_n_agent_pair_samples(self.n_agents)):
+            #     log_str += ", policies_level2_entropy_sample{}={:g}".format(_i, _seq_mean(stats["policy_level2_entropy_sample{}".format(_i)]))
+            # log_str += ", policies_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
             # log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy"]))
             # log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy"]))
             # log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
