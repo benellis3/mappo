@@ -485,13 +485,14 @@ class FLOUNDERLLearner(BasicLearner):
         pass
 
     def update_target_nets(self, level):
-        if self.args.critic_level1_share_params and level==1:
-            # self.target_critic.load_state_dict(self.critic.state_dict())
-            self.critic_models["level1"].load_state_dict(self.critic_models["level1"].state_dict())
-        if self.args.critic_level2_share_params and level==2:
-            self.critic_models["level2_0:1"].load_state_dict(self.critic_models["level2_0:1"].state_dict())
-        if self.args.critic_level3_share_params and level==3:
-            self.critic_models["level3_{}".format(0)].load_state_dict(self.critic_models["level3_{}".format(0)].state_dict())
+        self.target_critic_model.load_state_dict(self.critic_model.state_dict())
+        # if self.args.critic_level1_share_params and level==1:
+        #    # self.target_critic.load_state_dict(self.critic.state_dict())
+        #    self.critic_models["level1"].load_state_dict(self.critic_models["level1"].state_dict())
+        # if self.args.critic_level2_share_params and level==2:
+        #     self.critic_models["level2_0:1"].load_state_dict(self.critic_models["level2_0:1"].state_dict())
+        # if self.args.critic_level3_share_params and level==3:
+        #     self.critic_models["level3_{}".format(0)].load_state_dict(self.critic_models["level3_{}".format(0)].state_dict())
         pass
 
     def get_stats(self):
