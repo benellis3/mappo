@@ -230,8 +230,8 @@ class FLOUNDERLLearner(BasicLearner):
     def _train(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic - self.last_target_update_T_critic) / self.args.T_target_critic_update_interval > 1.0:
-            self.update_target_nets(level=1)
-            self.last_target_update_T_critic_level1 = self.T_critic
+            self.update_target_nets()
+            self.last_target_update_T_critic = self.T_critic
             print("updating target net!")
 
         # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
@@ -484,7 +484,7 @@ class FLOUNDERLLearner(BasicLearner):
 
         pass
 
-    def update_target_nets(self, level):
+    def update_target_nets(self):
         self.target_critic_model.load_state_dict(self.critic_model.state_dict())
         # if self.args.critic_level1_share_params and level==1:
         #    # self.target_critic.load_state_dict(self.critic.state_dict())
