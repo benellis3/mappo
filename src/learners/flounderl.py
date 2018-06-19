@@ -375,7 +375,7 @@ class FLOUNDERLLearner(BasicLearner):
             critic_optimiser.zero_grad()
             critic_loss.backward()
 
-            critic_grad_norm = th.nn.utils.clip_grad_norm(critic_parameters, 50)
+            critic_grad_norm = th.nn.utils.clip_grad_norm_(critic_parameters, 50)
             critic_optimiser.step()
 
             # Calculate critic statistics and update
@@ -451,7 +451,7 @@ class FLOUNDERLLearner(BasicLearner):
 
         #if self.args.debug_mode:
         #    _check_nan(agent_parameters)
-        policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
+        policy_grad_norm = th.nn.utils.clip_grad_norm_(agent_parameters, 50)
 
         _check_nan(agent_parameters)
         agent_optimiser.step() # DEBUG

@@ -453,10 +453,10 @@ class FLOUNDERLNonRecurrentAgentLevel2(NonRecurrentAgent):
                 print('Warning in FLOUNDERLNonRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
-        # if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-        #     epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-        #     epsilons, _, _ = _to_batch(epsilons, tformat)
-        #     x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+        if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
+            epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            epsilons, _, _ = _to_batch(epsilons, tformat)
+            x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
         x = _from_batch(x, params, tformat)
 
@@ -580,14 +580,14 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
 
 
             # add softmax exploration (if switched on)
-            # if self.args.flounderl_exploration_mode_level2 in ["softmax"] and not test_mode:
-            #    epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
-            #    epsilons, _, _ = _to_batch(epsilons, tformat)
-            #    n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
-            #    x = th.cat([epsilons * self.args.mackrel_delegation_probability_bias,
-            #                avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
-            #                            1 - self.args.mackrel_delegation_probability_bias)], dim=1) \
-            #        + x * (1 - epsilons)
+            if self.args.flounderl_exploration_mode_level2 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
+               epsilons, _, _ = _to_batch(epsilons, tformat)
+               n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
+               x = th.cat([epsilons * self.args.mackrel_delegation_probability_bias,
+                           avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
+                                       1 - self.args.mackrel_delegation_probability_bias)], dim=1) \
+                   + x * (1 - epsilons)
             #    if self.args.debug_mode:
             #        _check_nan(x)
 
@@ -646,10 +646,10 @@ class FLOUNDERLNonRecurrentAgentLevel3(NonRecurrentAgent):
                 print('Warning in FLOUNDERLNonRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
-        # if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-        #     epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-        #     epsilons, _, _ = _to_batch(epsilons, tformat)
-        #     x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+        if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
+            epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            epsilons, _, _ = _to_batch(epsilons, tformat)
+            x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
         x = _from_batch(x, params, tformat)
 
@@ -721,10 +721,10 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # add softmax exploration (if switched on)
-            # if self.args.flounderl_exploration_mode_level3 in ["softmax"] and not test_mode:
-            #    epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat))
-            #    epsilons, _, _ = _to_batch(epsilons, tformat)
-            #    x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+            if self.args.flounderl_exploration_mode_level3 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat))
+               epsilons, _, _ = _to_batch(epsilons, tformat)
+               x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
