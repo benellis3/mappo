@@ -3,8 +3,12 @@
 # from utils.blitzz.scheme import Scheme
 # from utils.blitzz.sequence_buffer import BatchEpisodeBuffer
 # from utils.blitzz.learners.coma import COMALearner, COMAPolicyLoss, COMACriticLoss
+import numpy.testing as npt
 from torch import nn
 from utils.dict2namedtuple import convert
+from utils.mackrel import _ordered_agent_pairings
+
+
 
 # from utils.blitzz.debug import to_np
 # from utils.blitzz.transforms import _build_model_inputs
@@ -59,13 +63,21 @@ def test1():
                           td_lambda=1.0,
                           gamma=0.99)
 
-    level1_out = th.zeros(1,1,1,1)
-    level2_out = th.zeros(1,1,1,1)
-    level3_out = th.zeros(1,1,1,1)
-    avail_actions_pair = th.zeros(1,1,1,1)
-    actions = th.zeros(1,1,1,1)
-    n_actions = 5
-    n_agents = 5
+    n_actions = 2
+    n_agents = 3
+    n_agent_pairings = len(_ordered_agent_pairings(n_agents))
+
+    level1_out = th.zeros(1,1,1,n_agent_pairings)
+    level2_out = th.zeros(n_agent_pairings,1,1,n_actions*n_actions+2)
+    level3_out = th.zeros(n_agents,1,1,n_actions+1)
+
+    level1_out[0,0,0,:] = th.FloatTensor([0.2, 0.3, 0.5])
+    level2_out[:,0,0,:] = th.FloatTensor([[0.1, 0.2, 0.4, 0.1, 0.1, 0.1],[0.5, 0.1, 0.1, 0.05, 0.2, 0.05],[0.0, 0.2, 0.3, 0.05, 0.45, 0.0]])
+    level3_out[:,0,0,:] = th.FloatTensor([[0.3, 0.7, 0.0], [0.2, 0.7, 0.1], [0.7, 0.25, 0.05]])
+
+    avail_actions_pair = th.zeros(n_agent_pairings,1,1,n_actions*n_actions+2)
+    actions = th.zeros(n_agents,1,1,1)
+    actions[:,0,0,0] = th.LongTensor([1, 0, 1])
 
     _args.update(_required_args)
 
@@ -109,8 +121,14 @@ def test1():
               "level2": {"agent_input_level2": {"avail_actions_pair":avail_actions_pair}},
               "level3": {"agent_input_level3": None}}
     hidden_states = {"level1":None, "level2":None, "level3":None}
-    ret = model(inputs=inputs, actions=actions, hidden_states=hidden_states, tformat=tformat, loss_fn=None)
-    a = 5
+    ret = model(inputs=inputs,
+                actions=actions,
+                hidden_states=hidden_states,
+                tformat=tformat,
+                loss_fn=lambda policies, tformat: None)
+
+    npt.assert_almost_equal(ret[0].sum().item(), 0.12795)
+
     pass
 
 

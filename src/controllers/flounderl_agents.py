@@ -268,6 +268,8 @@ class FLOUNDERLMultiagentController():
                                                                                 avail_actions=pairwise_avail_actions.data,
                                                                                 tformat=tformat_level2,
                                                                                 test_mode=test_mode)
+            # if th.sum(pair_sampled_actions == 26.0) > 0.0:
+            #     a = 5
 
             self.actions_level2 = pair_sampled_actions.clone()
             self.actions_level2_sampled = pair_sampled_actions.gather(0, sampled_pair_ids.long())
