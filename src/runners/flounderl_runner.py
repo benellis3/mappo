@@ -1,8 +1,9 @@
 import numpy as np
 from components.scheme import Scheme
-from components.transforms import _seq_mean
+from components.transforms import _seq_mean, _vdim
 from copy import deepcopy
 from itertools import combinations
+from scipy.stats.stats import pearsonr
 import torch as th
 from torch.distributions import Normal
 
@@ -148,14 +149,6 @@ class FLOUNDERLRunner(NStepRunner):
 
         test_suffix = "" if not self.test_mode else "_test"
 
-        #[np.nanmean(np.nansum((-th.log(self["policies__agent{}".format(_aid)][0]) *
-        #                       self["{}__agent{}".format(policy_label, _aid)][0]).cpu().numpy(), axis=2))
-        # TODO!
-        #self._add_stat("policy_level1_entropy",
-        #              self.episode_buffer.get_stat("policy_entropy", policy_label="policies_level1"),
-        #              T_env=T_env,
-        #              suffix=test_suffix)
-
         tmp = self.episode_buffer["policies_level1"][0]
         entropy1 = np.nanmean(np.nansum((-th.log(tmp)*tmp).cpu().numpy(), axis=2))
         self._add_stat("policy_level1_entropy",
@@ -185,6 +178,48 @@ class FLOUNDERLRunner(NStepRunner):
                        T_env=T_env,
                        suffix=test_suffix)
 
+        # common knowledge overlap between all agents
+        # a = self.episode_buffer["obs_intersection_all"]
+        # b = (self.episode_buffer["obs_intersection_all"][0] != 0.0)
+        overlap_all = th.sum((self.episode_buffer["obs_intersection_all"][0] > 0.0), dim=_vdim("bs*t*v")).float().mean()
+        self._add_stat("obs_intersection_all_rate",
+                       overlap_all,
+                       T_env=T_env,
+                       suffix=test_suffix)
+
+        # common knowledge overlap between agent pairs
+        for _pair_id, (id_1, id_2) in enumerate(_ordered_agent_pairings(self.n_agents)):
+            overlap_pair = th.sum(self.episode_buffer["obs_intersection__pair{}".format(_pair_id)][0] > 0.0, dim=_vdim("bs*t*v")).float().mean()
+            self._add_stat("obs_intersection__pair{}".format(_pair_id),
+                           overlap_pair,
+                           T_env=T_env,
+                           suffix=test_suffix)
+
+        # correlation of common knowledge overlap between active agent pairs and delegation
+        pair_intersections = []
+        for _pair_id, (id_1, id_2) in enumerate(_ordered_agent_pairings(self.n_agents)):
+            pair_intersections.append(self.episode_buffer["obs_intersection__pair{}".format(_pair_id)][0])
+        pair_intersections = th.stack(pair_intersections)
+        level1_sample = self.episode_buffer["actions_level1__sample{}".format(0)][0]
+        level1_sample[level1_sample!=level1_sample] = 0.0
+        _tmp = level1_sample.unsqueeze(0).long().repeat(1,1,1,pair_intersections.shape[-1])
+        active_intersections = pair_intersections.gather(0, _tmp)
+        active_pair_intersections_overlap = th.sum(active_intersections > 0.0, dim=_vdim("bs*t*v")).float().mean()
+        self._add_stat("active_pair_intersections_overlap",
+                       active_pair_intersections_overlap,
+                       T_env=T_env,
+                       suffix=test_suffix)
+
+        corr, p_value = pearsonr((active_intersections > 0.0).sum(dim=_vdim("a*bs*t*v"), keepdim=True).view(-1).cpu().numpy(),
+                                 (actions_level2 == 0.0).unsqueeze(0).view(-1).cpu().numpy())
+        self._add_stat("obs_overlap_corr_delegation",
+                       corr,
+                       T_env=T_env,
+                       suffix=test_suffix)
+        self._add_stat("obs_overlap_corr_delegation_pvalue",
+                       p_value,
+                       T_env=T_env,
+                       suffix=test_suffix)
 
         # TODO: Policy entropy across levels! (Use suffix)
         return
