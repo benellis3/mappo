@@ -28,9 +28,7 @@ try:
 except Exception as e:
     print(e)
 
-try:
-    from .starcraft2 import StarCraft2Env
-    REGISTRY["sc2"] = partial(env_fn,
-                              env=StarCraft2Env)
-except Exception as e:
-    print(e)
+from .starcraft2 import StarCraft2Env
+REGISTRY["sc2"] = partial(env_fn,
+                          env=StarCraft2Env)
+
