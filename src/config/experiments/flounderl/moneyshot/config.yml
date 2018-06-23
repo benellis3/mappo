@@ -17,6 +17,9 @@ env_args:
   map_name: 3m_3m
   intersection_global_view: False
 defaults: default flounderl
-batch_size: 8
-batch_size_run: 8
 mongodb_profile: gandalf_pymarl
+n_pair_samples: 1
+batch_size: 32
+batch_size_run: 32
+n_loops_per_thread_or_sub_or_main_process: 1
+n_subprocesses: 32

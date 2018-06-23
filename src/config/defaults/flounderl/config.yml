@@ -40,6 +40,7 @@ flounderl_use_obs_intersections: True
 flounderl_entropy_loss_regularization_factor: 0.000005
 gamma: 0.99
 n_step_return_n: 5
+n_pair_samples: 1
 learner: flounderl
 multiagent_controller: flounderl_mac
 n_critic_learner_reps: 4

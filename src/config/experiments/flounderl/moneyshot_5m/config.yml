@@ -1,6 +1,4 @@
 defaults: default flounderl
-batch_size: 8
-batch_size_run: 8
 mongodb_profile: gandalf_pymarl
 env: sc2
 env_stats_aggregator: sc2
@@ -20,3 +18,8 @@ env_args:
   step_mul: 8
   map_name: 5m_5m
   intersection_global_view: False
+n_pair_samples: 1
+batch_size: 32
+batch_size_run: 32
+n_loops_per_thread_or_sub_or_main_process: 1
+n_subprocesses: 32
