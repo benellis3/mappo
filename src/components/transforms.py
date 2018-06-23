@@ -436,8 +436,8 @@ def _one_hot(ndarray_or_tensor, **kwargs):
     try:
         y_onehot.scatter_(len(tensor.shape) - 1, tensor.long(), 1)
     except Exception as e:
-        a = th.max(tensor)
-        b = y_onehot.shape
+        a = y_onehot.cpu().numpy()
+        b = tensor.cpu().numpy()
         pass
     if len(nan_mask.shape) > 0:
         y_onehot[nan_mask.repeat(1, 1, y_onehot.shape[2])] = 0  # set nans to zero

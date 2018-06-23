@@ -181,7 +181,7 @@ class FLOUNDERLRunner(NStepRunner):
         # common knowledge overlap between all agents
         # a = self.episode_buffer["obs_intersection_all"]
         # b = (self.episode_buffer["obs_intersection_all"][0] != 0.0)
-        overlap_all = th.sum((self.episode_buffer["obs_intersection_all"][0] > 0.0), dim=_vdim("bs*t*v")).float().mean()
+        overlap_all = th.sum((self.episode_buffer["obs_intersection_all"][0] > 0.0), dim=_vdim("bs*t*v")).float().mean().item()
         self._add_stat("obs_intersection_all_rate",
                        overlap_all,
                        T_env=T_env,
@@ -189,7 +189,7 @@ class FLOUNDERLRunner(NStepRunner):
 
         # common knowledge overlap between agent pairs
         for _pair_id, (id_1, id_2) in enumerate(_ordered_agent_pairings(self.n_agents)):
-            overlap_pair = th.sum(self.episode_buffer["obs_intersection__pair{}".format(_pair_id)][0] > 0.0, dim=_vdim("bs*t*v")).float().mean()
+            overlap_pair = th.sum(self.episode_buffer["obs_intersection__pair{}".format(_pair_id)][0] > 0.0, dim=_vdim("bs*t*v")).float().mean().item()
             self._add_stat("obs_intersection__pair{}".format(_pair_id),
                            overlap_pair,
                            T_env=T_env,
@@ -204,7 +204,7 @@ class FLOUNDERLRunner(NStepRunner):
         level1_sample[level1_sample!=level1_sample] = 0.0
         _tmp = level1_sample.unsqueeze(0).long().repeat(1,1,1,pair_intersections.shape[-1])
         active_intersections = pair_intersections.gather(0, _tmp)
-        active_pair_intersections_overlap = th.sum(active_intersections > 0.0, dim=_vdim("bs*t*v")).float().mean()
+        active_pair_intersections_overlap = th.sum(active_intersections > 0.0, dim=_vdim("bs*t*v")).float().mean().item()
         self._add_stat("active_pair_intersections_overlap",
                        active_pair_intersections_overlap,
                        T_env=T_env,

@@ -42,7 +42,7 @@ class FLOUNDERLMultiagentController():
                                                 rename="past_actions",
                                                 select_agent_ids=list(range(self.n_agents)),
                                                 transforms=[("shift", dict(steps=1)),
-                                                              ("one_hot", dict(range=(0, _n_agent_pairings(self.n_agents))))],
+                                                              ("one_hot", dict(range=(0, self.n_actions)))],
                                                 switch=self.args.flounderl_agent_use_past_actions),
                                            dict(name="flounderl_epsilons_central",
                                                 scope="episode"),
@@ -75,9 +75,7 @@ class FLOUNDERLMultiagentController():
                                                                                   rename="past_actions",
                                                                                   select_agent_ids=list(range(self.n_agents)),
                                                                                   transforms=[("shift", dict(steps=1)),
-                                                                                              ("one_hot", dict(range=(0,
-                                                                                                                      _n_agent_pairings(
-                                                                                                                          self.n_agents))))],
+                                                                                              ("one_hot", dict(range=(0, self.n_actions)))],
                                                                                   switch=self.args.flounderl_agent_use_past_actions),
                                                                              ])
 
@@ -93,9 +91,7 @@ class FLOUNDERLMultiagentController():
                                                                 dict(name="actions",
                                                                      rename="past_actions",
                                                                      transforms=[("shift", dict(steps=1)),
-                                                                                 ("one_hot", dict(range=(0,
-                                                                                                         _n_agent_pairings(
-                                                                                                             self.n_agents))))],
+                                                                                 ("one_hot", dict(range=(0, self.n_actions)))],
                                                                      select_agent_ids=list(range(self.n_agents)),
                                                                      switch=self.args.flounderl_agent_use_past_actions),
                                                                 ])
