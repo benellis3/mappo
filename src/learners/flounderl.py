@@ -450,8 +450,10 @@ class FLOUNDERLLearner(BasicLearner):
         try:
             _check_nan(agent_parameters)
             agent_optimiser.step()  # DEBUG
+            self._add_stat("Agent NaN gradient", 0.0, T_env=T_env)
         except Exception as e:
-            self.logging_struct.py_logger.warning("NaN in agent gradients! Gradient not taken.")
+            self.logging_struct.py_logger.warning("NaN in agent gradients! Gradient not taken. ERROR: {}".format(e))
+            self._add_stat("Agent NaN gradient", 1.0, T_env=T_env)
 
 
         # increase episode counter (the fastest one is always)
