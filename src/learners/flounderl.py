@@ -439,33 +439,20 @@ class FLOUNDERLLearner(BasicLearner):
         FLOUNDERL_loss, _ = agent_controller_output["losses"]
         FLOUNDERL_loss = FLOUNDERL_loss.mean()
 
-        # if self.args.flounderl_use_entropy_regularizer:
-        #     FLOUNDERL_loss += self.args.flounderl_entropy_loss_regularization_factor * \
-        #                  EntropyRegularisationLoss()(policies=agent_controller_output["policies"],
-        #                                              tformat="a*bs*t*v").sum()
 
         # carry out optimization for agents
 
         agent_optimiser.zero_grad()
         FLOUNDERL_loss.backward()
 
-        #if self.args.debug_mode:
-        #    _check_nan(agent_parameters)
         policy_grad_norm = th.nn.utils.clip_grad_norm_(agent_parameters, 50)
 
-        _check_nan(agent_parameters)
-        agent_optimiser.step() # DEBUG
+        try:
+            _check_nan(agent_parameters)
+            agent_optimiser.step()  # DEBUG
+        except Exception as e:
+            self.logging_struct.py_logger.warning("NaN in agent gradients! Gradient not taken.")
 
-        #try:
-        #     print("no NaN this time..")
-        # except:
-        #     print("NaN in gradient or model!")
-        #     for p in agent_parameters:
-        #         print(p.grad)
-        #     a = 5
-
-        #for p in self.agent_level1_parameters:
-        #    print('===========\ngradient:\n----------\n{}'.format(p.grad))
 
         # increase episode counter (the fastest one is always)
         setattr(self, T_policy_str, getattr(self, T_policy_str) + len(batch_history) * batch_history._n_t)
