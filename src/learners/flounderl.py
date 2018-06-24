@@ -439,7 +439,6 @@ class FLOUNDERLLearner(BasicLearner):
         FLOUNDERL_loss, _ = agent_controller_output["losses"]
         FLOUNDERL_loss = FLOUNDERL_loss.mean()
 
-
         # carry out optimization for agents
 
         agent_optimiser.zero_grad()
