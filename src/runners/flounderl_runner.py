@@ -172,7 +172,7 @@ class FLOUNDERLRunner(NStepRunner):
                         suffix=test_suffix)
 
         actions_level2, _ = self.episode_buffer.get_col(col="actions_level2__sample{}".format(0))
-        delegation_rate = th.sum(actions_level2==0.0) / (actions_level2.contiguous().view(-1).shape[0] - th.sum(actions_level2!=actions_level2))
+        delegation_rate = th.sum(actions_level2==0.0) / (actions_level2.contiguous().view(-1).shape[0] - th.sum(actions_level2!=actions_level2)).item()
         self._add_stat("level2_delegation_rate",
                        delegation_rate,
                        T_env=T_env,
