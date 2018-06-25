@@ -75,9 +75,10 @@ def test1():
     level2_out[:,0,0,:] = th.FloatTensor([[0.1, 0.2, 0.4, 0.1, 0.1, 0.1],[0.5, 0.1, 0.1, 0.05, 0.2, 0.05],[0.0, 0.2, 0.3, 0.05, 0.45, 0.0]])
     level3_out[:,0,0,:] = th.FloatTensor([[0.3, 0.7, 0.0], [0.2, 0.7, 0.1], [0.7, 0.25, 0.05]])
 
-    avail_actions_pair = th.zeros(n_agent_pairings,1,1,n_actions*n_actions+2)
+    avail_actions_pair = th.ones(n_agent_pairings,1,1,n_actions*n_actions+2)
     actions = th.zeros(n_agents,1,1,1)
     actions[:,0,0,0] = th.LongTensor([1, 0, 1])
+    avail_actions = th.ones(n_agents, 1, 1, n_actions + 1)
 
     _args.update(_required_args)
 
@@ -119,7 +120,7 @@ def test1():
     tformat = {"level1":"a*bs*t*v", "level2":"a*bs*t*v", "level3": "a*bs*t*v"}
     inputs = {"level1":{"agent_input_level1": None},
               "level2": {"agent_input_level2": {"avail_actions_pair":avail_actions_pair}},
-              "level3": {"agent_input_level3": None}}
+              "level3": {"agent_input_level3": {"avail_actions":avail_actions}}}
     hidden_states = {"level1":None, "level2":None, "level3":None}
     ret = model(inputs=inputs,
                 actions=actions,
@@ -190,10 +191,11 @@ def test2():
     level2_out = th.cat([level2_out, level2_out * float("nan")], dim=2)
     level3_out = th.cat([level3_out, level3_out * float("nan")], dim=2)
 
-    avail_actions_pair = th.zeros(n_agent_pairings,1,1,n_actions*n_actions+2)
+    avail_actions_pair = th.ones(n_agent_pairings,1,1,n_actions*n_actions+2)
     actions = th.zeros(n_agents,1,1,1)
     actions[:,0,0,0] = th.LongTensor([1,0,1])
     actions = th.cat([actions, actions*float("nan")], dim=2)
+    avail_actions = th.ones(n_agents, 1, 1, n_actions + 1)
 
     _args.update(_required_args)
 
@@ -235,7 +237,7 @@ def test2():
     tformat = {"level1":"a*bs*t*v", "level2":"a*bs*t*v", "level3": "a*bs*t*v"}
     inputs = {"level1":{"agent_input_level1": None},
               "level2": {"agent_input_level2": {"avail_actions_pair":avail_actions_pair}},
-              "level3": {"agent_input_level3": None}}
+              "level3": {"agent_input_level3": {"avail_actions":avail_actions}}}
     hidden_states = {"level1":None, "level2":None, "level3":None}
     ret = model(inputs=inputs,
                 actions=actions,
@@ -250,7 +252,7 @@ def test2():
 
 def main():
     test1()
-    test2()
+    # test2()
     pass
 
 if __name__ == "__main__":

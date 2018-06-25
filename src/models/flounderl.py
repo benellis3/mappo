@@ -698,10 +698,6 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions
-            # n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
-            # x = th.exp(x)
-            # x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-            # x = th.div(x, x.sum(dim=1, keepdim=True))
             n_available_actions = avail_actions.sum(dim=1, keepdim=True)
             x = th.exp(x)
             x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
@@ -715,10 +711,6 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
                 if self.args.debug_verbose:
                     print('Warning in FLOUNDERLRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
-            # Alternative variant
-            #x = th.nn.functional.softmax(x).clone()
-            #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
-            #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             # add softmax exploration (if switched on)
             if self.args.flounderl_exploration_mode_level3 in ["softmax"] and not test_mode:
@@ -852,12 +844,14 @@ class FLOUNDERLAgent(nn.Module):
         pi_actions_selected = out_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
         # pi_actions_selected[pi_actions_selected  != pi_actions_selected ] = 0.0 #float("nan")
         pi_actions_selected[actions != actions] = float("nan")
+        avail_actions_level3 = inputs["level3"]["agent_input_level3"]["avail_actions"].clone().data
+        avail_actions_selected = avail_actions_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
 
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
         pi_c_prod_list = []
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
-            # calculate pi_a_cross_pi_b
+            # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
             actions_masked = actions.clone()
@@ -873,13 +867,18 @@ class FLOUNDERLAgent(nn.Module):
             _p_ab = p_ab[_i:_i+1]
             joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
+            # Set probabilities corresponding to jointly-disallowed actions to 0.0
+            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())
+            _z[avail_flags==0.0] = 0.0
             pi_ab_list.append(_z)
             # calculate pi_c_prod
             _pi_actions_selected = pi_actions_selected.clone()
             _pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 0.0
             #_pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 1.0 # mask shit
-            _pi_actions_selected[_a:_a+1] = 1.0
+            _pi_actions_selected[_a:_a + 1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
+            _pi_actions_selected[avail_actions_selected==0.0] = 0.0 # should never happen!
+            # Set probabilities corresponding to individually disallowed actions to 0.0
             _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)
 
