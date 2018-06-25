@@ -188,12 +188,19 @@ class FLOUNDERLRunner(NStepRunner):
                        suffix=test_suffix)
 
         # common knowledge overlap between agent pairs
+        overlaps = []
         for _pair_id, (id_1, id_2) in enumerate(_ordered_agent_pairings(self.n_agents)):
             overlap_pair = th.sum(self.episode_buffer["obs_intersection__pair{}".format(_pair_id)][0] > 0.0, dim=_vdim("bs*t*v")).float().mean().item()
-            self._add_stat("obs_intersection__pair{}".format(_pair_id),
+            overlaps.append(overlap_pair)
+            self._add_stat("obs_intersection_pair{}".format(_pair_id),
                            overlap_pair,
                            T_env=T_env,
                            suffix=test_suffix)
+
+        self._add_stat("obs_intersection_pairs_all".format(_pair_id),
+                       sum(overlaps) / float(len(overlaps)),
+                       T_env=T_env,
+                       suffix=test_suffix)
 
         # correlation of common knowledge overlap between active agent pairs and delegation
         pair_intersections = []
