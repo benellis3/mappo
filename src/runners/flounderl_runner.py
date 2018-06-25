@@ -9,7 +9,7 @@ from torch.distributions import Normal
 
 from components.epsilon_schedules import FlatThenDecaySchedule
 from runners import REGISTRY as r_REGISTRY
-from utils.mackrel import _n_agent_pair_samples, _n_agent_pairings, _ordered_agent_pairings, _n_agent_pairings
+from utils.mackrel import _n_agent_pair_samples, _n_agent_pairings, _ordered_agent_pairings
 
 NStepRunner = r_REGISTRY["nstep"]
 
@@ -172,7 +172,7 @@ class FLOUNDERLRunner(NStepRunner):
                         suffix=test_suffix)
 
         actions_level2, _ = self.episode_buffer.get_col(col="actions_level2__sample{}".format(0))
-        delegation_rate = th.sum(actions_level2==0.0) / (actions_level2.contiguous().view(-1).shape[0] - th.sum(actions_level2!=actions_level2)).item()
+        delegation_rate = (th.sum(actions_level2==0.0) / (actions_level2.contiguous().view(-1).shape[0] - th.sum(actions_level2!=actions_level2))).item()
         self._add_stat("level2_delegation_rate",
                        delegation_rate,
                        T_env=T_env,
@@ -420,17 +420,21 @@ class FLOUNDERLRunner(NStepRunner):
             for _i in range(_n_agent_pair_samples(self.n_agents)):
                 log_str += ", policies_level2_entropy_sample{}={:g}".format(_i, _seq_mean(stats["policy_level2_entropy_sample{}".format(_i)]))
             log_str += ", policies_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy"]))
-            self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
+
         else:
             log_str += ", level2_delegation_rate={:g}".format(_seq_mean(stats["level2_delegation_rate_test"]))
             log_str += ", policies_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy_test"]))
             for _i in range(_n_agent_pair_samples(self.n_agents)):
                 log_str += ", policies_level2_entropy_sample{}={:g}".format(_i, _seq_mean(stats["policy_level2_entropy_sample{}_test".format(_i)]))
             log_str += ", policies_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy_test"]))
-            # log_str += ", policy_level1_entropy={:g}".format(_seq_mean(stats["policy_level1_entropy_test"]))
-            # log_str += ", policy_level2_entropy={:g}".format(_seq_mean(stats["policy_level2_entropy_test"]))
-            # log_str += ", policy_level3_entropy={:g}".format(_seq_mean(stats["policy_level3_entropy_test"]))
+
+        log_str += ", {}".format(self.multiagent_controller.log(T_env=self.T_env, test_mode=self.test_mode, log_directly=False)[0])
+
+        if not self.test_mode:
+            self.logging_struct.py_logger.info("TRAIN RUNNER INFO: {}".format(log_str))
+        else:
             self.logging_struct.py_logger.info("TEST RUNNER INFO: {}".format(log_str))
+
         return log_str, log_dict
 
     pass

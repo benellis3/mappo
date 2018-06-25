@@ -105,7 +105,8 @@ class NStepRunner():
             self.multiagent_controller = c_REGISTRY[args.multiagent_controller](runner=self,
                                                                                 n_agents=self.n_agents,
                                                                                 n_actions=self.n_actions,
-                                                                                args=self.args)
+                                                                                args=self.args,
+                                                                                logging_struct=self.logging_struct)
             self.multiagent_controller.create_model(self.data_scheme)
         else:
             self.multiagent_controller = multiagent_controller

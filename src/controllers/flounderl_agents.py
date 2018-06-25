@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 from torch.autograd import Variable
 import torch as th
@@ -8,26 +9,27 @@ from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, \
     _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim, _vdim, _agent_flatten, _check_nan, \
-    _to_batch, _from_batch
+    _to_batch, _from_batch, _vdim, _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean
 
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
 from utils.mackrel import _n_agent_pair_samples, _agent_ids_2_pairing_id, _joint_actions_2_action_pair, \
     _pairing_id_2_agent_ids, _pairing_id_2_agent_ids__tensor, _n_agent_pairings, \
     _agent_ids_2_pairing_id, _joint_actions_2_action_pair_aa, _ordered_agent_pairings, _excluded_pair_ids
+
 class FLOUNDERLMultiagentController():
     """
     container object for a set of independent agents
     TODO: may need to propagate test_mode in here as well!
     """
 
-    def __init__(self, runner, n_agents, n_actions, action_selector=None, args=None):
+    def __init__(self, runner, n_agents, n_actions, action_selector=None, args=None, logging_struct=None):
         self.args = args
         self.runner = runner
         self.n_agents = n_agents
         self.n_actions = n_actions
         self.agent_output_type = "policies"
-
+        self.logging_struct = logging_struct
 
         self.model_class = mo_REGISTRY[args.flounderl_agent_model]
 
@@ -179,6 +181,8 @@ class FLOUNDERLMultiagentController():
         """
         sample from the FLOUNDERL tree
         """
+        T_env = info["T_env"]
+        test_suffix = "" if not test_mode else "_test"
 
         if self.args.agent_level1_share_params:
 
@@ -292,8 +296,16 @@ class FLOUNDERLMultiagentController():
             # selected_level_2_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
             pair_sampled_actions = pair_sampled_actions.gather(0, sampled_pair_ids.long())
 
-            actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions, self.n_actions, avail_actions1,
+            actions1, actions2 = _joint_actions_2_action_pair_aa(pair_sampled_actions,
+                                                                 self.n_actions,
+                                                                 avail_actions1,
                                                                  avail_actions2)
+            # count how often level2 actions are un-available at level 3
+            pair_action_unavail_rate = (th.mean((actions1 != actions1).float()).item() + th.mean((actions2 != actions2).float()).item()) / 2.0
+            self._add_stat("pair_action_unavail_rate",
+                           pair_action_unavail_rate,
+                           T_env=T_env,
+                           suffix=test_suffix)
 
             # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
             ttype = th.cuda.FloatTensor if self.args.use_cuda else th.FloatTensor
@@ -385,6 +397,9 @@ class FLOUNDERLMultiagentController():
             modified_inputs_list += [dict(name="policies_level3",
                                           select_agent_ids=list(range(self.n_agents)),
                                           data=self.policies_level3)]
+            modified_inputs_list += [dict(name="avail_actions",
+                                          select_agent_ids=list(range(self.n_agents)),
+                                          data=self.avail_actions)]
             modified_inputs_list += [dict(name="avail_actions",
                                           select_agent_ids=list(range(self.n_agents)),
                                           data=self.avail_actions)]
@@ -515,6 +530,72 @@ class FLOUNDERLMultiagentController():
                 th.save(self.agent_models["agent__agent{}".format(_agent_id)].state_dict(),
                         "results/models/{}/{}_agent{}__{}_T.weights".format(token, self.args.learner, _agent_id, T))
         pass
+
+    def _add_stat(self, name, value, T_env, suffix=""):
+        name += suffix
+
+        if isinstance(value, np.ndarray) and value.size == 1:
+            value = float(value)
+
+        if not hasattr(self, "_stats"):
+            self._stats = {}
+
+        if name not in self._stats:
+            self._stats[name] = []
+            self._stats[name+"_T_env"] = []
+        self._stats[name].append(value)
+        self._stats[name+"_T_env"].append(T_env)
+
+        if hasattr(self, "max_stats_len") and len(self._stats) > self.max_stats_len:
+            self._stats[name].pop(0)
+            self._stats[name+"_T_env"].pop(0)
+
+        # log to sacred if enabled
+        if hasattr(self.logging_struct, "sacred_log_scalar_fn"):
+            self.logging_struct.sacred_log_scalar_fn(key=_underscore_to_cap(name), val=value)
+
+        # log to tensorboard if enabled
+        if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
+            self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
+
+        return
+
+    def log(self, test_mode=None, T_env=None, log_directly = True):
+        """
+        Each learner has it's own logging routine, which logs directly to the python-wide logger if log_directly==True,
+        and returns a logging string otherwise
+
+        Logging is triggered in run.py
+        """
+        test_suffix = "" if not test_mode else "_test"
+
+        stats = self.get_stats()
+        if stats == {}:
+            self.logging_struct.py_logger.warning("Stats is empty... are you logging too frequently?")
+            return "", {}
+
+        logging_dict =  dict(T_env=T_env)
+
+        logging_dict["pair_action_unavail_rate"+test_suffix] = _seq_mean(stats["pair_action_unavail_rate"+test_suffix])
+
+        logging_str = ""
+        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_env"+test_suffix]))
+
+
+        if log_directly:
+            self.logging_struct.py_logger.info("{} MC INFO: {}".format("TEST" if self.test_mode else "TRAIN",
+                                                                           logging_str))
+        return logging_str, logging_dict
+
+
+    def get_stats(self):
+        if hasattr(self, "_stats"):
+            tmp = deepcopy(self._stats)
+            self._stats={}
+            return tmp
+        else:
+            return []
+
 
     pass
 

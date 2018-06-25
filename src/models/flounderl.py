@@ -869,7 +869,6 @@ class FLOUNDERLAgent(nn.Module):
             z = _x * _y
             u = _from_batch(z, params_x, tformat_x)
             pi_a_cross_pi_b_list.append(u)
-            # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1]
             joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
