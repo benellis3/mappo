@@ -397,9 +397,9 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
             if self.args.flounderl_exploration_mode_level1 in ["softmax"] and not test_mode:
-               epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
-               epsilons, _, _ = _to_batch(epsilons, tformat)
-               x =  epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
+               epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim("bs*t*v")).detach()
+               epsilons, _, _ = _to_batch(epsilons, "bs*t*v")
+               x = epsilons / _n_agent_pairings(self.n_agents) + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
@@ -583,11 +583,15 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
             if self.args.flounderl_exploration_mode_level2 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
                epsilons, _, _ = _to_batch(epsilons, tformat)
-               n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
-               x = th.cat([epsilons * self.args.mackrel_delegation_probability_bias,
-                           avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
-                                       1 - self.args.mackrel_delegation_probability_bias)], dim=1) \
-                   + x * (1 - epsilons)
+               n_available_actions[n_available_actions==0.0] = np.sqrt(float(np.finfo(np.float32).tiny))
+               x = avail_actions.detach() * epsilons / n_available_actions + x * (1 - epsilons)
+               #epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
+               #epsilons, _, _ = _to_batch(epsilons, tformat)
+               #n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
+               #x = th.cat([epsilons * self.args.flounderl_delegation_probability_bias,
+               #            avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
+               #                        1 - self.args.flounderl_delegation_probability_bias)], dim=1) \
+               #    + x * (1 - epsilons)
             #    if self.args.debug_mode:
             #        _check_nan(x)
 
@@ -714,9 +718,10 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
 
             # add softmax exploration (if switched on)
             if self.args.flounderl_exploration_mode_level3 in ["softmax"] and not test_mode:
-               epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat))
+               epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat)).detach()
                epsilons, _, _ = _to_batch(epsilons, tformat)
-               x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+               n_available_actions[n_available_actions==0.0] = np.sqrt(float(np.finfo(np.float32).tiny))
+               x = avail_actions.detach() * epsilons / n_available_actions + x * (1 - epsilons) # avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
