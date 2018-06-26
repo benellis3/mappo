@@ -31,6 +31,8 @@ class FLOUNDERLMultiagentController():
         self.agent_output_type = "policies"
         self.logging_struct = logging_struct
 
+        self._stats = {}
+
         self.model_class = mo_REGISTRY[args.flounderl_agent_model]
 
         # # Set up action selector
@@ -302,10 +304,11 @@ class FLOUNDERLMultiagentController():
                                                                  avail_actions2)
             # count how often level2 actions are un-available at level 3
             pair_action_unavail_rate = (th.mean((actions1 != actions1).float()).item() + th.mean((actions2 != actions2).float()).item()) / 2.0
-            self._add_stat("pair_action_unavail_rate",
+            self._add_stat("pair_action_unavail_rate__runner",
                            pair_action_unavail_rate,
                            T_env=T_env,
-                           suffix=test_suffix)
+                           suffix=test_suffix,
+                           to_sacred=False)
 
             # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
             ttype = th.cuda.FloatTensor if self.args.use_cuda else th.FloatTensor
@@ -531,7 +534,7 @@ class FLOUNDERLMultiagentController():
                         "results/models/{}/{}_agent{}__{}_T.weights".format(token, self.args.learner, _agent_id, T))
         pass
 
-    def _add_stat(self, name, value, T_env, suffix=""):
+    def _add_stat(self, name, value, T_env, suffix="", to_sacred=True, to_tb=True):
         name += suffix
 
         if isinstance(value, np.ndarray) and value.size == 1:
@@ -551,11 +554,11 @@ class FLOUNDERLMultiagentController():
             self._stats[name+"_T_env"].pop(0)
 
         # log to sacred if enabled
-        if hasattr(self.logging_struct, "sacred_log_scalar_fn"):
+        if hasattr(self.logging_struct, "sacred_log_scalar_fn") and to_sacred:
             self.logging_struct.sacred_log_scalar_fn(key=_underscore_to_cap(name), val=value)
 
         # log to tensorboard if enabled
-        if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
+        if hasattr(self.logging_struct, "tensorboard_log_scalar_fn") and to_tb:
             self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
 
         return
@@ -570,13 +573,21 @@ class FLOUNDERLMultiagentController():
         test_suffix = "" if not test_mode else "_test"
 
         stats = self.get_stats()
+        stats["pair_action_unavail_rate"+test_suffix] = _seq_mean(stats["pair_action_unavail_rate__runner"+test_suffix])
+
+        self._add_stat("pair_action_unavail_rate",
+                       stats["pair_action_unavail_rate"+test_suffix],
+                       T_env=T_env,
+                       suffix=test_suffix,
+                       to_sacred=True)
+
         if stats == {}:
             self.logging_struct.py_logger.warning("Stats is empty... are you logging too frequently?")
             return "", {}
 
         logging_dict =  dict(T_env=T_env)
 
-        logging_dict["pair_action_unavail_rate"+test_suffix] = _seq_mean(stats["pair_action_unavail_rate"+test_suffix])
+        logging_dict["pair_action_unavail_rate"+test_suffix] =stats["pair_action_unavail_rate"+test_suffix]
 
         logging_str = ""
         logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_env"+test_suffix]))
