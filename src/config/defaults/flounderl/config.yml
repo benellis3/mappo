@@ -42,7 +42,6 @@ n_pair_samples: 1
 learner: flounderl
 multiagent_controller: flounderl_mac
 n_critic_learner_reps: 4
-n_pair_samples: ~
 obs_last_action: True
 runner: flounderl
 T_target_critic_update_interval: 661500
