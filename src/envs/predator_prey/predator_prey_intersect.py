@@ -388,11 +388,15 @@ class PredatorPreyCapture(MultiAgentEnv):
 
     def get_obs_intersection(self, agent_ids):
         if self.fully_observable:
+            if self.toroidal or not self.intersection_unknown:
+                _, avail_actions =  self.get_obs_intersection1(agent_ids)
+            else:
+                _, avail_actions = self.get_obs_intersection2(agent_ids)
             s = self.grid[0, :, :, :].copy()
             for agent_id in agent_ids:
                 a_x, a_y = self.agents[agent_id, 0, :]
                 s[a_x, a_y, 0] = agent_id + 2.0
-            return s.reshape(self.state_size)
+            return s.reshape(self.state_size), avail_actions
         else:
             if self.toroidal or not self.intersection_unknown:
                 return self.get_obs_intersection1(agent_ids)
