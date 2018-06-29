@@ -24,23 +24,17 @@ class CentralVPolicyLoss(nn.Module):
     def __init__(self):
         super(CentralVPolicyLoss, self).__init__()
 
-    def forward(self, policies, advantages, actions, tformat):
-        assert tformat in ["a*bs*t*v"], "invalid input format!"
+    def forward(self, policies, advantages, tformat):
 
-        policy_mask = (policies == 0.0)
+        policies = policies.clone()
+        policies[policies < 10**(-40)] = 1.0
         log_policies = th.log(policies)
-        log_policies = log_policies.masked_fill(policy_mask, 0.0)
 
         _adv = advantages.clone().detach()
+        _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
+        _adv[_adv != _adv] = 0.0 # n-step return leads to NaNs
 
-        _act = actions.clone()
-        _act[_act!=_act] = 0.0 # mask NaNs in _act
-
-        _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
-        _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
-        _adv[actions != actions] = 0.0
-
-        loss_mean = -(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
+        loss_mean = - (log_policies * _adv).mean()
         output_tformat = "a*t"
 
         return loss_mean, output_tformat
@@ -254,29 +248,29 @@ class CentralVLearner(BasicLearner):
                                                                        to_cuda=self.args.use_cuda)
 
             _inputs_critic = inputs_critic
-            qtargets = target_critic_td_targets
+            vtargets = target_critic_td_targets
 
             output_critic, output_critic_tformat = self.critic_model.forward(_inputs_critic,
-                                                                               tformat=coma_model_inputs_tformat)
+                                                                             tformat="bs*t*v")
 
 
             critic_loss, \
-            critic_loss_tformat = CentralVCriticLoss()(input=output_critic["qvalue"],
-                                                   target=Variable(qtargets, requires_grad=False),
+            critic_loss_tformat = CentralVCriticLoss()(input=output_critic["vvalue"],
+                                                   target=Variable(vtargets.squeeze(0), requires_grad=False),
                                                    tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
             self.critic_optimiser.zero_grad()
             critic_loss.backward()
 
-            critic_grad_norm = th.nn.utils.clip_grad_norm(self.critic_parameters,
+            critic_grad_norm = th.nn.utils.clip_grad_norm_(self.critic_parameters,
                                                           50)
             self.critic_optimiser.step()
 
             # Calculate critic statistics and update
-            target_critic_mean = _naninfmean(output_target_critic["qvalue"])
+            target_critic_mean = _naninfmean(output_target_critic["vvalue"])
 
-            critic_mean = _naninfmean(output_critic["qvalue"])
+            critic_mean = _naninfmean(output_critic["vvalue"])
 
             critic_loss_arr.append(np.asscalar(critic_loss.data.cpu().numpy()))
             critic_mean_arr.append(critic_mean)
@@ -296,21 +290,20 @@ class CentralVLearner(BasicLearner):
                                  actions=actions)
 
         # get advantages
-        output_critic, output_critic_tformat = self.critic.forward(coma_model_inputs["critic"],
-                                                                   tformat=coma_model_inputs_tformat)
+        output_critic, output_critic_tformat = self.critic_model.forward(coma_model_inputs["critic"],
+                                                                         tformat="bs*t*v")
         # advantages = output_critic["advantage"]
         advantages = _n_step_return(values=output_critic["vvalue"].unsqueeze(0),
-                                    rewards=batch_history["rewards"][0],
+                                    rewards=batch_history["reward"][0],
                                     terminated=batch_history["terminated"][0],
                                     truncated=batch_history["truncated"][0],
                                     seq_lens=batch_history.seq_lens,
                                     horizon=batch_history._n_t-1,
-                                    n=self.args.n_step_return_n,
+                                    n=1 if not hasattr(self.args, "n_step_return_n") else self.args.n_step_return_n,
                                     gamma=self.args.gamma) - output_critic["vvalue"]
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(CentralVPolicyLoss(),
-                                       actions=Variable(actions),
                                        advantages=advantages)
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
@@ -334,14 +327,14 @@ class CentralVLearner(BasicLearner):
         self.agent_optimiser.zero_grad()
         CentralV_loss.backward()
 
-        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
+        policy_grad_norm = th.nn.utils.clip_grad_norm_(self.agent_parameters, 50)
         self.agent_optimiser.step()
 
         # increase episode counter (the fastest one is always)
         self.T_policy += len(batch_history) * batch_history._n_t
 
         # Calculate policy statistics
-        advantage_mean = _naninfmean(output_critic["advantage"])
+        advantage_mean = _naninfmean(advantages)
         self._add_stat("advantage_mean", advantage_mean, T_env=T_env)
         self._add_stat("policy_grad_norm", policy_grad_norm, T_env=T_env)
         self._add_stat("policy_loss", CentralV_loss.data.cpu().numpy(), T_env=T_env)
