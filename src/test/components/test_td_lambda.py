@@ -1,8 +1,8 @@
 import numpy.testing as tst
 import numpy as np
 import torch as th
-from utils.blitzz.sequence_buffer import BatchEpisodeBuffer
-from utils.blitzz.scheme import Scheme
+from components.episode_buffer import BatchEpisodeBuffer
+from components.scheme import Scheme
 
 def G_t_n(R, V, t, n, gamma, truncated):
     """
@@ -491,6 +491,64 @@ def test14():
     # ret2 = ret[1, :, :, 0]
     tst.assert_array_almost_equal(ret1[0,:], np.array([0.305,1.9,5.0]+[float("nan")]*(1+n_nan)), 5)
 
+def test15():
+    """
+    Test BatchEpisodeBuffer (2)
+    """
+    n_nan = 5
+    R = [1,-1,1,5] + [float("nan")]*n_nan
+    V = [2,1,-3,9] + [float("nan")]*n_nan
+    truncated = False # only applicable at end of episode!
+    gamma = 0.9
+    td_lambda = 0.5
+    n_agents=3
+    n_bs=1
+
+    R_tensor = th.FloatTensor(R).unsqueeze(0).unsqueeze(2)
+    V_tensor = th.FloatTensor(V).unsqueeze(0).unsqueeze(0).unsqueeze(3).repeat(1,n_bs,1,1)
+    terminated_tensor = th.FloatTensor([0.0]*(len(R)-1-n_nan) + [1.0] + [float("nan")]*n_nan).unsqueeze(0).unsqueeze(2)#.repeat(2,1,1,1)
+    truncated_tensor = th.FloatTensor([0.0]*(len(R)-1-n_nan) + [1.0 if truncated else 0.0] + [float("nan")]*n_nan).unsqueeze(0).unsqueeze(2)#.repeat(2,1,1,1)
+
+    scheme = Scheme([dict(name="reward",
+                          shape=(1,),
+                          dtype=np.float32,
+                          missing=np.nan,),
+                     dict(name="terminated",
+                          shape=(1,),
+                          dtype=np.float32,
+                          missing=np.nan,),
+                     dict(name="truncated",
+                          shape=(1,),
+                          dtype=np.float32,
+                          missing=np.nan,)
+                     ])
+
+    b = BatchEpisodeBuffer(data_scheme=scheme,
+                               n_bs=n_bs,
+                               n_t=len(R),
+                               n_agents=n_agents,
+                               is_cuda=False,
+                               is_shared_mem=False)
+
+    for hist_id in range(n_bs):
+        b.set_col(col="reward", data=R_tensor[:,:4,:], bs=hist_id, t=slice(0,4))
+        b.set_col(col="terminated", data=terminated_tensor[:,:4,:], bs=hist_id, t=slice(0,4))
+        b.set_col(col="truncated", data=truncated_tensor[:,:4,:], bs=hist_id, t=slice(0,4))
+    #b.seq_lens = [_s-n_nan for _s in b.seq_lens ]
+    b_pd = b.to_pd()
+
+    ret, _ = b.get_stat("td_lambda_targets",
+                        bs_ids=None,
+                        td_lambda=td_lambda,
+                        gamma=gamma,
+                        value_function_values=V_tensor,
+                        to_variable=False,
+                        to_cuda=False,
+                        n_agents=1)
+    # print(ret)
+    ret1 = ret[0,:,:,0]
+    # ret2 = ret[1, :, :, 0]
+    tst.assert_array_almost_equal(ret1[0,:], np.array([0.305,1.9,5.0]+[float("nan")]*(1+n_nan)), 5)
 
 def main():
     test1()
@@ -506,6 +564,7 @@ def main():
     test12()
     test13()
     test14()
+    test15()
 
 if __name__ == "__main__":
     main()

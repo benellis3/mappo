@@ -26,37 +26,21 @@ class FLOUNDERLPolicyLoss(nn.Module):
     def __init__(self):
         super(FLOUNDERLPolicyLoss, self).__init__()
 
-    def forward(self, policies, advantages, tformat):
-        assert tformat in ["a*bs*t*v"], "invalid input format!"
-
-
-        #policy_mask = (policies == 0.0)
-        #log_policies = th.log(policies.masked_fill(policy_mask, 1.0))
-        #log_policies = log_policies.masked_fill(policy_mask, 0.0)
-        #log_policies[log_policies!=log_policies] = 0.0 # just take out of final loss product
-        # log_policies = th.log(policies)
-
-
-        policies = policies.clone()
-        # policies[policies == 0.0] = 1.0
-        policies[policies < 10**(-40)] = 1.0
+    def forward(self, policies, advantages, actions, tformat):
+        #actions = actions.clone()
+        #actions_mask = (actions != actions)
+        #actions[actions_mask] = 0.0
+        #policies = th.gather(policies, _vdim(tformat), actions.long())
+        #policies[actions_mask] = float("nan")
+        mask = (policies < 10E-40) | (policies != policies)
+        policies[mask] = 1.0
         log_policies = th.log(policies)
-        #log_policies[policies < 10**(-40)] = 0.0
 
         _adv = advantages.clone().detach()
-        _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
-        _adv[_adv != _adv] = 0.0 # n-step return leads to NaNs
+        _adv = _adv.repeat(log_policies.shape[_adim(tformat)], 1, 1, 1)
+        _adv[_adv != _adv] = 0.0  # n-step return leads to NaNs
+        _adv[mask] = 0.0  # prevent gradients from flowing through illegitimate policy entries
 
-        # _act = actions.clone()
-        # _act[_act!=_act] = 0.0 # mask NaNs in _act
-        #
-        # _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
-        # _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
-        # _adv[actions != actions] = 0.0
-
-        # loss_mean = -(log_policies.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat))
-        # loss_mean = log_policies.mean(dim=_bsdim(tformat)) # DEBUG
-        #loss_mean = -(log_policies[:, :, :-1, :].squeeze(_vdim(tformat)) * _adv[:, :, :-1, :].squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat))
         loss_mean = - (log_policies * _adv).mean()
         output_tformat = "a*t"
 
@@ -431,6 +415,7 @@ class FLOUNDERLLearner(BasicLearner):
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(FLOUNDERLPolicyLoss(),
+                                       actions=actions,
                                        advantages=advantages.detach())
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
@@ -455,14 +440,14 @@ class FLOUNDERLLearner(BasicLearner):
 
         policy_grad_norm = th.nn.utils.clip_grad_norm_(agent_parameters, 50)
 
-        try:
-            _check_nan(agent_parameters)
-            agent_optimiser.step()  # DEBUG
-            self._add_stat("Agent NaN gradient", 0.0, T_env=T_env)
-        except Exception as e:
-            self.logging_struct.py_logger.warning("NaN in agent gradients! Gradient not taken. ERROR: {}".format(e))
-            self._add_stat("Agent NaN gradient", 1.0, T_env=T_env)
-
+        if self.args.debug_mode not in ["check_probs"]:
+            try:
+                _check_nan(agent_parameters)
+                agent_optimiser.step()  # DEBUG
+                self._add_stat("Agent NaN gradient", 0.0, T_env=T_env)
+            except Exception as e:
+                self.logging_struct.py_logger.warning("NaN in agent gradients! Gradient not taken. ERROR: {}".format(e))
+                self._add_stat("Agent NaN gradient", 1.0, T_env=T_env)
 
         # increase episode counter (the fastest one is always)
         setattr(self, T_policy_str, getattr(self, T_policy_str) + len(batch_history) * batch_history._n_t)

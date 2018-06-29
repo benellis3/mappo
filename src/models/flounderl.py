@@ -715,7 +715,6 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
                 if self.args.debug_verbose:
                     print('Warning in FLOUNDERLRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
-
             # add softmax exploration (if switched on)
             if self.args.flounderl_exploration_mode_level3 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat)).detach()
@@ -899,6 +898,28 @@ class FLOUNDERLAgent(nn.Module):
         _tmp =  out_level1.transpose(_adim(tformat_level1), _vdim(tformat_level1))
         _tmp[_tmp!=_tmp] = 0.0
         p_a_b_c = (p_prod * _tmp).sum(dim=_adim(tformat_level1), keepdim=True)
+
+        if self.args.debug_mode in ["check_probs"]:
+            if not hasattr(self, "action_table"):
+                self.action_table = {}
+            if not hasattr(self, "actions_sampled"):
+                self.actions_sampled = 0
+            actions_flat = actions.view(self.n_agents, -1)
+            for id in range(actions_flat.shape[1]):
+                act = tuple(actions_flat[:, id].tolist())
+                if act in self.action_table:
+                    self.action_table[act] += 1
+                else:
+                    self.action_table[act] = 0
+            self.actions_sampled += actions_flat.shape[0]
+
+        if self.args.debug_mode in ["check_probs"]:
+            actions_flat = actions.view(self.n_agents, -1)
+            for id in range(actions_flat.shape[1]):
+                print("sampled: ",
+                      self.action_table[tuple(actions_flat[:, id].tolist())] / self.actions_sampled,
+                      " pred: ",
+                      p_a_b_c.view(-1)[id])
 
         # DEBUG MODE HERE!
         # _check_nan(pi_c_prod)

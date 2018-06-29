@@ -24,15 +24,21 @@ class CentralVPolicyLoss(nn.Module):
     def __init__(self):
         super(CentralVPolicyLoss, self).__init__()
 
-    def forward(self, policies, advantages, tformat):
+    def forward(self, policies, advantages, actions, tformat):
 
-        policies = policies.clone()
-        policies[policies < 10**(-40)] = 1.0
+        actions = actions.clone()
+        actions_mask = (actions != actions)
+        actions[actions_mask] = 0.0
+        policies = th.gather(policies, _vdim(tformat), actions.long())
+        policies[actions_mask] = float("nan")
+        mask = (policies < 10E-40) | (policies != policies)
+        policies[mask] = 1.0
         log_policies = th.log(policies)
 
         _adv = advantages.clone().detach()
         _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
         _adv[_adv != _adv] = 0.0 # n-step return leads to NaNs
+        _adv[mask] = 0.0 # prevent gradients from flowing through illegitimate policy entries
 
         loss_mean = - (log_policies * _adv).mean()
         output_tformat = "a*t"
@@ -256,8 +262,8 @@ class CentralVLearner(BasicLearner):
 
             critic_loss, \
             critic_loss_tformat = CentralVCriticLoss()(input=output_critic["vvalue"],
-                                                   target=Variable(vtargets.squeeze(0), requires_grad=False),
-                                                   tformat=target_critic_td_targets_tformat)
+                                                       target=Variable(vtargets.squeeze(0), requires_grad=False),
+                                                       tformat=target_critic_td_targets_tformat)
 
             # optimize critic loss
             self.critic_optimiser.zero_grad()
@@ -304,7 +310,8 @@ class CentralVLearner(BasicLearner):
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(CentralVPolicyLoss(),
-                                       advantages=advantages)
+                                       actions = actions,
+                                       advantages=advantages.detach())
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
             len(batch_history))
@@ -348,7 +355,7 @@ class CentralVLearner(BasicLearner):
         pass
 
     def update_target_nets(self):
-        self.target_critic.load_state_dict(self.critic.state_dict())
+        self.target_critic_model.load_state_dict(self.critic_model.state_dict())
 
     def get_stats(self):
         if hasattr(self, "_stats"):

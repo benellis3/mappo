@@ -292,7 +292,7 @@ class COMALearner(BasicLearner):
             self.critic_optimiser.zero_grad()
             critic_loss.backward()
 
-            critic_grad_norm = th.nn.utils.clip_grad_norm(self.critic_parameters,
+            critic_grad_norm = th.nn.utils.clip_grad_norm_(self.critic_parameters,
                                                           50)
             self.critic_optimiser.step()
 
@@ -349,7 +349,7 @@ class COMALearner(BasicLearner):
         self.agent_optimiser.zero_grad()
         COMA_loss.backward()
 
-        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
+        policy_grad_norm = th.nn.utils.clip_grad_norm_(self.agent_parameters, 50)
         self.agent_optimiser.step()
 
         # increase episode counter (the fastest one is always)
