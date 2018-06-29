@@ -10,11 +10,11 @@ observe: True
 observe_db: True
 run_mode: sequential
 save_model: False
-share_agent_params: True
 tensorboard: True
 test_interval: 8000
 test_nepisode: 50
 use_tensorboard: True
 t_max: 100000000
 use_cuda: True
+share_agent_params: True
 

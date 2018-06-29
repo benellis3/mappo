@@ -22,6 +22,8 @@ target_critic_update_interval: 661500
 td_lambda: 0.8
 use_full_observability: False
 use_replay_buffer: False
+use_full_observability: False
+critic_share_params: True
 
 
 

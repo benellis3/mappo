@@ -77,7 +77,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.n_prey = args.n_prey
         self.agent_obs = args.agent_obs
         self.agent_obs_dim = np.asarray(self.agent_obs, dtype=int_type)
-        self.fully_observable = args.fully_observable
+        self.fully_observable = args.fully_observable if hasattr(args, "fully_observable") else False
         self.obs_size = self.state_size if self.fully_observable else 2*(2*args.agent_obs[0]+1)*(2*args.agent_obs[1]+1)
 
         # Define the episode and rewards
