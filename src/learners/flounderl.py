@@ -13,7 +13,7 @@ from debug.debug import IS_PYCHARM_DEBUG
 from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
-    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap, _check_nan
+    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap, _check_nan, _n_step_return
 from components.losses import EntropyRegularisationLoss
 from components.transforms import _to_batch, \
     _from_batch, _naninfmean
@@ -43,7 +43,7 @@ class FLOUNDERLPolicyLoss(nn.Module):
         log_policies = th.log(policies)
         #log_policies[policies < 10**(-40)] = 0.0
 
-        _adv = advantages.unsqueeze(0).clone().detach()
+        _adv = advantages.clone().detach()
         _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
         _adv[_adv != _adv] = 0.0 # n-step return leads to NaNs
 
@@ -406,10 +406,20 @@ class FLOUNDERLLearner(BasicLearner):
         output_critic, output_critic_tformat = critic.forward(flounderl_model_inputs["critic"],
                                                               actions=actions,
                                                               tformat=flounderl_model_inputs_tformat)
-        TD = rewards.clone().fill_(float("nan"))
-        TD[:, :-1, :] = rewards[:, 1:, :] + gamma * output_critic["vvalue"][:, 1:, :] - output_critic["vvalue"][:, :-1, :]
-        n_step_return = TD # TODO: 1-step return so far only
-        a = batch_history.to_pd()
+
+        advantages = _n_step_return(values=output_critic["vvalue"].unsqueeze(0),
+                                    rewards=rewards,
+                                    terminated=batch_history["terminated"][0],
+                                    truncated=batch_history["truncated"][0],
+                                    seq_lens=batch_history.seq_lens,
+                                    horizon=batch_history._n_t-1,
+                                    n=self.args.n_step_return_n,
+                                    gamma=self.args.gamma) - output_critic["vvalue"]
+
+        #TD = rewards.clone().fill_(float("nan"))
+        #TD[:, :-1, :] = rewards[:, 1:, :] + gamma * output_critic["vvalue"][:, 1:, :] - output_critic["vvalue"][:, :-1, :]
+        #n_step_return = TD # TODO: 1-step return so far only
+        #a = batch_history.to_pd()
         # n_step_return, n_step_return_tformat = batch_history.get_stat("n_step_return",
         #                                                                bs_ids=None,
         #                                                                n=self.args.n_step_return_n,
@@ -418,8 +428,6 @@ class FLOUNDERLLearner(BasicLearner):
         #                                                                to_variable=True,
         #                                                                n_agents=1,
         #                                                                to_cuda=self.args.use_cuda)
-
-        advantages = n_step_return # Q-V
 
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(FLOUNDERLPolicyLoss(),
