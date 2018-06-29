@@ -623,3 +623,57 @@ def _unpack_random_seed(seeds, output_shape, gen_fn):
     #     epsilons = Variable(th.FloatTensor(epsilon_variances.shape[_bsdim(tformat)],
     #                                        self.args.pomace_epsilon_size).zero_(), requires_grad=False)
     #     pass
+
+def _n_step_return(values, rewards, truncated, terminated, n, gamma, horizon, seq_lens):
+    """
+    return n-step returns
+
+    values expected to be in format a*bs*t*v
+    all others as bs*t*v
+    """
+
+    def _align_right(tensor, h, lengths):
+        for _i, _l in enumerate(lengths):
+            if _l < h + 1 and _l > 0:
+                tensor[:, _i, -_l:, :] = tensor[:, _i, :_l,
+                                         :].clone()  # clone is super important as otherwise, cyclical reference!
+                tensor[:, _i, :(h + 1 - _l), :] = float(
+                    "nan")  # not strictly necessary as will shift back anyway later...
+        return tensor
+
+    def _align_left(tensor, h, lengths):
+        for _i, _l in enumerate(lengths):
+            if _l < h + 1 and _l > 0:
+                tensor[:, _i, :_l, :] = tensor[:, _i, -_l:,:].clone()  # clone is super important as otherwise, cyclical reference!
+                tensor[:, _i, -(h + 1 - _l):, :] = float("nan")  # not strictly necessary as will shift back anyway later...
+        return tensor
+
+    ttype = th.FloatTensor if not values.is_cuda else th.cuda.FloatTensor
+    V_tensor = values.clone()
+    R_tensor = rewards.clone().unsqueeze(0).repeat(V_tensor.shape[0], 1, 1, 1)
+    TR_tensor = truncated.clone().unsqueeze(0).repeat(V_tensor.shape[0], 1, 1, 1)
+    TE_tensor = terminated.clone().unsqueeze(0).repeat(V_tensor.shape[0], 1, 1, 1)
+    V_tensor[(TR_tensor + TE_tensor)==1.0] = 0.0 # set values of terminal states to 0
+    R_tensor = _align_right(R_tensor, horizon, seq_lens)
+    V_tensor = _align_right(V_tensor, horizon, seq_lens)
+    N_tensor = V_tensor.clone().fill_(float("nan"))
+    # for _t in range(1, V_tensor.shape[2]):
+    #     realizable_length = min(n, V_tensor.shape[2] - _t)
+    #     R = R_tensor[:,:,_t:_t+realizable_length,:]
+    #     power = ttype(list(range(realizable_length))).unsqueeze(0).unsqueeze(0).unsqueeze(3)
+    #     G = ttype(V_tensor.shape[0], V_tensor.shape[1], realizable_length, 1).fill_(gamma) ** power
+    #     V = (gamma ** (realizable_length-1)) * V_tensor[:,:,_t+realizable_length-1:_t+realizable_length,:]
+    #     tmp = (R * G).sum(dim=2, keepdim=True)
+    #     N_tensor[:,:,_t-1:_t,:] = (R * G).sum(dim=2, keepdim=True) + V
+    #     x = 5
+    for _t in range(V_tensor.shape[2]-1, 0, -1):
+        realizable_length = min(n, V_tensor.shape[2] - _t)
+        R = R_tensor[:,:,_t:_t+realizable_length,:]
+        power = ttype(list(range(realizable_length))).unsqueeze(0).unsqueeze(0).unsqueeze(3)
+        G = ttype(V_tensor.shape[0], V_tensor.shape[1], realizable_length, 1).fill_(gamma) ** power
+        V = (gamma ** (realizable_length)) * V_tensor[:,:,_t+realizable_length-1:_t+realizable_length,:]
+        tmp = (R * G).sum(dim=2, keepdim=True)
+        N_tensor[:,:,_t-1:_t,:] = (R * G).sum(dim=2, keepdim=True) + V
+        # x = 5
+    N_tensor = _align_left(N_tensor, horizon, seq_lens)
+    return N_tensor

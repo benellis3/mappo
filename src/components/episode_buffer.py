@@ -585,8 +585,8 @@ class BatchEpisodeBuffer():
         G_buffer = R_tensor.clone() * float("nan")
         G_buffer[:, :, h - 1, :] = R_tensor[:, :, h, :]
 
-        a = G_buffer[:, :, h - 1:h, :]
-        b = gamma * V_tensor[:, :, h:, :] * truncated_tensor
+        #a = G_buffer[:, :, h - 1:h, :]
+        #b = gamma * V_tensor[:, :, h:, :] * truncated_tensor
         G_buffer[:, :, h - 1:h, :] += gamma * V_tensor[:, :, h:, :] * truncated_tensor
 
         for t in range(h - 1, 0, -1):
