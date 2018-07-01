@@ -183,6 +183,8 @@ class FLOUNDERLMultiagentController():
         """
         sample from the FLOUNDERL tree
         """
+        cd = inputs["agent_input_level2__agent0"].to_pd() # DEBUG
+
         T_env = info["T_env"]
         test_suffix = "" if not test_mode else "_test"
 
@@ -321,13 +323,13 @@ class FLOUNDERLMultiagentController():
             action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0], -1),
                                    actions2.squeeze(-1).view(actions2.shape[0], -1))
 
+            # a = np.nanmax(action_matrix.cpu().numpy())# DEBUG
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
-            active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], -1).unsqueeze(
-                2).clone()
+            active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
             active[active == active] = 1.0
             active[active != active] = 0.0
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0] = \
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[-1]) == 1.0].fill_(0.0)  # DEBUG
+            # avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 1.0] = \
+            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 1.0].fill_(0.0)
             avail_actions_level3[:, :, :, -1:] = active
             inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3,
                                                                             requires_grad=False)
@@ -356,6 +358,8 @@ class FLOUNDERLMultiagentController():
                                                              1)
 
             action_matrix[action_matrix != action_matrix] = individual_actions_sq[action_matrix != action_matrix]
+            # b = action_matrix.cpu().numpy().max() # DEBUG
+
 
             if self.args.debug_mode in ["level3_actions_only"]:
                 """

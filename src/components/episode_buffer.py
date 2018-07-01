@@ -105,7 +105,7 @@ class BatchEpisodeBuffer():
 
         pass
 
-    def get_col(self, col, scope="transition", agent_ids=None, t=None, stack=True, bs=None):
+    def get_col(self, col, scope="transition", agent_ids=None, t=None, stack=True, bs=None, fill_zero=False):
         """
         retrieve a single column from buffer (or a list of columns, labelled by agent_ids)
 
@@ -151,16 +151,52 @@ class BatchEpisodeBuffer():
             if stack:
                 ret = th.stack(ret)
                 tformat  = "a*" + tformat
+                if isinstance(bs, (list, tuple)):
+                    bs_ids = bs
+                elif isinstance(bs, slice):
+                    bs_ids = range(slice.start, slice.stop, slice.step if slice.step is not None else 1)
+                elif bs is None:
+                    bs_ids = list(range(self._n_bs))
+                else:
+                    bs_ids = [bs]
+                for _bs in bs_ids:
+                    first_nan_t = self.seq_lens[_bs]
+                    if isinstance(t, slice):
+                        first_nan_t = math.ceil((self.seq_lens[_bs] - t.start) / (t.step if t.step is not None else 1.0))
+                    if first_nan_t < ret.shape[2]:
+                        ret[:, :, first_nan_t:, :] = 0.0
+
             else:
                 tformat = "[a]*" + tformat
         else:
-            ret = _get_col(_col=col, _t=t, _bs=bs, _scope=scope)
+            ret = _get_col(_col=col,
+                           _t=t,
+                           _bs=bs,
+                           _scope=scope)
             if scope in ["transition"]:
                 tformat = "bs*t*v"
+                if fill_zero:
+                    if isinstance(bs, (list, tuple)):
+                        bs_ids = bs
+                    elif isinstance(bs, slice):
+                        bs_ids = range(slice.start, slice.stop, slice.step if slice.step is not None else 1)
+                    elif bs is None:
+                        bs_ids = list(range(self._n_bs))
+                    else:
+                        bs_ids = [bs]
+                    for _bs in bs_ids:
+                        first_nan_t = self.seq_lens[_bs]
+                        if isinstance(t, slice):
+                            first_nan_t = math.ceil((self.seq_lens[_bs] - t.start) / (t.step if t.step is not None else 1.0))
+                        if first_nan_t < ret.shape[1]:
+                            ret[:, first_nan_t:, :] = 0.0
+
             elif scope in ["episode"]:
                 tformat = "bs*v"
+                # assert not fill_zero, "fill_zero=True makes no sense for episode scope!"
             else:
                 assert False, "unknown scope!"
+
 
         return ret, tformat
 
@@ -197,10 +233,7 @@ class BatchEpisodeBuffer():
                 col_slice = slice(self.columns._transition[_col][0], self.columns._transition[_col][1])
                 if not isinstance(bs, (tuple, list)):
                     assert bs_slice.stop <= self.data._transition.shape[0] and t_slice.stop <= self.data._transition.shape[1], "indices out of range!"
-                    try:
-                        self.data._transition[bs_slice, t_slice, col_slice] = _data
-                    except Exception as e:
-                        pass
+                    self.data._transition[bs_slice, t_slice, col_slice] = _data
 
                     # modify sequence lengths
                     for _bs in range(bs_slice.start, bs_slice.stop):
@@ -335,7 +368,7 @@ class BatchEpisodeBuffer():
 
             # update seq_lens
             for bs_id in bs_ids: # maybe list comprehension but it's fast anyway
-                if bs_empty is not None and bs_id not in bs_empty:
+                if (bs_empty is not None and bs_id not in bs_empty) or bs_empty is None:
                     self.seq_lens[bs_id] = max(self.seq_lens[bs_id], max(t_ids)+1)
 
         elif scope in ["episode"]:
@@ -416,7 +449,8 @@ class BatchEpisodeBuffer():
                 _data, _data_format = self.get_col(col=scheme_item["name"],
                                                    scope=scope,
                                                    t=t_slice,
-                                                   bs=bs_ids)
+                                                   bs=bs_ids,
+                                                   fill_zero=fill_zero)
 
                 data = _apply_transform(scheme_item=scheme_item,
                                         _data=_data,
@@ -430,9 +464,11 @@ class BatchEpisodeBuffer():
 
                 cbh.set_col(scheme_item.get("rename", scheme_item.get("name")), data, scope=scope)
 
-            if fill_zero: # fill NaNs with zeros if requested
-                cbh.data._transition[cbh.data._transition!=cbh.data._transition] = 0.0
-                cbh.data._episode[cbh.data._episode!=cbh.data._episode] = 0.0
+            # if fill_zero: # fill NaNs due to early termination with zeros if requested
+            #    for _bs in range(len(bs_ids)):
+            #        #cbh.data._transition[cbh.data._transition!=cbh.data._transition] = 0.0
+            #        cbh.data._transition[_bs,cbh.seq_lens,:]
+            #    # cbh.data._episode[cbh.data._episode!=cbh.data._episode] = 0.0
 
             ret = cbh
             return ret

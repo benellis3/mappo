@@ -259,10 +259,95 @@ def test2():
 
     pass
 
+def test2b():
+    """
+    Test episode-wide data propagation
+    """
+    """
+    Test the following functions:
+    - view
+    """
+    env_state_size = 10
+    env_episode_limit = 7
+    buffer_size = 5
+    batch_size = 3
+    use_cuda = False
+    n_agents = 3
+
+    transition_scheme = Scheme([ dict(name="state",
+                                   shape=(env_state_size,),
+                                   dtype=np.float32,
+                                   missing=np.nan,
+                                   size=env_state_size),
+                                 dict(name="actions",
+                                      shape=(1,),
+                                      select_agent_ids=range(0, n_agents),
+                                      dtype=np.int32,
+                                      missing=-1, ),
+                                 dict(name="agent_id",
+                                      shape=(1,),
+                                      select_agent_ids=range(0, n_agents),
+                                      dtype=np.int32,
+                                      missing=-1, ),
+                                 dict(name="yeti",
+                                      shape=(1,),
+                                      scope="episode",
+                                      dtype=np.int32,
+                                      missing=-1, )
+                              ]).agent_flatten()
+
+
+    h = BatchEpisodeBuffer(data_scheme=transition_scheme,
+                           n_bs=batch_size,
+                           n_t=env_episode_limit + 1,
+                           n_agents=n_agents,
+                           is_cuda=use_cuda,
+                           is_shared_mem=False)
+    h.set_col(col="actions__agent0",
+              data=(th.arange(env_episode_limit + 1) + 1).unsqueeze(0).unsqueeze(2).repeat(batch_size, 1, 1),
+              bs=[1,2,0])
+    a = h.to_pd()
+    bs_ids = [0,2]
+    t_id = 1
+    agent_id = 0
+    n_actions = 5
+    view_scheme = Scheme([dict(name="actions",
+                               rename="past_action",
+                               select_agent_ids=[agent_id],
+                               transforms=[("shift", dict(steps=1, fill=0))],
+                                          # ("one_hot", dict(range=(0, n_actions-1)))],
+                               switch=True),
+                          dict(name="agent_id",
+                               #transforms=[("one_hot", dict(range=(0, n_agents - 1)))],
+                               select_agent_ids=[agent_id],
+                               switch=True),
+                          dict(name="yeti",
+                               scope="episode")
+                          ]).agent_flatten()
+
+    #dat = th.arange(env_episode_limit).unsqueeze(0).unsqueeze(2).repeat(batch_size, 1, 1)
+    h.set_col(col="actions__agent0", data=(th.arange(env_episode_limit+1)+1).unsqueeze(0).unsqueeze(2).repeat(batch_size, 1, 1))
+    # test __setitem__
+    h["actions__agent1"] = (th.arange(env_episode_limit+1)*2+2).unsqueeze(0).unsqueeze(2).repeat(batch_size, 1, 1), None
+    h.set_col(col="actions__agent2", data=(th.arange(env_episode_limit+1)*3+3).unsqueeze(0).unsqueeze(2).repeat(batch_size, 1, 1))
+    h_pd = h.to_pd()
+
+
+    ret, _ = h.view(dict_of_schemes=dict(scheme1=view_scheme),
+                    to_cuda=False,
+                    to_variable=True,
+                    bs_ids=bs_ids,
+                    t_id=t_id)
+    ret_pd = ret["scheme1"].to_pd()
+
+    pass
+
+
 def main():
     # test1()
-    test1b()
-    test2()
+    # test1b()
+    # test2()
+    test2b()
     pass
 
 if __name__ == "__main__":

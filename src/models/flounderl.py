@@ -870,7 +870,14 @@ class FLOUNDERLAgent(nn.Module):
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1]
             joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
-            _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
+            try:
+                _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
+            except Exception as e:
+                a = actions_masked[_a:_a+1].max()
+                b = actions_masked[_b:_b+1].max()
+                c = joint_actions.max()
+                d = self.n_actions
+                pass
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
             avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())
             _z[avail_flags==0.0] = 0.0
