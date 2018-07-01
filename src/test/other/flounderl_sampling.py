@@ -152,6 +152,7 @@ def test1():
                                                             test_mode=True)
 
         env_actions = [ a["data"] for a in selected_actions if (a["name"] == "actions")][0]
+        b = env_actions.max()
 
         hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
             len(batch_history))

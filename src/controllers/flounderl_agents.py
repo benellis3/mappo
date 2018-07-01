@@ -314,23 +314,31 @@ class FLOUNDERLMultiagentController():
 
             # Now check whether any of the pair_sampled_actions violate individual agent constraints on avail_actions
             ttype = th.cuda.FloatTensor if self.args.use_cuda else th.FloatTensor
-            action_matrix = ttype(self.n_agents,
-                                  pair_sampled_actions.shape[_bsdim(tformat)] *
-                                  pair_sampled_actions.shape[_tdim(tformat)]).fill_(float("nan"))
+            #action_matrix = ttype(self.n_agents,
+            #                      pair_sampled_actions.shape[_bsdim(tformat)] *
+            #                      pair_sampled_actions.shape[_tdim(tformat)]).fill_(float("nan"))
 
-            action_matrix.scatter_(0, pair_id1.squeeze(-1).view(pair_id1.shape[0], -1),
-                                   actions1.squeeze(-1).view(actions1.shape[0], -1))
-            action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0], -1),
-                                   actions2.squeeze(-1).view(actions2.shape[0], -1))
+            #action_matrix.scatter_(0, pair_id1.squeeze(-1).view(pair_id1.shape[0], -1),
+            #                       actions1.squeeze(-1).view(actions1.shape[0], -1))
+            #action_matrix.scatter_(0, pair_id2.squeeze(-1).view(pair_id2.shape[0], -1),
+            #                       actions2.squeeze(-1).view(actions2.shape[0], -1))
 
+            action_tensor = ttype(self.n_agents,
+                                  pair_sampled_actions.shape[_bsdim(tformat)],
+                                  pair_sampled_actions.shape[_tdim(tformat)],
+                                  1).fill_(float("nan"))
+            action_tensor.scatter_(0, pair_id1, actions1)
+            action_tensor.scatter_(0, pair_id2, actions2)
+
+            # l1 = action_tensor.clone().squeeze() # DEBUG
             # a = np.nanmax(action_matrix.cpu().numpy())# DEBUG
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
-            active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
-            active[active == active] = 1.0
-            active[active != active] = 0.0
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 1.0] = \
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 1.0].fill_(0.0)
-            avail_actions_level3[:, :, :, -1:] = active
+            active = action_tensor.clone() # action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
+            active[active == active] = 0.0
+            active[active != active] = 1.0
+            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0] = \
+            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0].fill_(0.0)
+            avail_actions_level3[:, :, :, -1:] = 1.0 - active
             inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3,
                                                                             requires_grad=False)
 
@@ -351,27 +359,30 @@ class FLOUNDERLMultiagentController():
                                                                                 test_mode=test_mode)
 
             # fill into action matrix all the actions that are not NaN
-            individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
-            self.actions_level3 = individual_actions_sq.view(individual_actions.shape[_adim(tformat_level3)],
-                                                             individual_actions.shape[_bsdim(tformat_level3)],
-                                                             individual_actions.shape[_tdim(tformat_level3)],
-                                                             1)
+            #individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
+            #self.actions_level3 = individual_actions_sq.view(individual_actions.shape[_adim(tformat_level3)],
+            #                                                 individual_actions.shape[_bsdim(tformat_level3)],
+            #                                                 individual_actions.shape[_tdim(tformat_level3)],
+            #                                                 1)
+            self.actions_level3 = individual_actions
 
-            action_matrix[action_matrix != action_matrix] = individual_actions_sq[action_matrix != action_matrix]
+            #action_matrix[action_matrix != action_matrix] = individual_actions_sq[action_matrix != action_matrix]
+            action_tensor[action_tensor != action_tensor] = individual_actions[action_tensor != action_tensor]
             # b = action_matrix.cpu().numpy().max() # DEBUG
 
-
+            # l2 = action_tensor.squeeze()  # DEBUG
             if self.args.debug_mode in ["level3_actions_only"]:
                 """
                 DEBUG MODE: LEVEL3 ACTIONS ONLY
                 Here we just pick actions from level3 - should therefore just correspond to vanilla COMA!
                 """
-                action_matrix  = individual_actions_sq
+                action_tensor  = individual_actions
 
-            self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)], # self.n_agents, #
-                                                    individual_actions.shape[_bsdim(tformat_level3)],
-                                                    individual_actions.shape[_tdim(tformat_level3)],
-                                                    1)
+            #self.final_actions = action_matrix.view(individual_actions.shape[_adim(tformat_level3)], # self.n_agents, #
+            #                                        individual_actions.shape[_bsdim(tformat_level3)],
+            #                                        individual_actions.shape[_tdim(tformat_level3)],
+            #                                        1)
+            self.final_actions = action_tensor.clone()
 
             #self.actions_level3 = individual_actions.clone()
             self.selected_actions_format_level3 = selected_actions_format_level3
