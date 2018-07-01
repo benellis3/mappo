@@ -328,7 +328,7 @@ class FLOUNDERLMultiagentController():
             active = action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
             active[active == active] = 1.0
             active[active != active] = 0.0
-            # avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 1.0] = \
+            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 1.0] = \
             avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 1.0].fill_(0.0)
             avail_actions_level3[:, :, :, -1:] = active
             inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3,

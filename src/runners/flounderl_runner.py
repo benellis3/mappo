@@ -339,7 +339,6 @@ class FLOUNDERLRunner(NStepRunner):
                                                                        t_id=self.t_episode,
                                                                        fill_zero=True, # TODO: DEBUG!!!
                                                                        )
-            p = action_selection_inputs["agent_input_level3__agent0"].to_pd()
 
             # retrieve avail_actions from episode_buffer
             avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,
@@ -489,7 +488,7 @@ class FLOUNDERLRunner(NStepRunner):
             # perform environment steps and insert into transition buffer
             observations = _env.get_obs()
             state = _env.get_state()
-            avail_actions = [_aa + [float("nan")] for _aa in _env.get_avail_actions()] #_env.get_avail_actions()  # add place for noop action
+            avail_actions = [_aa + [0] for _aa in _env.get_avail_actions()] #_env.get_avail_actions()  # add place for noop action
             ret_dict = dict(state=state)  # TODO: Check that env_info actually exists
             for _i, _obs in enumerate(observations):
                 ret_dict["observations__agent{}".format(_i)] = observations[_i]
@@ -531,7 +530,7 @@ class FLOUNDERLRunner(NStepRunner):
             # perform environment steps and add to transition buffer
             observations = _env.get_obs()
             state = _env.get_state()
-            avail_actions = [_aa + [float("nan")] for _aa in _env.get_avail_actions()] # _env.get_avail_actions()  # add place for noop action
+            avail_actions = [_aa + [0] for _aa in _env.get_avail_actions()] # _env.get_avail_actions()  # add place for noop action
             terminated = terminated
             truncated = terminated and env_info.get("episode_limit", False)
             ret_dict = dict(state=state,
