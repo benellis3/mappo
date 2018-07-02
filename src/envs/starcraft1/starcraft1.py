@@ -22,8 +22,8 @@ StarCraft I: Brood War
 
 # map parameter registry
 map_param_registry = {"m5v5_c_far": {"n_agents": 5, "n_enemies": 5},
-                      "dragoons_zealots": {"n_agents": 5, "n_enemies": 5}}
-
+                      "dragoons_zealots": {"n_agents": 5, "n_enemies": 5},
+                      "openbw": {"n_agents": 5, "n_enemies": 5}}
 
 class SC1(MultiAgentEnv):
 
@@ -79,6 +79,18 @@ class SC1(MultiAgentEnv):
             self.env_file_type = 'dylib'
 
         if self.map_name == 'm5v5_c_far':
+
+            self._agent_race = "Terran"
+            self._bot_race = "Terran"
+
+            self.unit_health_max_m = 40
+
+            self.max_reward = 5 * self.unit_health_max_m\
+                              + 5 * self.unit_health_max_m \
+                              + self.n_enemies * self.reward_death_value \
+                              + self.reward_win
+
+        elif self.map_name == 'openbw':
 
             self._agent_race = "Terran"
             self._bot_race = "Terran"
@@ -221,7 +233,7 @@ class SC1(MultiAgentEnv):
             self.kill_all_units()
 
             # self.restore_units()
-            self._obs = self.controller.init(micro_battles=True)
+            self._obs = self.controller.init(micro_battles=False)
         except:
             # self.full_restart()  # TODO: implement
             pass
