@@ -126,12 +126,11 @@ def test1():
     avail_actions, avail_actions_format = runner_obj.episode_buffer.get_col(col="avail_actions",
                                                                             agent_ids=list(range(runner_obj.n_agents)))
 
-    data_inputs, data_inputs_tformat = batch_history.view(
-        dict_of_schemes=runner_obj.multiagent_controller.joint_scheme_dict,
-        to_cuda=args.use_cuda,
-        to_variable=True,
-        bs_ids=None,
-        fill_zero=True)
+    data_inputs, data_inputs_tformat = batch_history.view(  dict_of_schemes=runner_obj.multiagent_controller.joint_scheme_dict,
+                                                            to_cuda=args.use_cuda,
+                                                            to_variable=True,
+                                                            bs_ids=None,
+                                                            fill_zero=True)
 
     bh = batch_history.to_pd()
 
