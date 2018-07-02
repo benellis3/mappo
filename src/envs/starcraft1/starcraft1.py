@@ -79,19 +79,7 @@ class SC1(MultiAgentEnv):
             self.env_file_type = 'dylib'
 
         if self.map_name == 'm5v5_c_far':
-
-            self._agent_race = "Terran"
-            self._bot_race = "Terran"
-
-            self.unit_health_max_m = 40
-
-            self.max_reward = 5 * self.unit_health_max_m\
-                              + 5 * self.unit_health_max_m \
-                              + self.n_enemies * self.reward_death_value \
-                              + self.reward_win
-
-        elif self.map_name == 'openbw':
-
+            self.micro_battles = True
             self._agent_race = "Terran"
             self._bot_race = "Terran"
 
@@ -103,6 +91,7 @@ class SC1(MultiAgentEnv):
                               + self.reward_win
 
         elif self.map_name == 'dragoons_zealots':
+            self.micro_battles = True
 
             self._agent_race = "Protoss"
             self._bot_race = "Protoss"
@@ -115,6 +104,19 @@ class SC1(MultiAgentEnv):
 
             self.max_reward = 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
                               + 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
+                              + self.n_enemies * self.reward_death_value \
+                              + self.reward_win
+
+        elif self.map_name == 'openbw':
+            self.micro_battles = False
+
+            self._agent_race = "Terran"
+            self._bot_race = "Terran"
+
+            self.unit_health_max_m = 40
+
+            self.max_reward = 5 * self.unit_health_max_m\
+                              + 5 * self.unit_health_max_m \
                               + self.n_enemies * self.reward_death_value \
                               + self.reward_win
 
@@ -174,7 +176,7 @@ class SC1(MultiAgentEnv):
     def _launch_client(self):
         self.controller = tc.Client()
         self.controller.connect(self.hostname, self.port)
-        self._obs = self.controller.init(micro_battles=False)
+        self._obs = self.controller.init(micro_battles=self.micro_battles)
 
         self.controller.send([
             [tcc.set_combine_frames, self._step_mul],
@@ -233,7 +235,7 @@ class SC1(MultiAgentEnv):
             self.kill_all_units()
 
             # self.restore_units()
-            self._obs = self.controller.init(micro_battles=False)
+            self._obs = self.controller.init(micro_battles=self.micro_battles)
         except:
             # self.full_restart()  # TODO: implement
             pass
