@@ -845,6 +845,7 @@ class FLOUNDERLAgent(nn.Module):
 
         _actions = actions.clone()
         _actions[actions != actions] = 0.0
+        pi = out_level3
         pi_actions_selected = out_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
         # pi_actions_selected[pi_actions_selected  != pi_actions_selected ] = 0.0 #float("nan")
         pi_actions_selected[actions != actions] = float("nan")
@@ -854,8 +855,11 @@ class FLOUNDERLAgent(nn.Module):
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
         pi_c_prod_list = []
+        pi_corr_list = []
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
             # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
+            pi_a = pi[_a:_a+1]
+            pi_b = pi[_b:_b+1]
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
             actions_masked = actions.clone()
@@ -885,12 +889,26 @@ class FLOUNDERLAgent(nn.Module):
             # Set probabilities corresponding to individually disallowed actions to 0.0
             _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)
+            # Calculate corrective delegation (when unavailable actions are selected)
+            aa_a, _, _ = _to_batch(avail_actions_level3[_a:_a+1], tformat_level3)
+            aa_b, _, _ = _to_batch(avail_actions_level3[_b:_b+1], tformat_level3)
+            paa, params_paa, tformat_paa = _to_batch(pairwise_avail_actions[_i:_i+1], tformat_level3)
+            _pi_a, _, _ = _to_batch(pi_a, tformat_level3)
+            _pi_b, _, _ = _to_batch(pi_b, tformat_level3)
+            # x = th.bmm(th.unsqueeze(aa_a, 2),  th.unsqueeze(aa_b, 1))
+            diff_matrix =  th.relu(paa[:, 1:-1].view(-1, self.n_actions, self.n_actions) -
+                                   th.bmm(th.unsqueeze(aa_a[:, :-1], 2),  th.unsqueeze(aa_b[:, :-1], 1)))
+            pi_a_int = th.pow(_pi_a[:, :-1], aa_a[:, :-1]*(-1.0) + 1)
+            pi_b_int = th.pow(_pi_b[:, :-1], aa_b[:, :-1]*(-1.0) + 1)
+            correction = th.bmm( th.bmm( th.unsqueeze(pi_a_int, 1), diff_matrix), th.unsqueeze(pi_b_int, 2) ).squeeze(2)
+            pi_corr_list.append(_from_batch(correction, params_paa, tformat_paa))
 
         pi_a_cross_pi_b = th.cat(pi_a_cross_pi_b_list, dim=0)
         pi_ab_selected = th.cat(pi_ab_list, dim=0)
         pi_c_prod = th.cat(pi_c_prod_list, dim=0)
-        p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected
+        pi_corr = th.cat(pi_corr_list, dim=0)
 
+        p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected + pi_corr
         # next, calculate p_a_b * prod(p, -a-b)
         p_prod = p_a_b * pi_c_prod
 
