@@ -174,7 +174,7 @@ class SC1(MultiAgentEnv):
     def _launch_client(self):
         self.controller = tc.Client()
         self.controller.connect(self.hostname, self.port)
-        self._obs = self.controller.init(micro_battles=True)
+        self._obs = self.controller.init(micro_battles=False)
 
         self.controller.send([
             [tcc.set_combine_frames, self._step_mul],
