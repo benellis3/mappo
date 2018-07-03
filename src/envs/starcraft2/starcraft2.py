@@ -49,7 +49,7 @@ difficulties = {
     "A": sc_pb.CheatInsane,
 }
 
-stalker_zaelot_maps = ['2d_3z', '3d_5z', '5d_7z' ]
+stalker_zaelot_maps = ['2s_3z', '3s_5z', '5s_7z' ]
 ssz_maps = [ '2s_2s_3z' ]
 csz_maps = [ '1c_3s_5z', '2c_3s_5z' ]
 
@@ -66,8 +66,8 @@ StarCraft II
 map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60},
                       "5m_5m": {"n_agents": 5, "n_enemies": 5, "limit": 60},
                       "8m_8m": {"n_agents": 8, "n_enemies": 8, "limit": 120},
-                      "2d_3z": {"n_agents": 5, "n_enemies": 5, "limit": 120},
-                      "3d_5z": {"n_agents": 8, "n_enemies": 8, "limit": 150},
+                      "2s_3z": {"n_agents": 5, "n_enemies": 5, "limit": 120},
+                      "3s_5z": {"n_agents": 8, "n_enemies": 8, "limit": 150},
                       "1c_3s_5z": {"n_agents": 9, "n_enemies": 9, "limit": 200},
                       "2c_3s_5z": {"n_agents": 10, "n_enemies": 10, "limit": 200},
                       "MMM": {"n_agents": 10, "n_enemies": 10, "limit": 150},
@@ -854,7 +854,7 @@ class SC2(MultiAgentEnv):
         nf_al = 4
         nf_en = 5
 
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
+        if self.map_name == '2s_3z' or self.map_name == '3s_5z':
             # unit types (in onehot)
             nf_al += 2
             nf_en += 2
@@ -901,7 +901,7 @@ class SC2(MultiAgentEnv):
                 enemy_feats[e_id, 4] = a_a2[0,self.n_actions_no_attack + e_id]  # available
 
 
-                if self.map_name == '2d_3z' or self.map_name == '3d_5z':
+                if self.map_name == '2s_3z' or self.map_name == '3s_5z':
                     type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
                     enemy_feats[e_id, 4 + type_id] = 1
             else:
@@ -925,7 +925,7 @@ class SC2(MultiAgentEnv):
                 ally_feats[i, 2] = (al_x - x) / sight_range  # relative X
                 ally_feats[i, 3] = (al_y - y) / sight_range  # relative Y
 
-                if self.map_name == '2d_3z' or self.map_name == '3d_5z':
+                if self.map_name == '2s_3z' or self.map_name == '3s_5z':
                     type_id = al_unit.unit_type - self.stalker_id  # id(Stalker) = self.stalker_id, id(Zealot) = self.zealot_id
                     ally_feats[i, 4 + type_id] = 1
 
@@ -953,7 +953,7 @@ class SC2(MultiAgentEnv):
         nf_al = 4
         nf_en = 5
 
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
+        if self.map_name == '2s_3z' or self.map_name == '3s_5z':
             nf_al += 2
             nf_en += 2
 
