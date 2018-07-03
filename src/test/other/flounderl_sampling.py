@@ -31,7 +31,7 @@ def test1():
                                n_agents=3,
                                n_prey=1,
                                agent_obs=(1,1),
-                               episode_limit=3, # 40
+                               episode_limit=2, # 40
                                intersection_global_view=True),
                  tensorboard=True,
                  name="33pp_comatest_dqn_new",
@@ -49,8 +49,8 @@ def test1():
                  epsilon_time_length=100000,
                  epsilon_decay="exp",
                  test_nepisode=50,
-                 batch_size=2, #32,
-                 batch_size_run=2, #32,
+                 batch_size=1, #32,
+                 batch_size_run=1, #32,
                  n_critic_learner_reps=200,
                  runner="flounderl",
                  n_loops_per_thread_or_sub_or_main_process=0,
@@ -136,7 +136,7 @@ def test1():
 
     stats = {}
     probs = {}
-    n_samples = 10
+    n_samples = 1000
     for _i in range(n_samples):
 
         hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
@@ -153,8 +153,7 @@ def test1():
         env_actions = [ a["data"] for a in selected_actions if (a["name"] == "actions")][0]
         b = env_actions.max()
 
-        hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
-            len(batch_history))
+        hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(len(batch_history))
 
         agent_controller_output, \
         agent_controller_output_tformat = runner_obj.multiagent_controller.get_outputs(data_inputs,

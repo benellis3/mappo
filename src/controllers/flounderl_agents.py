@@ -330,15 +330,27 @@ class FLOUNDERLMultiagentController():
             action_tensor.scatter_(0, pair_id1, actions1)
             action_tensor.scatter_(0, pair_id2, actions2)
 
-            # l1 = action_tensor.clone().squeeze() # DEBUG
-            # a = np.nanmax(action_matrix.cpu().numpy())# DEBUG
+            dbg = action_tensor.clone() # DEBUG
+            dbg[dbg!=dbg] = -float("inf") # DEBUG
+            mmm = dbg.max().cpu().numpy() # DEBUG
+            assert mmm < 5, "no-op in env action at mmm!" # DEBUG
+
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
+            self.avail_actions = avail_actions_level3.clone()
+
             active = action_tensor.clone() # action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
             active[active == active] = 0.0
             active[active != active] = 1.0
             avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0] = \
             avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0].fill_(0.0)
             avail_actions_level3[:, :, :, -1:] = 1.0 - active
+
+
+            av = avail_actions_level3.clone().view(-1, avail_actions_level3.shape[3]).cpu().numpy() # DEBUG
+            at_old = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
+            at_old_shp = action_tensor.clone().cpu().view(action_tensor.shape[0], -1, action_tensor.shape[3])
+            act = active.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
+
             inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3,
                                                                             requires_grad=False)
 
@@ -365,10 +377,17 @@ class FLOUNDERLMultiagentController():
             #                                                 individual_actions.shape[_tdim(tformat_level3)],
             #                                                 1)
             self.actions_level3 = individual_actions
-
-            #action_matrix[action_matrix != action_matrix] = individual_actions_sq[action_matrix != action_matrix]
             action_tensor[action_tensor != action_tensor] = individual_actions[action_tensor != action_tensor]
-            # b = action_matrix.cpu().numpy().max() # DEBUG
+
+            dbg = action_tensor.clone() # DEBUG
+            dbg[dbg!=dbg] = -float("inf") # DEBUG
+            mmm2 = dbg.max().cpu().numpy() # DEBUG
+            try:
+                assert mmm2 < 5, "no-op in env action at mmm2!" # DEBUG
+            except:
+                at_new = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy()
+                indv = individual_actions.clone().cpu().view(-1, individual_actions.shape[3]).numpy()
+                pass
 
             # l2 = action_tensor.squeeze()  # DEBUG
             if self.args.debug_mode in ["level3_actions_only"]:
@@ -387,7 +406,7 @@ class FLOUNDERLMultiagentController():
             #self.actions_level3 = individual_actions.clone()
             self.selected_actions_format_level3 = selected_actions_format_level3
             self.policies_level3 = modified_inputs_level3.clone()
-            self.avail_actions = avail_actions_level3.data
+            self.avail_actions_active = avail_actions_level3.data
 
             selected_actions_list = []
             for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples): #_n_agent_pair_samples(self.n_agents)):
@@ -415,12 +434,16 @@ class FLOUNDERLMultiagentController():
             modified_inputs_list += [dict(name="policies_level3",
                                           select_agent_ids=list(range(self.n_agents)),
                                           data=self.policies_level3)]
+            modified_inputs_list += [dict(name="avail_actions_active",
+                                          select_agent_ids=list(range(self.n_agents)),
+                                          data=self.avail_actions_active)]
             modified_inputs_list += [dict(name="avail_actions",
                                           select_agent_ids=list(range(self.n_agents)),
                                           data=self.avail_actions)]
-            modified_inputs_list += [dict(name="avail_actions",
-                                          select_agent_ids=list(range(self.n_agents)),
-                                          data=self.avail_actions)]
+
+            #modified_inputs_list += [dict(name="avail_actions",
+            #                              select_agent_ids=list(range(self.n_agents)),
+            #                              data=self.avail_actions)]
 
             hidden_states = dict(level1=hidden_states_level1,
                                  level2=hidden_states_level2,

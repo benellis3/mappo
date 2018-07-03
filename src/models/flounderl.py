@@ -873,7 +873,10 @@ class FLOUNDERLAgent(nn.Module):
             pi_a_cross_pi_b_list.append(u)
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1]
-            joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
+            try:
+                joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
+            except Exception as e:
+                pass
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
             avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())
@@ -961,6 +964,7 @@ class FLOUNDERLAgent(nn.Module):
                         }
 
         loss = loss_fn(policies=p_a_b_c, tformat=tformat_level3)
+
         # loss = p_a_b_c.sum(), "a*bs*t*v"
         #loss[0].sum().backward(retain_graph=True)
         # loss[0].backward(retain_graph=True)

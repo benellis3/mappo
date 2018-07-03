@@ -50,11 +50,16 @@ class FLOUNDERLRunner(NStepRunner):
                             select_agent_ids=range(0, self.n_agents),
                             dtype=np.int32,
                             missing=-1, ),
-                       dict(name="avail_actions",
+                       dict(name="avail_actions_active",
                             shape=(self.n_actions + 1,), # include no-op
                             select_agent_ids=range(0, self.n_agents),
                             dtype=np.int32,
                             missing=-1,),
+                       dict(name="avail_actions",
+                            shape=(self.n_actions + 1,),  # include no-op
+                            select_agent_ids=range(0, self.n_agents),
+                            dtype=np.int32,
+                            missing=-1, ),
                        dict(name="reward",
                             shape=(1,),
                             dtype=np.float32,
