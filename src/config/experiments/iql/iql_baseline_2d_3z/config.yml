@@ -6,8 +6,7 @@ batch_size_run: 8
 buffer_size: 5000
 defaults: default iql sc2
 env_args:
-  episode_limit: 120
-  map_name: 2d_3z
+  map_name: 2s_3z
 env_stats_aggregator: sc2
 iql_epsilon_start: 1.0
 iql_epsilon_finish: 0.05
