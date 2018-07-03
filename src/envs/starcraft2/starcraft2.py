@@ -49,19 +49,29 @@ difficulties = {
     "A": sc_pb.CheatInsane,
 }
 
+stalker_zaelot_maps = ['2d_3z', '3d_5z', '5d_7z' ]
+ssz_maps = [ '2s_2s_3z' ]
+csz_maps = [ '1c_3s_5z', '2c_3s_5z' ]
+
 action_move_id = 16     #    target: PointOrUnit
-action_atack_id = 23    #    target: PointOrUnit
+action_attack_id = 23    #    target: PointOrUnit
 action_stop_id = 4      #    target: None
+action_heal_id = 386      #    target: Unit
 
 '''
 StarCraft II
 '''
 
 # map parameter registry
-map_param_registry = {"3m_3m": {"n_agents":3, "n_enemies": 3},
-                      "5m_5m": {"n_agents": 5, "n_enemies": 5},
-                      "8m_8m": {"n_agents": 8, "n_enemies": 8},
-                      "2d_3z": {"n_agents": 5, "n_enemies": 5}}
+map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60},
+                      "5m_5m": {"n_agents": 5, "n_enemies": 5, "limit": 60},
+                      "8m_8m": {"n_agents": 8, "n_enemies": 8, "limit": 120},
+                      "2d_3z": {"n_agents": 5, "n_enemies": 5, "limit": 120},
+                      "3d_5z": {"n_agents": 8, "n_enemies": 8, "limit": 150},
+                      "1c_3s_5z": {"n_agents": 9, "n_enemies": 9, "limit": 200},
+                      "2c_3s_5z": {"n_agents": 10, "n_enemies": 10, "limit": 200},
+                      "MMM": {"n_agents": 10, "n_enemies": 10, "limit": 150},
+                     }
 
 class SC2(MultiAgentEnv):
 
@@ -76,7 +86,7 @@ class SC2(MultiAgentEnv):
             "map {} not in map registry! please add.".format(self.map_name)
         self.n_agents = map_param_registry[self.map_name]["n_agents"]
         self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        self.episode_limit = args.episode_limit
+        self.episode_limit = map_param_registry[self.map_name]["limit"]
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         self.difficulty = args.difficulty
@@ -90,48 +100,27 @@ class SC2(MultiAgentEnv):
         self.reward_scale_rate = args.reward_scale_rate
         # Other
         self.seed = args.seed
-        self.heuristic_function = args.heuristic_function
+        self.heuristic = args.heuristic
         self.measure_fps = args.measure_fps
+        self.obs_ignore_ally = args.obs_ignore_ally
+        self.obs_instead_state = args.obs_instead_of_state
 
         self.debug_inputs = False
         self.debug_rewards = False
+        self.debug_action_result = False
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
-        if sys.platform == 'linux':
-            self.game_version = "3.16.1"
-            os.environ['SC2PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftII')
-            self.stalker_id = 1885
-            self.zealot_id = 1886
-        # elif sys.platform == 'darwin':
-        #     self.game_version = "3.16.1"
-        #     os.environ['SC2PATH'] = os.path.join(os.getcwd(), '../' '3rdparty', 'StarCraftII')
-        #     self.stalker_id = 1885
-        #     self.zealot_id = 1886
-        else:
-            self.game_version = "4.1.2"  # latest release, uses visualisations
-            self.stalker_id = 1922
-            self.zealot_id = 1923
+        self.continuing_episode = args.continuing_episode
 
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            self._agent_race = "P"  # Protoss
-            self._bot_race = "P"   # Protoss
-
-            self.unit_health_max_z = 160
-            self.unit_health_max_s = 150
-
-            self.max_reward = 2 * self.unit_health_max_s + 3 * self.unit_health_max_z + self.n_enemies * self.reward_death_value + self.reward_win
-        else:
-            self._agent_race = "T" # Terran
-            self._bot_race = "T"   # Terran
-            self.unit_health_max = 45
-
-            self.max_reward = self.n_enemies * (self.unit_health_max + self.reward_death_value) + self.reward_win
+        # Configure map and platform-dependent settings
+        self.configure_settings()
 
         # Launch the game
         self._launch()
 
+        self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
         self._game_info = self.controller.game_info()
         self.map_x = self._game_info.start_raw.map_size.x
         self.map_y = self._game_info.start_raw.map_size.y
@@ -148,7 +137,78 @@ class SC2(MultiAgentEnv):
         self.timeouts = 0
         self.force_restarts = 0
 
-        #self.save_units()
+    def configure_settings(self):
+
+        if self.map_name in stalker_zaelot_maps:
+            self.map_type = 'stalker_zaelot'
+            self.unit_type_bits = 2
+            self.shield_bits = 1
+            self._agent_race = "P"
+            self._bot_race = "P"
+        elif self.map_name in ssz_maps:
+            self.map_type = 'ssz'
+            self.unit_type_bits = 3
+            self.shield_bits = 1
+            self._agent_race = "P"
+            self._bot_race = "P"
+        elif self.map_name in csz_maps:
+            self.map_type = 'csz'
+            self.unit_type_bits = 3
+            self.shield_bits = 1
+            self._agent_race = "P"
+            self._bot_race = "P"
+        elif self.map_name == 'MMM':
+            self.map_type = 'MMM'
+            self.unit_type_bits = 3
+            self.shield_bits = 0
+            self._agent_race = "T"
+            self._bot_race = "T"
+        else:
+            self.map_type = 'marines'
+            self.unit_type_bits = 0
+            self.shield_bits = 0
+            self._agent_race = "T"
+            self._bot_race = "T"
+
+        self.stalker_id = self.sentry_id = self.zealot_id = 0
+        self.marine_id = self.marauder_id= self.medivac_id = 0
+
+        if sys.platform == 'linux':
+            self.game_version = "3.16.1"
+            os.environ['SC2PATH'] = os.path.join(os.getcwd(), 'StarCraftII')
+
+            if self.map_type == 'stalker_zaelot':
+                self.stalker_id = 1885
+                self.zealot_id = 1886
+            elif self.map_type == 'ssz':
+                self.sentry_id = 1885
+                self.stalker_id = 1886
+                self.zealot_id = 1887
+            elif self.map_type == 'csz':
+                self.colossus_id = 1885
+                self.stalker_id = 1886
+                self.zealot_id = 1887
+            elif self.map_type == 'MMM':
+                self.marauder_id = 1885
+                self.marine_id = 1886
+                self.medivac_id = 1887
+        else:
+            self.game_version = "4.1.2" # latest release, uses visualisations
+            if self.map_type == 'stalker_zaelot':
+                self.stalker_id = 1922
+                self.zealot_id = 1923
+            elif self.map_type == 'ssz':
+                self.sentry_id = 1922
+                self.stalker_id = 1923
+                self.zealot_id = 1924
+            elif self.map_type == 'csz':
+                self.colossus_id = 1922
+                self.stalker_id = 1923
+                self.zealot_id = 1924
+            elif self.map_type == 'MMM':
+                self.marauder_id = 1922
+                self.marine_id = 1923
+                self.medivac_id = 1924
 
     def _launch(self):
 
@@ -196,6 +256,9 @@ class SC2(MultiAgentEnv):
 
         self._episode_count += 1
 
+        if self.heuristic:
+            self.heuristic_targets = [0] * self.n_agents
+
         # naive way to measure FPS
         if self.measure_fps:
             if self._episode_count == 10:
@@ -224,8 +287,6 @@ class SC2(MultiAgentEnv):
         except protocol.ConnectionError:
             self.full_restart()
 
-        #print(self.agents[0])
-        #print(self.agents[4])
         #print(self.controller.query(q_pb.RequestQuery(abilities=[q_pb.RequestQueryAvailableAbilities(unit_tag=self.agents[0].tag)])))
         #print(self.controller.data_raw())
 
@@ -262,7 +323,7 @@ class SC2(MultiAgentEnv):
       # Collect individual actions
         sc_actions = []
         for a_id, action in enumerate(actions):
-            if not self.heuristic_function:
+            if not self.heuristic:
                 agent_action = self.get_agent_action(a_id, action)
             else:
                 agent_action = self.get_agent_action_heuristic(a_id, action)
@@ -273,16 +334,18 @@ class SC2(MultiAgentEnv):
 
         try:
             res_actions = self.controller.actions(req_actions)
+            if self.debug_action_result:
+                print(res_actions)
             # Make step in SC2, i.e. apply actions
             self.controller.step(self._step_mul)
             # Observe here so that we know if the episode is over.
             self._obs = self.controller.observe()
         except protocol.ProtocolError:
             self.full_restart()
-            return 0, True, {"episode_limit": True} #{"episode_limit": True}
+            return 0, True, {}
         except protocol.ConnectionError:
             self.full_restart()
-            return 0, True, {"episode_limit": True} #{"episode_limit": True}
+            return 0, True, {}
 
         self._total_steps += 1
         self._episode_steps += 1
@@ -305,8 +368,8 @@ class SC2(MultiAgentEnv):
         elif self.episode_limit > 0 and self._episode_steps >= self.episode_limit:
             # Episode limit reached
             terminated = True
-            # info["episode_limit"] = True
-            info["episode_limit"] = False
+            if self.continuing_episode:
+                info["episode_limit"] = True
             self.battles_game += 1
             self.timeouts += 1
 
@@ -378,34 +441,61 @@ class SC2(MultiAgentEnv):
             if self.debug_inputs:
                 print("Agent %d: West"% a_id)
         else:
-            # attack units that are in range
-            enemy_id = action - self.n_actions_no_attack
-            enemy_unit = self.enemies[enemy_id]
-            enemy_tag = enemy_unit.tag
-            cmd = r_pb.ActionRawUnitCommand(ability_id = action_atack_id,
-                    target_unit_tag = enemy_tag,
+            # attack/heal units that are in range
+            target_id = action - self.n_actions_no_attack
+            if self.map_type == 'MMM' and unit.unit_type == self.medivac_id:
+                target_unit = self.agents[target_id]
+                action_id = action_heal_id
+            else:
+                target_unit = self.enemies[target_id]
+                action_id = action_attack_id
+            target_tag = target_unit.tag
+
+            cmd = r_pb.ActionRawUnitCommand(ability_id = action_id,
+                    target_unit_tag = target_tag,
                     unit_tags = [tag],
                     queue_command = False)
+
             if self.debug_inputs:
-                print("Agent %d attacks enemy # %d" % (a_id, enemy_id))
+                print("Agent %d attacks enemy # %d" % (a_id, target_id))
 
         sc_action = sc_pb.Action(action_raw=r_pb.ActionRaw(unit_command=cmd))
         return sc_action
-
 
     def get_agent_action_heuristic(self, a_id, action):
 
         unit = self.get_unit_by_id(a_id)
         tag = unit.tag
 
-        enemy_tag = 0
-        for unit in self.enemies.values():
-            if unit.health > 0:
-                enemy_tag = unit.tag
+        #if self.map_type == 'MMM':
+        #    if unit.unit_type == self.medivac_id:
+        #        units = [t_unit for t_unit in self.agents.values() if
+        #                 (t_unit.unit_type == self.marine_id and t_unit.health < t_unit.health_max and t_unit.health > 0)]
+        #        if len(units) == 0:
+        #            units = [t_unit for t_unit in self.agents.values() if
+        #                     (t_unit.unit_type == self.marauder_id and t_unit.health > 0)]
+        #        action_id = action_heal_id
+        #    elif unit.unit_type == self.marauder_id:
+        #        units = [t_unit for t_unit in self.enemies.values() if (t_unit.unit_type == 48 or t_unit.unit_type == 51)]
+        #        action_id = action_attack_id
+        #    else:
+        #        units = self.enemies.values()
+        #        action_id = action_attack_id
+        #else:
+        #    units = self.enemies.items()
+        #    action_id = action_attack_id
+        #
+        # for t_id, t_unit in units:
+        #     if t_unit.health > 0:
+        #         target_tag = t_unit.tag
+        #         target_id = t_id
+        #         break
 
-        # attack units that are in range
-        cmd = r_pb.ActionRawUnitCommand(ability_id = action_atack_id,
-                target_unit_tag = enemy_tag,
+        target_tag = self.enemies[self.heuristic_targets[a_id]].tag
+        action_id = action_attack_id
+
+        cmd = r_pb.ActionRawUnitCommand(ability_id = action_id,
+                target_unit_tag = target_tag,
                 unit_tags = [tag],
                 queue_command = False)
 
@@ -472,9 +562,7 @@ class SC2(MultiAgentEnv):
                 print("--------------------------")
 
             reward = delta_enemy + delta_deaths
-            if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-                reward = abs(reward) # shield regeration
-            assert reward >= 0, 'Reward not positive'
+            reward = abs(reward) # shield regeration
         else:
             if self.debug_rewards:
                 print("--------------------------")
@@ -495,51 +583,55 @@ class SC2(MultiAgentEnv):
         return math.hypot(x2 - x1, y2 - y1)
 
     def unit_shoot_range(self, agent_id):
-
         return 6
 
     def unit_sight_range(self, agent_id):
-
         return 9
 
     def unit_max_cooldown(self, agent_id):
-        # These are the biggest I've seen, there is no info about this
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
+
+        if self.map_type == 'marines':
             return 15
 
         unit = self.get_unit_by_id(agent_id)
-        if unit.unit_type == self.stalker_id: # Protoss's Stalker
-            return 35
-        if unit.unit_type == self.zealot_id: # Protoss's Zaelot
-            return 22
+        if unit.unit_type == self.marine_id:
+            return 15
+        if unit.unit_type == self.marauder_id:
+            return 25
+        if unit.unit_type == self.medivac_id:
+            return 200
 
-    def unit_max_shield(self, unit_id, ally):
-        # These are the biggest I've seen, there is no info about this
-        if ally:
-            unit = self.agents[unit_id]
-        else:
-            unit = self.enemies[unit_id]
+        if unit.unit_type == self.stalker_id:
+            return 35
+        if unit.unit_type == self.zealot_id:
+            return 22
+        if unit.unit_type == self.colossus_id:
+            return 24
+        if unit.unit_type == self.sentry_id:
+            return 13
+
+    def unit_max_shield(self, unit):
 
         if unit.unit_type == 74 or unit.unit_type == self.stalker_id: # Protoss's Stalker
             return 80
         if unit.unit_type == 73 or unit.unit_type == self.zealot_id: # Protoss's Zaelot
             return 50
+        if unit.unit_type == 77 or unit.unit_type == self.sentry_id: # Protoss's Sentry
+            return 40
+        if unit.unit_type == 4 or unit.unit_type == self.colossus_id: # Protoss's Colossus
+            return 150
 
-    def get_obs_agent(self, agent_id, return_data=False):
+    def get_obs_agent(self, agent_id):
 
         unit = self.get_unit_by_id(agent_id)
 
-        nf_al = 4
-        nf_en = 4
-
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            # unit types (in onehot)
-            nf_al += 2
-            nf_en += 2
+        nf_al = 4 + self.unit_type_bits
+        nf_en = 4 + self.unit_type_bits
 
         move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
-        ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
+        if not self.obs_ignore_ally:
+            ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
 
         if unit.health > 0: # otherwise dead, return all zeros
             x = unit.pos.x
@@ -563,37 +655,38 @@ class SC2(MultiAgentEnv):
                     enemy_feats[e_id, 2] = (e_x - x) / sight_range # relative X
                     enemy_feats[e_id, 3] = (e_y - y) / sight_range # relative Y
 
-                    if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-                        type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
+                    if self.unit_type_bits > 0:
+                        type_id = self.get_unit_type_id(e_unit, False)
                         enemy_feats[e_id, 4 + type_id] = 1
 
-            # place the features of the agent himself always at the first place
-            al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
-            for i, al_id in enumerate(al_ids):
+            if not self.obs_ignore_ally:
+                # place the features of the agent himself always at the first place
+                al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
+                for i, al_id in enumerate(al_ids):
 
-                al_unit = self.get_unit_by_id(al_id)
-                al_x = al_unit.pos.x
-                al_y = al_unit.pos.y
-                dist = self.distance(x, y, al_x, al_y)
+                    al_unit = self.get_unit_by_id(al_id)
+                    al_x = al_unit.pos.x
+                    al_y = al_unit.pos.y
+                    dist = self.distance(x, y, al_x, al_y)
 
-                if dist < sight_range and al_unit.health > 0: # visible and alive
-                    ally_feats[i, 0] = 1 # visible
-                    ally_feats[i, 1] = dist / sight_range # distance
-                    ally_feats[i, 2] = (al_x - x) / sight_range # relative X
-                    ally_feats[i, 3] = (al_y - y) / sight_range # relative Y
+                    if dist < sight_range and al_unit.health > 0: # visible and alive
+                        ally_feats[i, 0] = 1 # visible
+                        ally_feats[i, 1] = dist / sight_range # distance
+                        ally_feats[i, 2] = (al_x - x) / sight_range # relative X
+                        ally_feats[i, 3] = (al_y - y) / sight_range # relative Y
 
-                    if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-                        type_id = al_unit.unit_type - self.stalker_id # id(Stalker) = self.stalker_id, id(Zealot) = self.zealot_id
-                        ally_feats[i, 4 + type_id] = 1
+                        if self.unit_type_bits > 0:
+                            type_id = self.get_unit_type_id(al_unit, True)
+                            ally_feats[i, 4 + type_id] = 1
 
-        if return_data:
-            return dict(move_feat=move_feats,
-                        enemy_feats=enemy_feats,
-                        ally_feats=ally_feats)
+        if not self.obs_ignore_ally:
+            agent_obs = np.concatenate((move_feats.flatten(),
+                                        enemy_feats.flatten(),
+                                        ally_feats.flatten()))
+        else:
+            agent_obs = np.concatenate((move_feats.flatten(),
+                                        enemy_feats.flatten()))
 
-        agent_obs = np.concatenate((move_feats.flatten(),
-                                    enemy_feats.flatten(),
-                                    ally_feats.flatten()))
 
         agent_obs = agent_obs.astype(dtype=np.float32)
 
@@ -603,7 +696,8 @@ class SC2(MultiAgentEnv):
             print("Available Actions\n", self.get_avail_agent_actions(agent_id))
             print("Move feats\n", move_feats)
             print("Enemy feats\n", enemy_feats)
-            print("Ally feats\n", ally_feats)
+            if not self.obs_ignore_ally:
+                print("Ally feats\n", ally_feats)
             print("***************************************")
 
         return agent_obs
@@ -614,12 +708,12 @@ class SC2(MultiAgentEnv):
 
     def get_state(self):
 
-        nf_al = 4
-        nf_en = 3
+        if self.obs_instead_state:
+            obs_concat = np.concatenate(self.get_obs(), axis=0).astype(np.float32)
+            return obs_concat
 
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            nf_al += 3
-            nf_en += 3
+        nf_al = 4 + self.shield_bits + self.unit_type_bits
+        nf_en = 3 + self.shield_bits + self.unit_type_bits
 
         ally_state = np.zeros((self.n_agents, nf_al))
         enemy_state = np.zeros((self.n_enemies, nf_en))
@@ -634,15 +728,22 @@ class SC2(MultiAgentEnv):
                 max_cd = self.unit_max_cooldown(al_id)
 
                 ally_state[al_id, 0] = al_unit.health / al_unit.health_max # health
-                ally_state[al_id, 1] = al_unit.weapon_cooldown / max_cd # cooldown
+                if self.map_type == 'MMM' and al_unit.unit_type == self.medivac_id:
+                    ally_state[al_id, 1] = al_unit.energy / max_cd # energy
+                else:
+                    ally_state[al_id, 1] = al_unit.weapon_cooldown / max_cd # cooldown
                 ally_state[al_id, 2] = (x - center_x) / self.max_distance_x # relative X
                 ally_state[al_id, 3] = (y - center_y) / self.max_distance_y # relative Y
 
-                if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-                    shield_max = self.unit_max_shield(al_id, True)
-                    ally_state[al_id, 4] = al_unit.shield / shield_max # shield
-                    type_id = al_unit.unit_type - self.stalker_id
-                    ally_state[al_id, 5 + type_id] = 1
+                ind = 4
+                if self.shield_bits > 0:
+                    max_shield = self.unit_max_shield(al_unit)
+                    ally_state[al_id, ind] = al_unit.shield / max_shield # shield
+                    ind += 1
+
+                if self.unit_type_bits > 0:
+                    type_id = self.get_unit_type_id(al_unit, True)
+                    ally_state[al_id, ind + type_id] = 1
 
         for e_id, e_unit in self.enemies.items():
             if e_unit.health > 0:
@@ -653,11 +754,15 @@ class SC2(MultiAgentEnv):
                 enemy_state[e_id, 1] = (x - center_x) / self.max_distance_x # relative X
                 enemy_state[e_id, 2] = (y - center_y) / self.max_distance_y # relative Y
 
-                if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-                    shield_max = self.unit_max_shield(e_id, False)
-                    enemy_state[e_id, 3] = e_unit.shield / shield_max # shield
-                    type_id = e_unit.unit_type - 73 # id(Stalker) = 74, id(Zealot) = 73
-                    enemy_state[e_id, 4 + type_id] = 1
+                ind = 3
+                if self.shield_bits > 0:
+                    max_shield = self.unit_max_shield(e_unit)
+                    enemy_state[e_id, ind] = e_unit.shield / max_shield # shield
+                    ind += 1
+
+                if self.unit_type_bits > 0:
+                    type_id = self.get_unit_type_id(e_unit, False)
+                    enemy_state[e_id, ind + type_id] = 1
 
         state = np.append(ally_state.flatten(), enemy_state.flatten())
         if self.state_last_action:
@@ -673,6 +778,67 @@ class SC2(MultiAgentEnv):
 
         return state
 
+    def get_unit_type_id(self, unit, ally):
+
+        if ally == True: # we use new SC2 unit types
+
+            if self.map_type == 'stalker_zaelot':
+                # id(Stalker) + 1 = id(Zealot)
+                type_id = unit.unit_type - self.stalker_id
+            elif self.map_type == 'ssz':
+                if unit.unit_type == self.sentry_id:
+                    type_id = 0
+                elif unit.unit_type == self.zealot_id:
+                    type_id = 1
+                else:
+                    type_id = 2
+            elif self.map_type == 'csz':
+                if unit.unit_type == self.colossus_id:
+                    type_id = 0
+                elif unit.unit_type == self.zealot_id:
+                    type_id = 1
+                else:
+                    type_id = 2
+            elif self.map_type == 'MMM':
+                if unit.unit_type == self.marauder_id:
+                    type_id = 0
+                elif unit.unit_type == self.marine_id:
+                    type_id = 1
+                else:
+                    type_id = 2
+
+        else: # 'We use default SC2 unit types'
+
+            if self.map_type == 'stalker_zaelot':
+                # id(Stalker) = 74, id(Zealot) = 73
+                type_id = unit.unit_type - 73
+            elif self.map_type == 'ssz':
+                # id(Stalker) = 74, id(Zealot) = 73, id(Sentry) = 77
+                if unit.unit_type == 77:
+                    type_id = 0
+                elif unit.unit_type == 73:
+                    type_id = 1
+                else:
+                    type_id = 2
+            elif self.map_type == 'csz':
+                # id(Stalker) = 74, id(Zealot) = 73, id(Colossus) = 4
+                if unit.unit_type == 4:
+                    type_id = 0
+                elif unit.unit_type == 73:
+                    type_id = 1
+                else:
+                    type_id = 2
+            elif self.map_type == 'MMM':
+                if unit.unit_type == 51:
+                    type_id = 0
+                elif unit.unit_type == 48:
+                    type_id = 1
+                else:
+                    type_id = 2
+
+        return type_id
+
+    # TODO Mika - not sure if we need these anymore and whether they are correct after my changes
     def get_intersect(self, coordinates, e_unit, sight_range ):
         e_x = e_unit.pos.x
         e_y = e_unit.pos.y
@@ -776,14 +942,33 @@ class SC2(MultiAgentEnv):
             print("***************************************")
         return state, avail_actions
 
-    def get_state_size(self):
+    def get_obs_intersect_pair_size(self):
+        return self.get_obs_intersect_size()
+
+    def get_obs_intersect_all_size(self):
+        return self.get_obs_intersect_size()
+
+    def get_obs_intersect_size(self):
 
         nf_al = 4
-        nf_en = 3
+        nf_en = 5
 
         if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            nf_al += 3
-            nf_en += 3
+            nf_al += 2
+            nf_en += 2
+
+        enemy_feats = self.n_enemies *  nf_en
+        ally_feats = (self.n_agents) * nf_al
+
+        return  enemy_feats + ally_feats
+
+    def get_state_size(self):
+
+        if self.obs_instead_state:
+            return self.get_obs_size() * self.n_agents
+
+        nf_al = 4 + self.shield_bits + self.unit_type_bits
+        nf_en = 3 + self.shield_bits + self.unit_type_bits
 
         enemy_state = self.n_enemies * nf_en
         ally_state = self.n_agents * nf_al
@@ -819,11 +1004,16 @@ class SC2(MultiAgentEnv):
 
             shoot_range = self.unit_shoot_range(agent_id)
 
-            for e_id, e_unit in self.enemies.items():
-                if e_unit.health > 0:
-                    dist = self.distance(unit.pos.x, unit.pos.y, e_unit.pos.x, e_unit.pos.y)
+            target_items = self.enemies.items()
+            if self.map_type == 'MMM' and unit.unit_type == self.medivac_id:
+                # Medivacs cannot heal themselves and other flying units
+                target_items = [(t_id, t_unit) for (t_id, t_unit) in self.agents.items() if t_unit.unit_type != self.medivac_id]
+
+            for t_id, t_unit in target_items:
+                if t_unit.health > 0:
+                    dist = self.distance(unit.pos.x, unit.pos.y, t_unit.pos.x, t_unit.pos.y)
                     if dist <= shoot_range:
-                        avail_actions[e_id + self.n_actions_no_attack] = 1
+                        avail_actions[t_id + self.n_actions_no_attack] = 1
 
             return avail_actions
 
@@ -841,38 +1031,18 @@ class SC2(MultiAgentEnv):
 
     def get_obs_size(self):
 
-        nf_al = 4
-        nf_en = 4
+        if not self.obs_ignore_ally:
+            nf_al = 4 + self.unit_type_bits
+        else:
+            nf_al = 0
 
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            nf_al += 2
-            nf_en += 2
+        nf_en = 4 + self.unit_type_bits
 
         move_feats = self.n_actions_no_attack - 2
-        enemy_feats = self.n_enemies *  nf_en
+        enemy_feats = self.n_enemies * nf_en
         ally_feats = (self.n_agents - 1) * nf_al
 
         return move_feats + enemy_feats + ally_feats
-
-    def get_obs_intersect_pair_size(self):
-        return self.get_obs_intersect_size()
-
-    def get_obs_intersect_all_size(self):
-        return self.get_obs_intersect_size()
-
-    def get_obs_intersect_size(self):
-
-        nf_al = 4
-        nf_en = 5
-
-        if self.map_name == '2d_3z' or self.map_name == '3d_5z':
-            nf_al += 2
-            nf_en += 2
-
-        enemy_feats = self.n_enemies *  nf_en
-        ally_feats = (self.n_agents) * nf_al
-
-        return  enemy_feats + ally_feats
 
     def close(self):
         print("Closing StarCraftII")
@@ -949,6 +1119,8 @@ class SC2(MultiAgentEnv):
             for unit in self._obs.observation.raw_data.units:
                 if unit.owner == 2: # agent
                     self.enemies[len(self.enemies)] = unit
+                    if self._episode_count == 1: # TODO check this
+                        self.max_reward += unit.health_max + unit.shield_max
 
             if len(self.agents) == self.n_agents and len(self.enemies) == self.n_enemies:
                 # All good
@@ -968,9 +1140,6 @@ class SC2(MultiAgentEnv):
                 # iffy way, but would not thraw an error for sure
                 self.full_restart()
                 self.reset()
-
-            #assert len(self.agents) == self.n_agents, "Incorrect number of agents: " + str(len(self.agents))
-            #assert len(self.enemies) == self.n_enemies, "Incorrect number of enemies: " + str(len(self.enemies))
 
     def update_units(self):
         # TODO optimise this
@@ -1007,14 +1176,45 @@ class SC2(MultiAgentEnv):
             if not updated: # means dead
                 e_unit.health = 0
 
-        if n_ally_alive == 0 and n_enemy_alive > 0:
+        if self.heuristic:
+            for al_id, al_unit in self.agents.items():
+                current_target = self.heuristic_targets[al_id]
+                if current_target == 0 or self.enemies[current_target].health == 0:
+                    x = al_unit.pos.x
+                    y = al_unit.pos.y
+                    min_dist = 32
+                    min_id = -1
+                    for e_id, e_unit in self.enemies.items():
+                        if e_unit.health > 0:
+                            dist = self.distance(x, y, e_unit.pos.x, e_unit.pos.y)
+                            if dist < min_dist:
+                                min_dist = dist
+                                min_id = e_id
+                    self.heuristic_targets[al_id] = min_id
+
+        if (n_ally_alive == 0 and n_enemy_alive > 0) or self.only_medivac_left(ally=True):
             return -1 # loss
-        if n_ally_alive > 0 and n_enemy_alive == 0:
+        if (n_ally_alive > 0 and n_enemy_alive == 0) or self.only_medivac_left(ally=False):
             return 1 # win
         if n_ally_alive == 0 and n_enemy_alive == 0:
             return 0 # tie, not sure if this is possible
 
         return None
+
+    def only_medivac_left(self, ally):
+        if self.map_type != 'MMM':
+            return False
+
+        if ally:
+            units_alive = [a for a in self.agents.values() if (a.health > 0 and a.unit_type != self.medivac_id)]
+            if len(units_alive) == 0:
+                return True
+            return False
+        else:
+            units_alive = [a for a in self.enemies.values() if (a.health > 0 and a.unit_type != self.medivac_id)]
+            if len(units_alive) == 1 and units_alive[0].unit_type == 54:
+                return True
+            return False
 
     def get_unit_by_id(self, a_id):
         return self.agents[a_id]
@@ -1023,6 +1223,7 @@ class SC2(MultiAgentEnv):
         stats = {}
         stats["battles_won"] = self.battles_won
         stats["battles_game"] = self.battles_game
+        stats["battles_draw"] = self.timeouts
         stats["win_rate"] = self.battles_won / self.battles_game
         stats["timeouts"] = self.timeouts
         stats["restarts"] = self.force_restarts
