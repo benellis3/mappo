@@ -642,7 +642,8 @@ def test2():
                                seed=5,
                                heuristic=True,
                                obs_ignore_ally=False,
-                               obs_instead_state=False),
+                               obs_instead_of_state=False,
+                               continuing_episode=False),
                  tensorboard=True,
                  name="33pp_comatest_dqn_new",
                  target_critic_update_interval=200000*2000, # DEBUG # 200000*20

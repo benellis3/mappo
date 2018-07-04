@@ -103,7 +103,7 @@ class SC2(MultiAgentEnv):
         self.heuristic = args.heuristic
         self.measure_fps = args.measure_fps
         self.obs_ignore_ally = args.obs_ignore_ally
-        self.obs_instead_state = args.obs_instead_of_state
+        self.obs_instead_of_state = args.obs_instead_of_state
 
         self.debug_inputs = False
         self.debug_rewards = False
@@ -175,7 +175,7 @@ class SC2(MultiAgentEnv):
 
         if sys.platform == 'linux':
             self.game_version = "3.16.1"
-            os.environ['SC2PATH'] = os.path.join(os.getcwd(), 'StarCraftII')
+            os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
 
             if self.map_type == 'stalker_zaelot':
                 self.stalker_id = 1885
@@ -964,7 +964,7 @@ class SC2(MultiAgentEnv):
 
     def get_state_size(self):
 
-        if self.obs_instead_state:
+        if self.obs_instead_of_state:
             return self.get_obs_size() * self.n_agents
 
         nf_al = 4 + self.shield_bits + self.unit_type_bits
