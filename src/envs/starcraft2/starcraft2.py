@@ -708,7 +708,7 @@ class SC2(MultiAgentEnv):
 
     def get_state(self):
 
-        if self.obs_instead_state:
+        if self.obs_instead_of_state:
             obs_concat = np.concatenate(self.get_obs(), axis=0).astype(np.float32)
             return obs_concat
 
