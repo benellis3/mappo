@@ -184,7 +184,7 @@ class FLOUNDERLMultiagentController():
         """
         sample from the FLOUNDERL tree
         """
-        cd = inputs["agent_input_level2__agent0"].to_pd() # DEBUG
+        # cd = inputs["agent_input_level2__agent0"].to_pd() # DEBUG
 
         T_env = info["T_env"]
         test_suffix = "" if not test_mode else "_test"
@@ -199,6 +199,7 @@ class FLOUNDERLMultiagentController():
                                                                        inputs_tformat=tformat)
             if self.args.debug_mode:
                 _check_nan(inputs_level1)
+
             out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model.model_level1(inputs_level1["agent_input_level1"],
                                                                                                       hidden_states=hidden_states["level1"],
                                                                                                       loss_fn=None,
@@ -230,6 +231,7 @@ class FLOUNDERLMultiagentController():
             self.actions_level1 = sampled_pair_ids.clone()
             self.selected_actions_format = selected_actions_format_level1
             self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
+
 
             inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
                                                                        inputs,
@@ -383,7 +385,7 @@ class FLOUNDERLMultiagentController():
             action_tensor[action_tensor != action_tensor] = individual_actions[action_tensor != action_tensor]
 
             # set states beyond episode termination to NaN
-            action_tensor = _pad_nan(action_tensor, tformat=tformat_level3, seq_lens=inputs["agent_input_level1"].seq_lens)
+            action_tensor = _pad_nan(action_tensor, tformat=tformat_level3, seq_lens=inputs["agent_input_level1"].seq_lens) # DEBUG
 
             dbg = action_tensor.clone() # DEBUG
             dbg[dbg!=dbg] = -float("inf") # DEBUG

@@ -20,7 +20,6 @@ from torch.autograd import Variable
 
 def test1():
     """
-    Simple 3-agent test without any NaN-entries anywhere
     """
     _args = dict(env="pred_prey",
                  n_agents=4,
@@ -187,12 +186,11 @@ def test1():
         if _i % 10000 == (10000-1):
             data = { k:{ str(_k): "{} ({})".format(_v / float(_i), probs[k][_k]) for _k, _v in v.items()} for k, v in stats.items()}
             pprint.pprint("_i ({}): \n {}".format(_i, data))
-            with open('data{}.txt'.format(_i), 'w') as outfile:
+            with open('data{}_test1.txt'.format(_i), 'w') as outfile:
                 json.dump(data, outfile)
 
-def test1b():
+def test2():
     """
-    Simple 3-agent test without any NaN-entries anywhere
     """
     _args = dict(n_agents=5,
                  t_max=1000000,
@@ -378,11 +376,11 @@ def test1b():
             data = {k: {str(_k): "{} ({})".format(_v / float(_i), probs[k][_k]) for _k, _v in v.items()}
                     for k, v in stats.items()}
             pprint.pprint("_i ({}): \n {}".format(_i, data))
-            with open('data{}.txt'.format(_i), 'w') as outfile:
+            with open('data{}_test2.txt'.format(_i), 'w') as outfile:
                 json.dump(data, outfile)
 
 
-def test3():
+def test1_para():
     _args = dict(env="pred_prey",
                  n_agents=4,
                  t_max=1000000,
@@ -476,6 +474,7 @@ def test3():
     runner_obj = r_REGISTRY[args.runner](args=args,
                                          logging_struct=_logging_struct)
     batch_history = runner_obj.run(test_mode=False)
+    cbh = batch_history.to_pd()
 
     action_selection_inputs, \
     action_selection_inputs_tformat = runner_obj.episode_buffer.view(
@@ -618,11 +617,12 @@ def test3():
     data = {k: {str(_k): "{} ({})".format(_v / float(n_samples), total_probs[k][_k]) for _k, _v in v.items()}
             for k, v in total_stats.items()}
     pprint.pprint(": \n {}".format(data))
-    with open('data{}_multi.txt'.format(n_samples), 'w') as outfile:
+    with open('data{}_test1para_multi.txt'.format(n_samples), 'w') as outfile:
         json.dump(data, outfile)
     pass
 
-def test2():
+def test2_para():
+
     _args = dict(n_agents=5,
                  t_max=1000000,
                  learner="coma",
@@ -650,7 +650,7 @@ def test2():
                                continuing_episode=False),
                  tensorboard=True,
                  name="33pp_comatest_dqn_new",
-                 target_critic_update_interval=200000*2000, # DEBUG # 200000*20
+                 target_critic_update_interval=200000 * 2000,  # DEBUG # 200000*20
                  agent="basic",
                  agent_model="DQN",
                  observe=True,
@@ -664,13 +664,13 @@ def test2():
                  epsilon_time_length=100000,
                  epsilon_decay="exp",
                  test_nepisode=50,
-                 batch_size=1, #32,
-                 batch_size_run=1, #32,
+                 batch_size=1,  # 32,
+                 batch_size_run=1,  # 32,
                  n_critic_learner_reps=200,
                  runner="flounderl",
-                 n_loops_per_thread_or_sub_or_main_process=0,
+                 n_loops_per_thread_or_sub_or_main_process=1,
                  n_threads_per_subprocess_or_main_process=0,
-                 n_subprocesses=0,
+                 n_subprocesses=1,
                  multiagent_controller="flounderl_mac",
                  flounderl_agent_model="flounderl_agent",
                  flounderl_agent_model_level1="flounderl_recurrent_agent_level1",
@@ -700,7 +700,7 @@ def test2():
                  flounderl_exploration_mode_level3="softmax",
                  flounderl_use_entropy_regularizer=False,
                  flounderl_use_obs_intersections=True,
-                 use_cuda=False, #True,
+                 use_cuda=False,  # True,
                  agent_level1_share_params=True,
                  agent_level2_share_params=True,
                  agent_level3_share_params=True,
@@ -728,15 +728,15 @@ def test2():
     runner_obj = r_REGISTRY[args.runner](args=args,
                                          logging_struct=_logging_struct)
     batch_history = runner_obj.run(test_mode=False)
+    cbh = batch_history.to_pd()
 
     action_selection_inputs, \
-    action_selection_inputs_tformat = runner_obj.episode_buffer.view(
-        dict_of_schemes=runner_obj.multiagent_controller.joint_scheme_dict,
-        to_cuda=runner_obj.args.use_cuda,
-        to_variable=True,
-        bs_ids=None,
-        fill_zero=True,  # TODO: DEBUG!!!
-        )
+    action_selection_inputs_tformat = batch_history.view(dict_of_schemes=runner_obj.multiagent_controller.joint_scheme_dict,
+                                                         to_cuda=runner_obj.args.use_cuda,
+                                                         to_variable=True,
+                                                         bs_ids=None,
+                                                         fill_zero=True,  # TODO: DEBUG!!!
+                                                         )
 
     avail_actions, avail_actions_format = runner_obj.episode_buffer.get_col(col="avail_actions",
                                                                             agent_ids=list(range(runner_obj.n_agents)))
@@ -750,7 +750,11 @@ def test2():
     from torch import multiprocessing as mp
     import time
 
-    def mp_worker(rank, n_samples, data_inputs, q):
+     # try this
+
+    _hs, _ = runner_obj.multiagent_controller.generate_initial_hidden_states(len(batch_history))
+
+    def mp_worker(rank, n_samples, data_inputs, q, hs, T_env, n_agents, action_selection_inputs, avail_actions):
         # n_samples, data_inputs, the_time = args
         # = args
 
@@ -759,22 +763,23 @@ def test2():
 
         for _i in range(n_samples):
 
-            hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
-                len(batch_history))
+            hidden_states = {_k:_v.clone() for _k, _v in  hs.items()}
+
+                #, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
+                #len(batch_history))
 
             hidden_states, selected_actions, action_selector_outputs, selected_actions_format = \
                 runner_obj.multiagent_controller.select_actions(inputs=action_selection_inputs,
                                                                 avail_actions=avail_actions,
                                                                 tformat=action_selection_inputs_tformat,
-                                                                info=dict(T_env=runner_obj.T_env),
+                                                                info=dict(T_env=T_env),
                                                                 hidden_states=hidden_states,
                                                                 test_mode=True)
 
             env_actions = [a["data"] for a in selected_actions if (a["name"] == "actions")][0]
             # b = env_actions.max()
 
-            hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
-                len(batch_history))
+            hidden_states = {_k:_v.clone() for _k, _v in  hs.items()}
 
             agent_controller_output, \
             agent_controller_output_tformat = runner_obj.multiagent_controller.get_outputs(data_inputs,
@@ -786,7 +791,7 @@ def test2():
                                                                                            test_mode=False,
                                                                                            actions=env_actions,
                                                                                            batch_history=batch_history)
-            actions_view = env_actions.cpu().view(runner_obj.n_agents, -1)
+            actions_view = env_actions.cpu().view(n_agents, -1)
             policies_view = agent_controller_output["policies"].cpu().view(1, -1)
             for act in range(actions_view.shape[1]):
                 if not act in stats:
@@ -836,9 +841,12 @@ def test2():
     processes = []#
     q = Queue()
     for rank in range(num_processes):
-        p = mp.Process(target=mp_worker, args=(rank, int(n_samples / num_processes), data_inputs, q))
+        p = mp.Process(target=mp_worker, args=(rank, int(n_samples / num_processes), data_inputs, q, _hs, runner_obj.T_env,
+                                               runner_obj.n_agents, action_selection_inputs, avail_actions.clone()))
         p.start()
         processes.append(p)
+
+    del runner_obj
     #for p in processes:
     #    p.join()
 
@@ -870,16 +878,17 @@ def test2():
     data = {k: {str(_k): "{} ({})".format(_v / float(n_samples), total_probs[k][_k]) for _k, _v in v.items()}
             for k, v in total_stats.items()}
     pprint.pprint(": \n {}".format(data))
-    with open('data{}_multi.txt'.format(n_samples), 'w') as outfile:
+    with open('data{}_test2para_multi.txt'.format(n_samples), 'w') as outfile:
         json.dump(data, outfile)
     pass
 
-
 def main():
     # test1()
-    test1b()
+    # test1()
     # test2()
     # test3()
+    # test1_para() # broken mysteriously
+    test2_para() # broken mysteriously
     pass
 
 if __name__ == "__main__":

@@ -324,13 +324,14 @@ def _build_model_inputs(column_dict, inputs, inputs_tformat, to_variable=True, f
 
     ret_dict = {}
     assert inputs_tformat in ["{?}*bs*t*v"], "invalid input format!"
-    output_tformat = "[a]*bs*t*v"
+    # output_tformat = "[a]*bs*t*v"
     for _source_name, _input_regions in column_dict.items():
         if _source_name not in ret_dict:
             ret_dict[_source_name] = {}
         for _input_region, _scheme in _input_regions.items():
             input_region_list = []
             for _scheme_list_entry in _scheme.scheme_list:
+
                 scope = _scheme_list_entry.get("scope", "transition")
                 switch = _scheme_list_entry.get("switch", True)
                 if not switch:
@@ -338,15 +339,18 @@ def _build_model_inputs(column_dict, inputs, inputs_tformat, to_variable=True, f
                 _data, _data_format = inputs[_source_name].get_col(col=_scheme_list_entry["name"],
                                                                    scope=scope)
                 input_region_list.append(_data)
+
             try:
                 input_region_list_cat = th.cat(input_region_list, dim=_vdim(_data_format))
             except RuntimeError as e:
-                assert False, "Triggered Runtime error <{}>. Have you defined a scheme that features " \
-                              "episode and transition data in the same input column and does NOT " \
-                              "expand-transform the episode data along the t dimension?".format(e)
+               assert False, "Triggered Runtime error <{}>. Have you defined a scheme that features " \
+                             "episode and transition data in the same input column and does NOT " \
+                             "expand-transform the episode data along the t dimension?".format(e)
+
             if to_variable and not isinstance(input_region_list_cat, Variable):
                 requires_grad = _scheme_list_entry.get("requires_grad", True)
                 input_region_list_cat = Variable(input_region_list_cat, requires_grad=requires_grad)
+
             ret_dict[_source_name][_input_region] = input_region_list_cat
 
     if stack:
@@ -433,12 +437,12 @@ def _one_hot(ndarray_or_tensor, **kwargs):
         y_onehot = th.cuda.FloatTensor(*tensor.shape[:-1], (rng[1] - rng[0] + 1)).zero_()
     nan_mask = (tensor != tensor)
     tensor[nan_mask] = 0  # mask nans the simple way # DEBUG
-    try:
-        y_onehot.scatter_(len(tensor.shape) - 1, tensor.long(), 1)
-    except Exception as e:
-        a = y_onehot.cpu().numpy()
-        b = tensor.cpu().numpy()
-        pass
+    # try:
+    y_onehot.scatter_(len(tensor.shape) - 1, tensor.long(), 1)
+    # except Exception as e:
+    #     a = y_onehot.cpu().numpy()
+    #     b = tensor.cpu().numpy()
+    #     pass
     if len(nan_mask.shape) > 0:
         y_onehot[nan_mask.repeat(1, 1, y_onehot.shape[2])] = 0  # set nans to zero
     return y_onehot
