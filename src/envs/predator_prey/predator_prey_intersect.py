@@ -91,7 +91,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         # Define the internal state
         self.agents = np.zeros((self.n_agents, self.batch_size, 2), dtype=int_type)
         self.prey = np.zeros((self.n_prey, self.batch_size, 2), dtype=int_type)
-        self.prey_alive = np.zeros((self.n_prey, self.batch_size), dtype=int_type)
+        self.prey_alive = np.zeros((self.n_prey, self.batch_size), dtype=int_type) 
         self.steps = 0
         self.reset()
 
