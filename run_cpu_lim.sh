@@ -23,5 +23,5 @@ fi
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v `pwd`/mongodb:/data/db \
     -e DISPLAY=unix$DISPLAY \
-    -t pymarl/pytorch \
+    -t pymarl \
     ${@:1}
