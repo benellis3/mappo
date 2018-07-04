@@ -10,7 +10,7 @@ coma_epsilon_decay_mode: "exp"
 coma_exploration_mode: "softmax"
 coma_use_entropy_regularizer: False
 env_args:
-  map_name: 2d_3z
+  map_name: 2s_3z
 env_stats_aggregator: sc2
 n_critic_learner_reps: 30
 n_loops_per_thread_or_sub_or_main_process: 1

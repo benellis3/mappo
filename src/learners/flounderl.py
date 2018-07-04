@@ -13,7 +13,7 @@ from debug.debug import IS_PYCHARM_DEBUG
 from components.scheme import Scheme
 from components.transforms import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
-    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap, _check_nan
+    _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap, _check_nan, _n_step_return
 from components.losses import EntropyRegularisationLoss
 from components.transforms import _to_batch, \
     _from_batch, _naninfmean
@@ -26,26 +26,22 @@ class FLOUNDERLPolicyLoss(nn.Module):
     def __init__(self):
         super(FLOUNDERLPolicyLoss, self).__init__()
 
-    def forward(self, policies, advantages, tformat):
-        assert tformat in ["a*bs*t*v"], "invalid input format!"
+    def forward(self, policies, advantages, actions, tformat):
+        #actions = actions.clone()
+        #actions_mask = (actions != actions)
+        #actions[actions_mask] = 0.0
+        #policies = th.gather(policies, _vdim(tformat), actions.long())
+        #policies[actions_mask] = float("nan")
+        mask = (policies < 10E-40) | (policies != policies)
+        policies[mask] = 1.0
+        log_policies = th.log(policies)
 
-        policy_mask = (policies == 0.0)
-        log_policies = th.log(policies.masked_fill(policy_mask, 1.0))
-        log_policies = log_policies.masked_fill(policy_mask, 0.0)
-        log_policies[log_policies!=log_policies] = 0.0 # just take out of final loss product
+        _adv = advantages.clone().detach()
+        _adv = _adv.repeat(log_policies.shape[_adim(tformat)], 1, 1, 1)
+        _adv[_adv != _adv] = 0.0  # n-step return leads to NaNs
+        _adv[mask] = 0.0  # prevent gradients from flowing through illegitimate policy entries
 
-        _adv = advantages.unsqueeze(0).clone().detach()
-        _adv=_adv.repeat(log_policies.shape[_adim(tformat)],1,1,1)
-        _adv[_adv != _adv] = 0.0 # n-step return leads to NaNs
-
-        # _act = actions.clone()
-        # _act[_act!=_act] = 0.0 # mask NaNs in _act
-        #
-        # _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
-        # _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
-        # _adv[actions != actions] = 0.0
-
-        loss_mean = -(log_policies.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
+        loss_mean = - (log_policies * _adv).mean()
         output_tformat = "a*t"
 
         return loss_mean, output_tformat
@@ -218,8 +214,8 @@ class FLOUNDERLLearner(BasicLearner):
     def _train(self, batch_history, data_inputs, data_inputs_tformat, T_env):
         # Update target if necessary
         if (self.T_critic - self.last_target_update_T_critic) / self.args.T_target_critic_update_interval > 1.0:
-            self.update_target_nets(level=1)
-            self.last_target_update_T_critic_level1 = self.T_critic
+            self.update_target_nets()
+            self.last_target_update_T_critic = self.T_critic
             print("updating target net!")
 
         # assert self.n_agents <= 4, "not implemented for >= 4 agents!"
@@ -363,7 +359,7 @@ class FLOUNDERLLearner(BasicLearner):
             critic_optimiser.zero_grad()
             critic_loss.backward()
 
-            critic_grad_norm = th.nn.utils.clip_grad_norm(critic_parameters, 50)
+            critic_grad_norm = th.nn.utils.clip_grad_norm_(critic_parameters, 50)
             critic_optimiser.step()
 
             # Calculate critic statistics and update
@@ -394,9 +390,20 @@ class FLOUNDERLLearner(BasicLearner):
         output_critic, output_critic_tformat = critic.forward(flounderl_model_inputs["critic"],
                                                               actions=actions,
                                                               tformat=flounderl_model_inputs_tformat)
-        TD = rewards.clone().zero_()
-        TD[:, :-1, :] = rewards[:, :-1, :] + gamma * output_critic["vvalue"][:, 1:, :] - output_critic["vvalue"][:, :-1, :]
-        n_step_return = TD # TODO: 1-step return so far only
+
+        advantages = _n_step_return(values=output_critic["vvalue"].unsqueeze(0),
+                                    rewards=rewards,
+                                    terminated=batch_history["terminated"][0],
+                                    truncated=batch_history["truncated"][0],
+                                    seq_lens=batch_history.seq_lens,
+                                    horizon=batch_history._n_t-1,
+                                    n=self.args.n_step_return_n,
+                                    gamma=self.args.gamma) - output_critic["vvalue"]
+
+        #TD = rewards.clone().fill_(float("nan"))
+        #TD[:, :-1, :] = rewards[:, 1:, :] + gamma * output_critic["vvalue"][:, 1:, :] - output_critic["vvalue"][:, :-1, :]
+        #n_step_return = TD # TODO: 1-step return so far only
+        #a = batch_history.to_pd()
         # n_step_return, n_step_return_tformat = batch_history.get_stat("n_step_return",
         #                                                                bs_ids=None,
         #                                                                n=self.args.n_step_return_n,
@@ -406,10 +413,9 @@ class FLOUNDERLLearner(BasicLearner):
         #                                                                n_agents=1,
         #                                                                to_cuda=self.args.use_cuda)
 
-        advantages = n_step_return - output_critic["vvalue"] # Q-V
-
         # only train the policy once in order to stay on-policy!
         policy_loss_function = partial(FLOUNDERLPolicyLoss(),
+                                       actions=actions,
                                        advantages=advantages.detach())
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(
@@ -419,7 +425,6 @@ class FLOUNDERLLearner(BasicLearner):
         agent_controller_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
                                                                                  hidden_states=hidden_states,
                                                                                  loss_fn=policy_loss_function,
-                                                                                 loss_level=level,
                                                                                  tformat=data_inputs_tformat,
                                                                                  avail_actions=None,
                                                                                  test_mode=False,
@@ -428,30 +433,21 @@ class FLOUNDERLLearner(BasicLearner):
         FLOUNDERL_loss, _ = agent_controller_output["losses"]
         FLOUNDERL_loss = FLOUNDERL_loss.mean()
 
-        if self.args.flounderl_use_entropy_regularizer:
-            FLOUNDERL_loss += self.args.flounderl_entropy_loss_regularization_factor * \
-                         EntropyRegularisationLoss()(policies=agent_controller_output["policies"],
-                                                     tformat="a*bs*t*v").sum()
-
         # carry out optimization for agents
 
         agent_optimiser.zero_grad()
         FLOUNDERL_loss.backward()
 
-        #if self.args.debug_mode:
-        #    _check_nan(agent_parameters)
-        policy_grad_norm = th.nn.utils.clip_grad_norm(agent_parameters, 50)
-        try:
-            _check_nan(agent_parameters)
-            # agent_optimiser.step() # DEBUG
-        except:
-            print("NaN in gradient or model!")
-            for p in agent_parameters:
-                print(p.grad)
-            a = 5
+        policy_grad_norm = th.nn.utils.clip_grad_norm_(agent_parameters, 50)
 
-        #for p in self.agent_level1_parameters:
-        #    print('===========\ngradient:\n----------\n{}'.format(p.grad))
+        if self.args.debug_mode not in ["check_probs"]:
+            try:
+                _check_nan(agent_parameters)
+                agent_optimiser.step()  # DEBUG
+                self._add_stat("Agent NaN gradient", 0.0, T_env=T_env)
+            except Exception as e:
+                self.logging_struct.py_logger.warning("NaN in agent gradients! Gradient not taken. ERROR: {}".format(e))
+                self._add_stat("Agent NaN gradient", 1.0, T_env=T_env)
 
         # increase episode counter (the fastest one is always)
         setattr(self, T_policy_str, getattr(self, T_policy_str) + len(batch_history) * batch_history._n_t)
@@ -470,14 +466,15 @@ class FLOUNDERLLearner(BasicLearner):
 
         pass
 
-    def update_target_nets(self, level):
-        if self.args.critic_level1_share_params and level==1:
-            # self.target_critic.load_state_dict(self.critic.state_dict())
-            self.critic_models["level1"].load_state_dict(self.critic_models["level1"].state_dict())
-        if self.args.critic_level2_share_params and level==2:
-            self.critic_models["level2_0:1"].load_state_dict(self.critic_models["level2_0:1"].state_dict())
-        if self.args.critic_level3_share_params and level==3:
-            self.critic_models["level3_{}".format(0)].load_state_dict(self.critic_models["level3_{}".format(0)].state_dict())
+    def update_target_nets(self):
+        self.target_critic_model.load_state_dict(self.critic_model.state_dict())
+        # if self.args.critic_level1_share_params and level==1:
+        #    # self.target_critic.load_state_dict(self.critic.state_dict())
+        #    self.critic_models["level1"].load_state_dict(self.critic_models["level1"].state_dict())
+        # if self.args.critic_level2_share_params and level==2:
+        #     self.critic_models["level2_0:1"].load_state_dict(self.critic_models["level2_0:1"].state_dict())
+        # if self.args.critic_level3_share_params and level==3:
+        #     self.critic_models["level3_{}".format(0)].load_state_dict(self.critic_models["level3_{}".format(0)].state_dict())
         pass
 
     def get_stats(self):
@@ -496,25 +493,25 @@ class FLOUNDERLLearner(BasicLearner):
         stats = self.get_stats()
         logging_dict = {}
         logging_str = ""
-        for _i in range(1,4):
-            logging_dict.update({"advantage_mean_level{}".format(_i): _seq_mean(stats["advantage_mean_level{}".format(_i)]),
-                                 "critic_grad_norm_level{}".format(_i): _seq_mean(stats["critic_grad_norm_level{}".format(_i)]),
-                                 "critic_loss_level{}".format(_i):_seq_mean(stats["critic_loss_level{}".format(_i)]),
-                                 "policy_grad_norm_level{}".format(_i): _seq_mean(stats["policy_grad_norm_level{}".format(_i)]),
-                                 "policy_loss_level{}".format(_i): _seq_mean(stats["policy_loss_level{}".format(_i)]),
-                                 "target_critic_mean_level{}".format(_i): _seq_mean(stats["target_critic_mean_level{}".format(_i)]),
-                                 "T_critic_level{}".format(_i): getattr(self, "T_critic_level{}".format(_i)),
-                                 "T_policy_level{}".format(_i): getattr(self, "T_policy_level{}".format(_i))}
-                                )
-            logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format(_i)],
-                                                                                  _i, logging_dict["T_critic_level{}".format(_i)])
-
-        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_policy_level1",
-                                                                          "T_critic_level1",
-                                                                          "T_policy_level2",
-                                                                          "T_critic_level2",
-                                                                          "T_policy_level3",
-                                                                          "T_critic_level3"]))
+        # for _i in range(1,4):
+        #     logging_dict.update({"advantage_mean_level{}".format(_i): _seq_mean(stats["advantage_mean_level{}".format(_i)]),
+        #                          "critic_grad_norm_level{}".format(_i): _seq_mean(stats["critic_grad_norm_level{}".format(_i)]),
+        #                          "critic_loss_level{}".format(_i):_seq_mean(stats["critic_loss_level{}".format(_i)]),
+        #                          "policy_grad_norm_level{}".format(_i): _seq_mean(stats["policy_grad_norm_level{}".format(_i)]),
+        #                          "policy_loss_level{}".format(_i): _seq_mean(stats["policy_loss_level{}".format(_i)]),
+        #                          "target_critic_mean_level{}".format(_i): _seq_mean(stats["target_critic_mean_level{}".format(_i)]),
+        #                          "T_critic_level{}".format(_i): getattr(self, "T_critic_level{}".format(_i)),
+        #                          "T_policy_level{}".format(_i): getattr(self, "T_policy_level{}".format(_i))}
+        #                         )
+        #     logging_str = "T_policy_level{}={:g}, T_critic_level{}={:g}, ".format(_i, logging_dict["T_policy_level{}".format(_i)],
+        #                                                                           _i, logging_dict["T_critic_level{}".format(_i)])
+        #
+        # logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_policy_level1",
+        #                                                                   "T_critic_level1",
+        #                                                                   "T_policy_level2",
+        #                                                                   "T_critic_level2",
+        #                                                                   "T_policy_level3",
+        #                                                                   "T_critic_level3"]))
 
         if log_directly:
             self.logging_struct.py_logger.info("{} LEARNER INFO: {}".format(self.args.learner.upper(), logging_str))

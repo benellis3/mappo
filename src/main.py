@@ -50,8 +50,8 @@ def setup_mongodb(conf_str):
             logger.warning("Couldn't connect to MongoDB.")
             logger.info("Fallback to FileStorageObserver in results/sacred.")
             mongodb_fail = True
-            import os
-            os._exit(1)
+            # import os
+            # os._exit(1)
 
     #if mongodb_fail:
     if mongodb_fail:

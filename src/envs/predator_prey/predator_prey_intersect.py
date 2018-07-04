@@ -360,8 +360,6 @@ class PredatorPreyCapture(MultiAgentEnv):
             s = self.grid[0, :, :, :].copy()
             a_x, a_y = self.agents[agent_id, batch, :]
             s[a_x, a_y, 0] = 2.0
-            # a = s[:, :, 0]
-            # b = s[:, :, 1]
             return s.reshape(self.state_size)
         else:
             return self._get_obs_from_grid(self.grid, agent_id, batch)
@@ -377,16 +375,33 @@ class PredatorPreyCapture(MultiAgentEnv):
             return self.grid[0, :, :, :].reshape(self.state_size)
 
     def get_obs_intersect_pair_size(self):
-        return 2 * self.get_obs_size()
+        if self.fully_observable:
+            return self.get_obs_size()
+        else:
+            return 2 * self.get_obs_size()
 
     def get_obs_intersect_all_size(self):
-        return self.n_agents * self.get_obs_size()
+        if self.fully_observable:
+            return self.get_obs_size()
+        else:
+            return self.n_agents * self.get_obs_size()
 
     def get_obs_intersection(self, agent_ids):
-        if self.toroidal or not self.intersection_unknown:
-            return self.get_obs_intersection1(agent_ids)
+        if self.fully_observable:
+            if self.toroidal or not self.intersection_unknown:
+                _, avail_actions =  self.get_obs_intersection1(agent_ids)
+            else:
+                _, avail_actions = self.get_obs_intersection2(agent_ids)
+            s = self.grid[0, :, :, :].copy()
+            for agent_id in agent_ids:
+                a_x, a_y = self.agents[agent_id, 0, :]
+                s[a_x, a_y, 0] = agent_id + 2.0
+            return s.reshape(self.state_size), avail_actions
         else:
-            return self.get_obs_intersection2(agent_ids)
+            if self.toroidal or not self.intersection_unknown:
+                return self.get_obs_intersection1(agent_ids)
+            else:
+                return self.get_obs_intersection2(agent_ids)
 
     def get_obs_intersection2(self, agent_ids):
         # Compute available actions

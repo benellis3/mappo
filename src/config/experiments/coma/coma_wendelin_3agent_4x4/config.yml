@@ -50,7 +50,6 @@ runner: coma
 runner_test_batch_size: 32
 save_model: False
 save_model_interval: 10e6
-share_agent_params: True
 t_max: 1000000
 target_critic_update_interval: 661500
 td_lambda: 0.8
@@ -61,3 +60,5 @@ use_cuda: True
 use_replay_buffer: False
 use_tensorboard: False
 use_full_observability: False
+share_agent_params: True
+critic_share_params: True

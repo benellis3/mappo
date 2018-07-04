@@ -21,7 +21,7 @@ debug_verbose: False
 env: sc1
 env_stats_aggregator: sc1
 env_args:
-  map_name: m5v5_c_far
+  map_name: openbw
   hostname: localhost
   step_mul: 7
   episode_limit: 70
@@ -40,7 +40,7 @@ observe: True
 observe_db: True
 run_mode: sequential
 runner: coma
-runner_test_batch_size: 32
+runner_test_batch_size: 16
 save_model: False
 save_model_interval: 10e6
 share_agent_params: True
@@ -52,7 +52,7 @@ test_interval: 2000
 test_nepisode: 30
 use_cuda: True
 use_replay_buffer: False
-use_tensorboard: False
+use_tensorboard: Falsez
 
 
 #defaults: default coma sc1

@@ -51,7 +51,6 @@ class FLOUNDERLVFunction(nn.Module):
         """
         pass
 
-
     def forward(self, inputs, tformat):
         # _check_inputs_validity(inputs, self.input_shapes, tformat, allow_nonseq=True)
 
@@ -379,6 +378,8 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
 
             # mask policy elements corresponding to unavailable actions
             #n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
+
+            # DEBUG
             x = th.exp(x)
             x_sum = x.sum(dim=1, keepdim=True)
             second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*x.shape[1])
@@ -395,11 +396,10 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
             #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
-            # add softmax exploration (if switched on)
-            # if self.args.flounderl_exploration_mode_level1 in ["softmax"] and not test_mode:
-            #    epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim(tformat)).unsqueeze(0)
-            #    epsilons, _, _ = _to_batch(epsilons, tformat)
-            #    x =  epsilons / _n_agent_pairings(n_agents) + x * (1 - epsilons)
+            if self.args.flounderl_exploration_mode_level1 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim("bs*t*v")).detach()
+               epsilons, _, _ = _to_batch(epsilons, "bs*t*v")
+               x = epsilons / _n_agent_pairings(self.n_agents) + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
@@ -418,6 +418,13 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
 
 class FLOUNDERLNonRecurrentAgentLevel2(NonRecurrentAgent):
 
+    def __init__(self, input_shapes, n_actions, output_type=None, output_shapes={}, layer_args={}, args=None, **kwargs):
+        super().__init__(input_shapes,
+        n_actions,
+        output_type = output_type,
+        output_shapes = dict(output=n_actions*n_actions + 2),
+        layer_args = layer_args,
+        args = args, ** kwargs)  # need to expand using no-op action
 
     def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
         test_mode = kwargs["test_mode"]
@@ -446,10 +453,10 @@ class FLOUNDERLNonRecurrentAgentLevel2(NonRecurrentAgent):
                 print('Warning in FLOUNDERLNonRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
-        # if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-        #     epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-        #     epsilons, _, _ = _to_batch(epsilons, tformat)
-        #     x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+        if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
+            epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            epsilons, _, _ = _to_batch(epsilons, tformat)
+            x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
         x = _from_batch(x, params, tformat)
 
@@ -476,7 +483,7 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
 
         # Set up layer_args automatically if required
         self.output_shapes = {}
-        self.output_shapes["output"] = 1 + self.n_actions*self.n_actions # includes delegation action
+        self.output_shapes["output"] = 2 + self.n_actions*self.n_actions # includes delegation action and no-op
         if self.output_shapes is not None:
             self.output_shapes.update(output_shapes)
 
@@ -547,50 +554,44 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
 
             # mask policy elements corresponding to unavailable actions
             n_available_actions = avail_actions.sum(dim=1, keepdim=True)
-            if self.args.mackrel_logit_bias != 0:
-                x = th.cat([x[:, 0:1] + self.args.mackrel_logit_bias, x[:, 1:]], dim=1)
-                x = th.exp(x)
-                x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
-                x[:, 0] = th.div(x[:, 0].clone(), 1.0 + x[:, 0])
-                x_sum = x[:,1:].sum(dim=1, keepdim=True)
-                second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10)
-                x_sum = x_sum.masked_fill(second_mask, 1.0)
-                z =  (1 - x[:, 0:1])
-                z = z.masked_fill(z <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
-                y = x[:, 0:1]
-                y = y.masked_fill(y <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
-                m = th.div(x[:,1:].clone(), x_sum)
-                m = m.masked_fill(m <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
-                x = th.cat([ y, z * m], dim=1).clone()
-            else:
-                x = th.exp(x)
-                x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
-                x_sum = x.sum(dim=1, keepdim=True)
-                second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1])
-                x_sum = x_sum.masked_fill(second_mask, 1.0)
-                x = th.div(x, x_sum)
-
-            # throw debug warning if second masking was necessary
-            #if th.sum(second_mask.data) > 0:
-            #    if self.args.debug_verbose:
-            #        print('Warning in FLOUNDERLRecurrentAgentLevel2.forward(): some sum during the softmax has been 0!')
-
-            # Alternative variant
-            #x = th.nn.functional.softmax(x).clone()
-            #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
-            #x = th.div(x, x.sum(dim=1, keepdim=True))
-
+            # if self.args.mackrel_logit_bias != 0:
+            #     x = th.cat([x[:, 0:1] + self.args.mackrel_logit_bias, x[:, 1:]], dim=1)
+            #     x = th.exp(x)
+            #     x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+            #     x[:, 0] = th.div(x[:, 0].clone(), 1.0 + x[:, 0])
+            #     x_sum = x[:,1:].sum(dim=1, keepdim=True)
+            #     second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10)
+            #     x_sum = x_sum.masked_fill(second_mask, 1.0)
+            #     z =  (1 - x[:, 0:1])
+            #     z = z.masked_fill(z <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
+            #     y = x[:, 0:1]
+            #     y = y.masked_fill(y <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
+            #     m = th.div(x[:,1:].clone(), x_sum)
+            #     m = m.masked_fill(m <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1]*10, np.sqrt(float(np.finfo(np.float32).tiny)))
+            #     x = th.cat([ y, z * m], dim=1).clone()
+            # else:
+            #DEBUG: TODO: Re-enable logit bias!!!
+            x = th.exp(x)
+            x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
+            x_sum = x.sum(dim=1, keepdim=True)
+            second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny))*avail_actions.shape[1])
+            x_sum = x_sum.masked_fill(second_mask, 1.0)
+            x = th.div(x, x_sum)
 
 
             # add softmax exploration (if switched on)
-            # if self.args.flounderl_exploration_mode_level2 in ["softmax"] and not test_mode:
-            #    epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
-            #    epsilons, _, _ = _to_batch(epsilons, tformat)
-            #    n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
-            #    x = th.cat([epsilons * self.args.mackrel_delegation_probability_bias,
-            #                avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
-            #                            1 - self.args.mackrel_delegation_probability_bias)], dim=1) \
-            #        + x * (1 - epsilons)
+            if self.args.flounderl_exploration_mode_level2 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
+               epsilons, _, _ = _to_batch(epsilons, tformat)
+               n_available_actions[n_available_actions==0.0] = np.sqrt(float(np.finfo(np.float32).tiny))
+               x = avail_actions.detach() * epsilons / n_available_actions + x * (1 - epsilons)
+               #epsilons = inputs["epsilons_central_level2"].unsqueeze(_tdim(tformat)).detach()
+               #epsilons, _, _ = _to_batch(epsilons, tformat)
+               #n_available_actions[n_available_actions.data == 1] = 2.0 # mask zeros!!
+               #x = th.cat([epsilons * self.args.flounderl_delegation_probability_bias,
+               #            avail_actions[:, 1:] * (epsilons / (n_available_actions - 1)) * (
+               #                        1 - self.args.flounderl_delegation_probability_bias)], dim=1) \
+               #    + x * (1 - epsilons)
             #    if self.args.debug_mode:
             #        _check_nan(x)
 
@@ -649,10 +650,10 @@ class FLOUNDERLNonRecurrentAgentLevel3(NonRecurrentAgent):
                 print('Warning in FLOUNDERLNonRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
         # add softmax exploration (if switched on)
-        # if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-        #     epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-        #     epsilons, _, _ = _to_batch(epsilons, tformat)
-        #     x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+        if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
+            epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
+            epsilons, _, _ = _to_batch(epsilons, tformat)
+            x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
         x = _from_batch(x, params, tformat)
 
@@ -667,7 +668,7 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
         super().__init__(input_shapes,
         n_actions,
         output_type = output_type,
-        output_shapes = dict(output=n_actions), # do not include no-op!
+        output_shapes = dict(output=1+n_actions), # do include no-op!
         layer_args = layer_args,
         args = args, ** kwargs)
 
@@ -701,10 +702,6 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
             x = self.output(h)
 
             # mask policy elements corresponding to unavailable actions
-            # n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
-            # x = th.exp(x)
-            # x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-            # x = th.div(x, x.sum(dim=1, keepdim=True))
             n_available_actions = avail_actions.sum(dim=1, keepdim=True)
             x = th.exp(x)
             x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
@@ -718,16 +715,12 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
                 if self.args.debug_verbose:
                     print('Warning in FLOUNDERLRecurrentAgentLevel3.forward(): some sum during the softmax has been 0!')
 
-            # Alternative variant
-            #x = th.nn.functional.softmax(x).clone()
-            #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
-            #x = th.div(x, x.sum(dim=1, keepdim=True))
-
             # add softmax exploration (if switched on)
-            # if self.args.flounderl_exploration_mode_level3 in ["softmax"] and not test_mode:
-            #    epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat))
-            #    epsilons, _, _ = _to_batch(epsilons, tformat)
-            #    x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
+            if self.args.flounderl_exploration_mode_level3 in ["softmax"] and not test_mode:
+               epsilons = inputs["epsilons_central_level3"].unsqueeze(_tdim(tformat)).detach()
+               epsilons, _, _ = _to_batch(epsilons, tformat)
+               n_available_actions[n_available_actions==0.0] = np.sqrt(float(np.finfo(np.float32).tiny))
+               x = avail_actions.detach() * epsilons / n_available_actions + x * (1 - epsilons) # avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
 
             h = _from_batch(h, params_h, tformat_h)
             x = _from_batch(x, params_x, tformat_x)
@@ -836,24 +829,37 @@ class FLOUNDERLAgent(nn.Module):
                                                                                                             tformat=tformat["level3"],
                                                                                                             **kwargs)
 
-        _check_nan(out_level1) # DEBUG
-        _check_nan(out_level2)
-        _check_nan(out_level3)
 
         # for each agent pair (a,b), calculate p_a_b = p(u_a, u_b|tau_a tau_b CK_ab) = p(u_d|CK_ab)*pi(u_a|tau_a)*pi(u_b|tau_b) + p(u_ab|CK_ab)
         # output dim of p_a_b is (n_agents choose 2) x bs x t x n_actions**2
-        p_d = out_level2[:,:,:,0:1]
+
+        # Bulk NaN masking
+        # out_level1[out_level1 != out_level1] = 0.0
+        # out_level2[out_level2 != out_level2] = 0.0
+        # out_level3[out_level3 != out_level3] = 0.0
+        # actions = actions.detach()
+        # actions[actions!=actions] = 0.0
+
+        p_d = out_level2[:, :, :, 0:1]
         p_ab = out_level2[:, :, :, 1:]
+
         _actions = actions.clone()
         _actions[actions != actions] = 0.0
+        pi = out_level3
         pi_actions_selected = out_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
+        # pi_actions_selected[pi_actions_selected  != pi_actions_selected ] = 0.0 #float("nan")
         pi_actions_selected[actions != actions] = float("nan")
+        avail_actions_level3 = inputs["level3"]["agent_input_level3"]["avail_actions"].clone().data
+        avail_actions_selected = avail_actions_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
 
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
         pi_c_prod_list = []
-        for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
-            # calculate pi_a_cross_pi_b
+        pi_corr_list = []
+        for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)): #_ordered_agent_pairings(self.n_agents)[:self.args.n_pair_samples] if hasattr("n_pair_samples", self.args) else _ordered_agent_pairings(self.n_agents)): #(_ordered_agent_pairings(self.n_agents)):
+            # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
+            pi_a = pi[_a:_a+1]
+            pi_b = pi[_b:_b+1]
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
             actions_masked = actions.clone()
@@ -865,31 +871,89 @@ class FLOUNDERLAgent(nn.Module):
             z = _x * _y
             u = _from_batch(z, params_x, tformat_x)
             pi_a_cross_pi_b_list.append(u)
-            # z = th.bmm(_x.unsqueeze(2), _y.unsqueeze(1)).view(_x.shape[0], -1) # TODO: Check the flattening is correct order!!!
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1]
             joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
+            # Set probabilities corresponding to jointly-disallowed actions to 0.0
+            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())
+            _z[avail_flags==0.0] = 0.0
             pi_ab_list.append(_z)
             # calculate pi_c_prod
             _pi_actions_selected = pi_actions_selected.clone()
+            _pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 0.0
             #_pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 1.0 # mask shit
-            _pi_actions_selected[_a:_a+1] = 1.0
+            _pi_actions_selected[_a:_a + 1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
-            _k = th.prod(pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
+            _pi_actions_selected[avail_actions_selected==0.0] = 0.0 # should never happen!
+            # Set probabilities corresponding to individually disallowed actions to 0.0
+            _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)
+            # Calculate corrective delegation (when unavailable actions are selected)
+            aa_a, _, _ = _to_batch(avail_actions_level3[_a:_a+1], tformat_level3)
+            aa_b, _, _ = _to_batch(avail_actions_level3[_b:_b+1], tformat_level3)
+            paa, params_paa, tformat_paa = _to_batch(pairwise_avail_actions[_i:_i+1], tformat_level3)
+            _pi_a, _, _ = _to_batch(pi_a, tformat_level3)
+            _pi_b, _, _ = _to_batch(pi_b, tformat_level3)
+            # x = th.bmm(th.unsqueeze(aa_a, 2),  th.unsqueeze(aa_b, 1))
+            diff_matrix =  th.relu(paa[:, 1:-1].view(-1, self.n_actions, self.n_actions) -
+                                   th.bmm(th.unsqueeze(aa_a[:, :-1], 2),  th.unsqueeze(aa_b[:, :-1], 1)))
+            pi_a_int = th.pow(_pi_a[:, :-1], aa_a[:, :-1]*(-1.0) + 1)
+            pi_b_int = th.pow(_pi_b[:, :-1], aa_b[:, :-1]*(-1.0) + 1)
+            correction = th.bmm( th.bmm( th.unsqueeze(pi_a_int, 1), diff_matrix), th.unsqueeze(pi_b_int, 2) ).squeeze(2)
+            pi_corr_list.append(_from_batch(correction, params_paa, tformat_paa))
 
         pi_a_cross_pi_b = th.cat(pi_a_cross_pi_b_list, dim=0)
         pi_ab_selected = th.cat(pi_ab_list, dim=0)
         pi_c_prod = th.cat(pi_c_prod_list, dim=0)
-        p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected
+        pi_corr = th.cat(pi_corr_list, dim=0)
 
+        p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected + pi_corr
         # next, calculate p_a_b * prod(p, -a-b)
         p_prod = p_a_b * pi_c_prod
 
         # now, calculate p_a_b_c
         _tmp =  out_level1.transpose(_adim(tformat_level1), _vdim(tformat_level1))
+        _tmp[_tmp!=_tmp] = 0.0
         p_a_b_c = (p_prod * _tmp).sum(dim=_adim(tformat_level1), keepdim=True)
+
+        if self.args.debug_mode in ["check_probs"]:
+            if not hasattr(self, "action_table"):
+                self.action_table = {}
+            if not hasattr(self, "actions_sampled"):
+                self.actions_sampled = 0
+            actions_flat = actions.view(self.n_agents, -1)
+            for id in range(actions_flat.shape[1]):
+                act = tuple(actions_flat[:, id].tolist())
+                if act in self.action_table:
+                    self.action_table[act] += 1
+                else:
+                    self.action_table[act] = 0
+            self.actions_sampled += actions_flat.shape[0]
+
+        if self.args.debug_mode in ["check_probs"]:
+            actions_flat = actions.view(self.n_agents, -1)
+            for id in range(actions_flat.shape[1]):
+                print("sampled: ",
+                      self.action_table[tuple(actions_flat[:, id].tolist())] / self.actions_sampled,
+                      " pred: ",
+                      p_a_b_c.view(-1)[id])
+
+        # DEBUG MODE HERE!
+        # _check_nan(pi_c_prod)
+        # _check_nan(p_d)
+        # _check_nan(pi_ab_selected)
+        # _check_nan(pi_a_cross_pi_b)
+        # _check_nan(p_a_b)
+        # _check_nan(p_a_b_c)
+
+        # agent_parameters = list(self.parameters())
+        # pi_c_prod.sum().backward(retain_graph=True) # p_prod throws NaN
+        # _check_nan(agent_parameters)
+        # p_a_b.sum().backward(retain_graph=True)
+        # _check_nan(agent_parameters)
+        # p_prod.sum().backward(retain_graph=True)
+        # _check_nan(agent_parameters)
 
         hidden_states = {"level1": hidden_states_level1,
                          "level2": hidden_states_level2,
@@ -897,4 +961,17 @@ class FLOUNDERLAgent(nn.Module):
                         }
 
         loss = loss_fn(policies=p_a_b_c, tformat=tformat_level3)
+
+        # loss = p_a_b_c.sum(), "a*bs*t*v"
+        #loss[0].sum().backward(retain_graph=True)
+        # loss[0].backward(retain_graph=True)
+
+        # try:
+        #     _check_nan(agent_parameters)
+        # except Exception as e:
+        #     for a, b in self.named_parameters():
+        #         print("{}:{}".format(a, b.grad))
+        #     a = 5
+        #     pass
+
         return p_a_b_c, hidden_states, loss, tformat_level3 # note: policies can have NaNs in it!!

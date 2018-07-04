@@ -72,6 +72,9 @@ REGISTRY["flounderl_nonrecurrent_agent_level1"] = MACKRELNonRecurrentAgentLevel1
 REGISTRY["flounderl_nonrecurrent_agent_level2"] = MACKRELNonRecurrentAgentLevel2
 REGISTRY["flounderl_nonrecurrent_agent_level3"] = MACKRELNonRecurrentAgentLevel3
 
+from .centralV import CentralVCritic
+REGISTRY["centralV_critic"] = CentralVCritic
+
 
 
 

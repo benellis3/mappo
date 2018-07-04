@@ -18,17 +18,30 @@ def _n_agent_pairings(n_agents):
     return int((n_agents * (n_agents-1)) / 2)
 
 def _joint_actions_2_action_pair(joint_action, n_actions,use_delegate_action=True):
-    if use_delegate_action:
-        mask = (joint_action == 0.0)
-        joint_action[mask] = 1.0
-        _action1 = th.floor((joint_action-1.0) / n_actions)
-        _action2 = (joint_action-1.0) % n_actions
-        _action1[mask] = float("nan")
-        _action2[mask] = float("nan")
+    if isinstance(joint_action, int):
+        if use_delegate_action:
+            if joint_action != 0.0:
+                _action1 = (joint_action - 1.0) // n_actions
+                _action2 = (joint_action - 1.0) % n_actions
+            else:
+                _action1 = float("nan")
+                _action2 = float("nan")
+        else:
+            _action1 = th.floor(joint_action / n_actions)
+            _action2 = (joint_action) % n_actions
+        return _action1, _action2
     else:
-        _action1 = th.floor(joint_action / n_actions)
-        _action2 = (joint_action) % n_actions
-    return _action1, _action2
+        if use_delegate_action:
+            mask = (joint_action == 0.0)
+            joint_action[mask] = 1.0
+            _action1 = th.floor((joint_action-1.0) / n_actions)
+            _action2 = (joint_action-1.0) % n_actions
+            _action1[mask] = float("nan")
+            _action2[mask] = float("nan")
+        else:
+            _action1 = th.floor(joint_action / n_actions)
+            _action2 = (joint_action) % n_actions
+        return _action1, _action2
 
 def _joint_actions_2_action_pair_aa(joint_action, n_actions, avail_actions1, avail_actions2, use_delegate_action=True):
     if use_delegate_action:
@@ -55,6 +68,9 @@ def _joint_actions_2_action_pair_aa(joint_action, n_actions, avail_actions1, ava
     return _action1, _action2
 
 def _action_pair_2_joint_actions(action_pair, n_actions):
+    assert action_pair[0].max() < n_actions and action_pair[1].max() < n_actions , "Input outside action range: {}, {} but should be < {}".format(action_pair[0].max(),
+                                                                                                                                                  action_pair[1].max(),
+                                                                                                                                                  n_actions)
     return action_pair[0] * n_actions + action_pair[1]
 
 def _pairing_id_2_agent_ids(pairing_id, n_agents):
