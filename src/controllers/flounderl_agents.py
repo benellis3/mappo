@@ -9,7 +9,8 @@ from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, \
     _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim, _vdim, _agent_flatten, _check_nan, \
-    _to_batch, _from_batch, _vdim, _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean
+    _to_batch, _from_batch, _vdim, _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean, \
+    _pad_nan
 
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
@@ -199,12 +200,14 @@ class FLOUNDERLMultiagentController():
             if self.args.debug_mode:
                 _check_nan(inputs_level1)
             out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model.model_level1(inputs_level1["agent_input_level1"],
-                                                                                                                        hidden_states=hidden_states["level1"],
-                                                                                                                        loss_fn=None,
-                                                                                                                        tformat=inputs_level1_tformat,
-                                                                                                                        n_agents=self.n_agents,
-                                                                                                                        test_mode=test_mode,
-                                                                                                                        **kwargs)
+                                                                                                      hidden_states=hidden_states["level1"],
+                                                                                                      loss_fn=None,
+                                                                                                      tformat=inputs_level1_tformat,
+                                                                                                      n_agents=self.n_agents,
+                                                                                                      test_mode=test_mode,
+                                                                                                      **kwargs)
+
+
             if self.args.debug_mode:
                 _check_nan(inputs_level1)
 
@@ -379,15 +382,19 @@ class FLOUNDERLMultiagentController():
             self.actions_level3 = individual_actions
             action_tensor[action_tensor != action_tensor] = individual_actions[action_tensor != action_tensor]
 
+            # set states beyond episode termination to NaN
+            action_tensor = _pad_nan(action_tensor, tformat=tformat_level3, seq_lens=inputs["agent_input_level1"].seq_lens)
+
             dbg = action_tensor.clone() # DEBUG
             dbg[dbg!=dbg] = -float("inf") # DEBUG
             mmm2 = dbg.max().cpu().numpy() # DEBUG
-            # try:
-            assert mmm2 < self.n_actions, "no-op in env action at mmm2!" # DEBUG
-            #except:
-            #    at_new = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy()
-            #    indv = individual_actions.clone().cpu().view(-1, individual_actions.shape[3]).numpy()
-            #    pass
+            try:
+                assert mmm2 < self.n_actions, "no-op in env action at mmm2!" # DEBUG
+            except:
+                at_new = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy()
+                indv = individual_actions.clone().cpu().view(-1, individual_actions.shape[3]).numpy()
+                av_env = self.avail_actions.clone().view(-1, self.avail_actions.shape[3]).cpu().numpy()
+                pass
 
             # l2 = action_tensor.squeeze()  # DEBUG
             if self.args.debug_mode in ["level3_actions_only"]:

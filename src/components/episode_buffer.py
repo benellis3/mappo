@@ -425,6 +425,12 @@ class BatchEpisodeBuffer():
                 return _data
                 pass
 
+            # adjust sequence lengths
+            if t_id is None:
+                adjusted_seq_lens = [ self.seq_lens[_bs] for _bs in bs_ids ]
+            else:
+                adjusted_seq_lens = [1 if self.seq_lens[_bs] > t_id else 0 for _bs in bs_ids]
+
             # doing a bit of scheme-fu here: could certainly be done a bit nicer, but it's fast anyway so who cares
             output_sizes = scheme.get_output_sizes(self._data_scheme)
             scheme_renamed = deepcopy(scheme)
@@ -435,7 +441,9 @@ class BatchEpisodeBuffer():
                                      n_t=1 if t_id is not None else self.data._transition.shape[1],
                                      is_cuda=self.is_cuda,
                                      is_shared_mem=True,
-                                     sizes=output_sizes)
+                                     sizes=output_sizes,
+                                     )
+
 
             for scheme_item in scheme.scheme_list:
 
@@ -463,6 +471,8 @@ class BatchEpisodeBuffer():
                     data = data[:, -1:, :]
 
                 cbh.set_col(scheme_item.get("rename", scheme_item.get("name")), data, scope=scope)
+
+            cbh.seq_lens=adjusted_seq_lens
 
             # if fill_zero: # fill NaNs due to early termination with zeros if requested
             #    for _bs in range(len(bs_ids)):

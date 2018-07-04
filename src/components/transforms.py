@@ -677,3 +677,30 @@ def _n_step_return(values, rewards, truncated, terminated, n, gamma, horizon, se
         # x = 5
     N_tensor = _align_left(N_tensor, horizon, seq_lens)
     return N_tensor
+
+def _pad_nan(tensor, tformat, seq_lens):
+    """
+    Fill dummy states beyond episode limit with NaNs (in_place)
+    """
+    assert tformat in ["a*bs*t*v", "bs*t*v"], "invalid tformat"
+    bs_ids = range(tensor.shape[_bsdim(tformat)])
+    for _bs in bs_ids:
+        first_nan_t = seq_lens[_bs]
+        if first_nan_t < tensor.shape[_tdim(tformat)]:
+            if tformat in ["a*bs*t*v"]:
+                tensor[:, :, first_nan_t:, :] = float("nan")
+            elif tformat in ["bs*t*v"]:
+                tensor[:, first_nan_t:, :] = float("nan")
+    return tensor
+
+def _pad_zero(tensor, tformat, seq_lens):
+    """
+    Fill dummy states beyond episode limit with NaNs (in_place)
+    """
+    bs_ids = range(_bsdim(tformat))
+    for _bs in bs_ids:
+        first_nan_t = seq_lens[_bs]
+        if first_nan_t < tensor.shape[1]:
+            tensor[:, first_nan_t:, :] = 0
+    return tensor
+
