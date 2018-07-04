@@ -856,7 +856,7 @@ class FLOUNDERLAgent(nn.Module):
         pi_ab_list = []
         pi_c_prod_list = []
         pi_corr_list = []
-        for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
+        for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)): #_ordered_agent_pairings(self.n_agents)[:self.args.n_pair_samples] if hasattr("n_pair_samples", self.args) else _ordered_agent_pairings(self.n_agents)): #(_ordered_agent_pairings(self.n_agents)):
             # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
             pi_a = pi[_a:_a+1]
             pi_b = pi[_b:_b+1]
@@ -873,10 +873,7 @@ class FLOUNDERLAgent(nn.Module):
             pi_a_cross_pi_b_list.append(u)
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1]
-            try:
-                joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
-            except Exception as e:
-                pass
+            joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
             avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())

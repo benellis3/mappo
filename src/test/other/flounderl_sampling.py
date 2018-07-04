@@ -320,7 +320,8 @@ def test1b():
         bs_ids=None,
         fill_zero=True)
 
-    # bh = batch_history.to_pd()
+    bh = batch_history.to_pd()
+    nact = runner_obj.n_actions
 
     stats = {}
     probs = {}
