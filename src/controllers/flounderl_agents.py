@@ -333,7 +333,7 @@ class FLOUNDERLMultiagentController():
             dbg = action_tensor.clone() # DEBUG
             dbg[dbg!=dbg] = -float("inf") # DEBUG
             mmm = dbg.max().cpu().numpy() # DEBUG
-            assert mmm < 5, "no-op in env action at mmm!" # DEBUG
+            assert mmm < self.n_actions, "no-op in env action at mmm!" # DEBUG
 
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
             self.avail_actions = avail_actions_level3.clone()
@@ -382,12 +382,12 @@ class FLOUNDERLMultiagentController():
             dbg = action_tensor.clone() # DEBUG
             dbg[dbg!=dbg] = -float("inf") # DEBUG
             mmm2 = dbg.max().cpu().numpy() # DEBUG
-            try:
-                assert mmm2 < 5, "no-op in env action at mmm2!" # DEBUG
-            except:
-                at_new = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy()
-                indv = individual_actions.clone().cpu().view(-1, individual_actions.shape[3]).numpy()
-                pass
+            # try:
+            assert mmm2 < self.n_actions, "no-op in env action at mmm2!" # DEBUG
+            #except:
+            #    at_new = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy()
+            #    indv = individual_actions.clone().cpu().view(-1, individual_actions.shape[3]).numpy()
+            #    pass
 
             # l2 = action_tensor.squeeze()  # DEBUG
             if self.args.debug_mode in ["level3_actions_only"]:
