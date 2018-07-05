@@ -22,7 +22,7 @@ def test1():
     """
     """
     _args = dict(env="pred_prey",
-                 n_agents=4,
+                 n_agents=3,
                  t_max=1000000,
                  learner="coma",
                  env_args=dict(prey_movement="escape",
@@ -383,14 +383,15 @@ def test2():
 
 
 def test1_para():
+
     _args = dict(env="pred_prey",
-                 n_agents=4,
+                 n_agents=3,
                  t_max=1000000,
                  learner="coma",
                  env_args=dict(prey_movement="escape",
                                predator_prey_shape=(3,3),
                                nagent_capture_enabled=False,
-                               predator_prey_toroidal=True,
+                               predator_prey_toroidal=False,
                                n_agents=3,
                                n_prey=1,
                                agent_obs=(1,1),
@@ -614,7 +615,11 @@ def test1_para():
             else:
                 for _k, _v in v.items():
                     if _k not in total_probs[k]:
-                        total_probs[k][_k] += _res[1][k][_k]
+                        try:
+                            total_probs[k][_k] += _res[1][k][_k]
+                        except Exception as e:
+                            print("Exception {}".format(e))
+                            pass
 
     data = {k: {str(_k): "{} ({})".format(_v / float(n_samples), total_probs[k][_k]) for _k, _v in v.items()}
             for k, v in total_stats.items()}
@@ -915,11 +920,11 @@ def test__evaljson():
 def main():
     # test1()
     # test1()
-    test2()
+    # test2()
     # test3()
-    # test1_para() # broken mysteriously
+    test1_para() # broken mysteriously
     # test2_para() # broken mysteriously
-    test__evaljson()
+    # test__evaljson()
     pass
 
 if __name__ == "__main__":
