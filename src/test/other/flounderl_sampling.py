@@ -915,7 +915,7 @@ def test__evaljson():
 def main():
     # test1()
     # test1()
-    # test2()
+    test2()
     # test3()
     # test1_para() # broken mysteriously
     # test2_para() # broken mysteriously
