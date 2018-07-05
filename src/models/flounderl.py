@@ -841,7 +841,7 @@ class FLOUNDERLAgent(nn.Module):
         # actions[actions!=actions] = 0.0
 
         p_d = out_level2[:, :, :, 0:1]
-        p_ab = out_level2[:, :, :, 1:]
+        p_ab = out_level2[:, :, :, 1:-1]
 
         _actions = actions.clone()
         _actions[actions != actions] = 0.0
@@ -859,6 +859,7 @@ class FLOUNDERLAgent(nn.Module):
         pi_corr_list = []
 
         # DEBUG: if prob is 0 throw a debug!
+        # jakob debug
 
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)): #_ordered_agent_pairings(self.n_agents)[:self.args.n_pair_samples] if hasattr("n_pair_samples", self.args) else _ordered_agent_pairings(self.n_agents)): #(_ordered_agent_pairings(self.n_agents)):
             # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
@@ -903,8 +904,24 @@ class FLOUNDERLAgent(nn.Module):
             _pi_a, _, _ = _to_batch(pi_a, tformat_level3)
             _pi_b, _, _ = _to_batch(pi_b, tformat_level3)
             # x = th.bmm(th.unsqueeze(aa_a, 2),  th.unsqueeze(aa_b, 1))
+            # At least one action unavailable.
             diff_matrix =  th.relu(paa[:, 1:-1].view(-1, self.n_actions, self.n_actions) -
                                    th.bmm(th.unsqueeze(aa_a[:, :-1], 2),  th.unsqueeze(aa_b[:, :-1], 1)))
+
+            diff_matrix = diff_matrix * _p_ab.view(-1, self.n_actions, self.n_actions)
+
+
+            both_unavailable = th.relu(paa[:, 1:-1].view(-1, self.n_actions, self.n_actions) -
+                                  th.add(th.unsqueeze(aa_a[:, :-1], 2), th.unsqueeze(aa_b[:, :-1], 1)))
+            both_unavailable = both_unavailable * _p_ab.view(-1, self.n_actions, self.n_actions)
+            both_unavailable_weight = th.sum(both_unavailable.view(-1, self.n_actions*self.n_actions), -1, keepdim=True)
+
+            # If neither component of the joint action is available both get resampled, with the probability of the independent actors.
+            correction = both_unavailable_weight * pi_actions_selected[_a:_a + 1].view(-1,1) *pi_actions_selected[_b:_b + 1].view(-1,1)
+
+            act_a = actions_masked[_a:_a + 1].view(-1, 1)
+            act_b = actions_masked[_b:_b + 1].view(-1, 1)
+            b_resamples = th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(),2).repeat([1,1,5]))
             pi_a_int = th.pow(_pi_a[:, :-1], aa_a[:, :-1]*(-1.0) + 1)
             pi_b_int = th.pow(_pi_b[:, :-1], aa_b[:, :-1]*(-1.0) + 1)
             correction = th.bmm( th.bmm( th.unsqueeze(pi_a_int, 1), diff_matrix), th.unsqueeze(pi_b_int, 2) ).squeeze(2)
