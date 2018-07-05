@@ -910,20 +910,20 @@ class FLOUNDERLAgent(nn.Module):
 
             diff_matrix = diff_matrix * _p_ab.view(-1, self.n_actions, self.n_actions)
 
-
             both_unavailable = th.relu(paa[:, 1:-1].view(-1, self.n_actions, self.n_actions) -
                                   th.add(th.unsqueeze(aa_a[:, :-1], 2), th.unsqueeze(aa_b[:, :-1], 1)))
+
             both_unavailable = both_unavailable * _p_ab.view(-1, self.n_actions, self.n_actions)
             both_unavailable_weight = th.sum(both_unavailable.view(-1, self.n_actions*self.n_actions), -1, keepdim=True)
 
             # If neither component of the joint action is available both get resampled, with the probability of the independent actors.
             correction = both_unavailable_weight * pi_actions_selected[_a:_a + 1].view(-1,1) * pi_actions_selected[_b:_b + 1].view(-1,1)
 
-            act_a = actions_masked[_a:_a + 1].view(-1, 1)
-            act_b = actions_masked[_b:_b + 1].view(-1, 1)
-            b_resamples = th.sum(th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(),2).repeat([1,1,5])),-1)
+            act_a = actions_masked[_a:_a + 1].view(-1, 1,1).long()
+            act_b = actions_masked[_b:_b + 1].view(-1, 1,1).long()
+            b_resamples = th.sum(th.gather(diff_matrix, 1, act_a.repeat([1,1, self.n_actions])),-1)
             b_resamples = b_resamples * pi_actions_selected[_b:_b + 1].view(-1,1)
-            a_resamples = th.sum(th.gather(diff_matrix, 2, th.unsqueeze(act_b.long(),1).repeat([1,5,1])),-1)
+            a_resamples = th.sum(th.gather(diff_matrix, 2, act_b.repeat([1, self.n_actions,1])), 1)
             a_resamples = a_resamples * pi_actions_selected[_a:_a + 1].view(-1,1)
 
             correction = correction + b_resamples + a_resamples
