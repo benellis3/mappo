@@ -880,7 +880,7 @@ class FLOUNDERLAgent(nn.Module):
             joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
-            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())
+            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long() + 1)
             _z[avail_flags==0.0] = 0.0 # TODO: RENORMALIZE?
             pi_ab_list.append(_z)
             # calculate pi_c_prod
