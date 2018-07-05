@@ -21,7 +21,14 @@ class MACKRELMultiagentController():
     TODO: may need to propagate test_mode in here as well!
     """
 
-    def __init__(self, runner, n_agents, n_actions, logging_struct=None, action_selector=None, args=None):
+    def __init__(self,
+                 runner,
+                 n_agents,
+                 n_actions,
+                 logging_struct=None,
+                 action_selector=None,
+                 args=None):
+
         self.args = args
         self.runner = runner
         self.n_agents = n_agents

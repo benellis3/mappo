@@ -917,11 +917,11 @@ class FLOUNDERLAgent(nn.Module):
             both_unavailable_weight = th.sum(both_unavailable.view(-1, self.n_actions*self.n_actions), -1, keepdim=True)
 
             # If neither component of the joint action is available both get resampled, with the probability of the independent actors.
-            correction = both_unavailable_weight * pi_actions_selected[_a:_a + 1].view(-1,1) *pi_actions_selected[_b:_b + 1].view(-1,1)
+            correction = both_unavailable_weight * pi_actions_selected[_a:_a + 1].view(-1,1) * pi_actions_selected[_b:_b + 1].view(-1,1)
 
             act_a = actions_masked[_a:_a + 1].view(-1, 1)
             act_b = actions_masked[_b:_b + 1].view(-1, 1)
-            b_resamples = th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(),2).repeat([1,1,5]))
+            b_resamples = th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(), 2).repeat([1,1,self.n_actions]))
             pi_a_int = th.pow(_pi_a[:, :-1], aa_a[:, :-1]*(-1.0) + 1)
             pi_b_int = th.pow(_pi_b[:, :-1], aa_b[:, :-1]*(-1.0) + 1)
             correction = th.bmm( th.bmm( th.unsqueeze(pi_a_int, 1), diff_matrix), th.unsqueeze(pi_b_int, 2) ).squeeze(2)
