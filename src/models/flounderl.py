@@ -921,9 +921,9 @@ class FLOUNDERLAgent(nn.Module):
 
             act_a = actions_masked[_a:_a + 1].view(-1, 1)
             act_b = actions_masked[_b:_b + 1].view(-1, 1)
-            b_resamples = th.sum(th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(),2).repeat([1,1,5])),-1)
+            b_resamples = th.sum(th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(),2).repeat([1,1,self.n_actions])),-1)
             b_resamples = b_resamples * pi_actions_selected[_b:_b + 1].view(-1,1)
-            a_resamples = th.sum(th.gather(diff_matrix, 2, th.unsqueeze(act_b.long(),1).repeat([1,5,1])),-1)
+            a_resamples = th.sum(th.gather(diff_matrix, 2, th.unsqueeze(act_b.long(),1).repeat([1,self.n_actions,1])),-1)
             a_resamples = a_resamples * pi_actions_selected[_a:_a + 1].view(-1,1)
 
             correction = correction + b_resamples + a_resamples
