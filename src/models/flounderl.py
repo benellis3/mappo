@@ -921,10 +921,13 @@ class FLOUNDERLAgent(nn.Module):
 
             act_a = actions_masked[_a:_a + 1].view(-1, 1)
             act_b = actions_masked[_b:_b + 1].view(-1, 1)
-            b_resamples = th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(),2).repeat([1,1,5]))
-            pi_a_int = th.pow(_pi_a[:, :-1], aa_a[:, :-1]*(-1.0) + 1)
-            pi_b_int = th.pow(_pi_b[:, :-1], aa_b[:, :-1]*(-1.0) + 1)
-            correction = th.bmm( th.bmm( th.unsqueeze(pi_a_int, 1), diff_matrix), th.unsqueeze(pi_b_int, 2) ).squeeze(2)
+            b_resamples = th.sum(th.gather(diff_matrix, 1, th.unsqueeze(act_a.long(),2).repeat([1,1,5])),-1)
+            b_resamples = b_resamples * pi_actions_selected[_b:_b + 1].view(-1,1)
+            a_resamples = th.sum(th.gather(diff_matrix, 2, th.unsqueeze(act_b.long(),1).repeat([1,5,1])),-1)
+            a_resamples = a_resamples * pi_actions_selected[_a:_a + 1].view(-1,1)
+
+
+            correction = correction + b_resamples + a_resamples
             pi_corr_list.append(_from_batch(correction, params_paa, tformat_paa))
 
         pi_a_cross_pi_b = th.cat(pi_a_cross_pi_b_list, dim=0)
