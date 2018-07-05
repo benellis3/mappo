@@ -192,6 +192,7 @@ def test1():
 def test2():
     """
     """
+
     _args = dict(n_agents=5,
                  t_max=1000000,
                  learner="coma",
@@ -354,6 +355,7 @@ def test2():
                                                                                        test_mode=False,
                                                                                        actions=env_actions,
                                                                                        batch_history=batch_history)
+
         actions_view = env_actions.cpu().view(runner_obj.n_agents, -1)
         policies_view = agent_controller_output["policies"].cpu().view(1, -1)
         for act in range(actions_view.shape[1]):
@@ -882,13 +884,42 @@ def test2_para():
         json.dump(data, outfile)
     pass
 
+def test__evaljson():
+    import json
+    #home / cs / Documents / pymarl/src/test/other/data999999_test1.txt
+    with open("/home/cs/Documents/pymarl/src/test/other/data59999_test2.txt", "r") as f:#data999999_test1.txt", "r") as f:
+        a = json.load(f)
+
+    res = []
+    for k, v in a.items():
+        for _k, _v in v.items():
+            res.append(_v)
+
+    prob_fails = []
+    stat_fails = []
+    for r in res:
+        stat = float(r.split(" ")[0])
+        prob = float(r.split(" ")[1][1:-1])
+        if prob == 0.0 and stat > 0.0:
+            prob_fails.append(r)
+        # if stat == 0.0 and prob > 0.0:
+        #    stat_fails.append(r)
+
+    print("PROB FAIL:")
+    import pprint
+    pprint.pprint(prob_fails)
+
+    print(len(prob_fails))
+    print(len(res))
+
 def main():
     # test1()
     # test1()
     # test2()
     # test3()
     # test1_para() # broken mysteriously
-    test2_para() # broken mysteriously
+    # test2_para() # broken mysteriously
+    test__evaljson()
     pass
 
 if __name__ == "__main__":

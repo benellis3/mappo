@@ -852,10 +852,14 @@ class FLOUNDERLAgent(nn.Module):
         avail_actions_level3 = inputs["level3"]["agent_input_level3"]["avail_actions"].clone().data
         avail_actions_selected = avail_actions_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
 
+        # RENORMALIZE THIS STUFF
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
         pi_c_prod_list = []
         pi_corr_list = []
+
+        # DEBUG: if prob is 0 throw a debug!
+
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)): #_ordered_agent_pairings(self.n_agents)[:self.args.n_pair_samples] if hasattr("n_pair_samples", self.args) else _ordered_agent_pairings(self.n_agents)): #(_ordered_agent_pairings(self.n_agents)):
             # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
             pi_a = pi[_a:_a+1]
@@ -877,7 +881,7 @@ class FLOUNDERLAgent(nn.Module):
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
             avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())
-            _z[avail_flags==0.0] = 0.0
+            _z[avail_flags==0.0] = 0.0 # TODO: RENORMALIZE?
             pi_ab_list.append(_z)
             # calculate pi_c_prod
             _pi_actions_selected = pi_actions_selected.clone()
@@ -886,6 +890,9 @@ class FLOUNDERLAgent(nn.Module):
             _pi_actions_selected[_a:_a + 1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
             _pi_actions_selected[avail_actions_selected==0.0] = 0.0 # should never happen!
+            if th.sum(avail_actions_selected==0.0):
+                a=5
+                pass
             # Set probabilities corresponding to individually disallowed actions to 0.0
             _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)
@@ -916,6 +923,10 @@ class FLOUNDERLAgent(nn.Module):
         _tmp =  out_level1.transpose(_adim(tformat_level1), _vdim(tformat_level1))
         _tmp[_tmp!=_tmp] = 0.0
         p_a_b_c = (p_prod * _tmp).sum(dim=_adim(tformat_level1), keepdim=True)
+
+        if th.sum(p_a_b_c == 0.0) > 0.0:
+            a= 5
+            pass
 
         if self.args.debug_mode in ["check_probs"]:
             if not hasattr(self, "action_table"):
