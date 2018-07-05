@@ -28,7 +28,7 @@ def test1():
                  env_args=dict(prey_movement="escape",
                                predator_prey_shape=(3,3),
                                nagent_capture_enabled=False,
-                               predator_prey_toroidal=True,
+                               predator_prey_toroidal=False,
                                n_agents=3,
                                n_prey=1,
                                agent_obs=(1,1),
@@ -149,7 +149,7 @@ def test1():
                                                             tformat=action_selection_inputs_tformat,
                                                             info=dict(T_env=runner_obj.T_env),
                                                             hidden_states=hidden_states,
-                                                            test_mode=True)
+                                                            test_mode=False)
 
         env_actions = [ a["data"] for a in selected_actions if (a["name"] == "actions")][0]
         # b = env_actions.max()
@@ -336,7 +336,7 @@ def test2():
                                                             tformat=action_selection_inputs_tformat,
                                                             info=dict(T_env=runner_obj.T_env),
                                                             hidden_states=hidden_states,
-                                                            test_mode=True)
+                                                            test_mode=False)
 
         env_actions = [a["data"] for a in selected_actions if (a["name"] == "actions")][0]
         # b = env_actions.max()
@@ -517,7 +517,7 @@ def test1_para():
                                                                 tformat=action_selection_inputs_tformat,
                                                                 info=dict(T_env=runner_obj.T_env),
                                                                 hidden_states=hidden_states,
-                                                                test_mode=True)
+                                                                test_mode=False)
 
             env_actions = [a["data"] for a in selected_actions if (a["name"] == "actions")][0]
             # b = env_actions.max()
@@ -776,7 +776,7 @@ def test2_para():
                                                                 tformat=action_selection_inputs_tformat,
                                                                 info=dict(T_env=T_env),
                                                                 hidden_states=hidden_states,
-                                                                test_mode=True)
+                                                                test_mode=False)
 
             env_actions = [a["data"] for a in selected_actions if (a["name"] == "actions")][0]
             # b = env_actions.max()
