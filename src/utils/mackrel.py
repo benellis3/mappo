@@ -57,7 +57,7 @@ def _joint_actions_2_action_pair_aa(joint_action, n_actions, avail_actions1, ava
 
     aa_m1 = _action1 != _action1
     aa_m2 = _action2 != _action2
-    _action1[aa_m1 ] = 0
+    _action1[aa_m1] = 0
     _action2[aa_m2] = 0
     aa1 = avail_actions1.data.gather(-1, ( _action1.long() ))
     aa2 = avail_actions2.data.gather(-1, ( _action2.long() ))
