@@ -894,9 +894,9 @@ class FLOUNDERLAgent(nn.Module):
             _pi_actions_selected[_a:_a + 1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
             _pi_actions_selected[avail_actions_selected==0.0] = 0.0 # should never happen!
-            if th.sum(avail_actions_selected==0.0):
-                a=5
-                pass
+            # if th.sum(avail_actions_selected==0.0):
+            #     a=5
+            #     pass
             # Set probabilities corresponding to individually disallowed actions to 0.0
             _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)

@@ -3,6 +3,7 @@
 # from utils.blitzz.scheme import Scheme
 # from utils.blitzz.sequence_buffer import BatchEpisodeBuffer
 # from utils.blitzz.learners.coma import COMALearner, COMAPolicyLoss, COMACriticLoss
+from components.episode_buffer import BatchEpisodeBuffer
 import numpy.testing as npt
 from torch import nn
 from utils.dict2namedtuple import convert
@@ -133,7 +134,7 @@ def test1():
                                                             bs_ids=None,
                                                             fill_zero=True)
 
-    # bh = batch_history.to_pd()
+    bh = batch_history.to_pd()
 
     stats = {}
     probs = {}
@@ -381,6 +382,224 @@ def test2():
             with open('data{}_test2.txt'.format(_i), 'w') as outfile:
                 json.dump(data, outfile)
 
+
+def test2_full():
+    """
+    """
+
+    _args = dict(n_agents=3,
+                 t_max=1000000,
+                 learner="coma",
+                 env="sc2",
+                 env_stats_aggregator="sc2",
+                 env_args=dict(difficulty="3",
+                               episode_limit=40,
+                               heuristic_function=False,
+                               measure_fps=True,
+                               move_amount=5,
+                               reward_death_value=10,
+                               reward_negative_scale=0.5,
+                               reward_only_positive=True,
+                               reward_scale=False,
+                               reward_scale_rate=0,
+                               reward_win=200,
+                               state_last_action=True,
+                               step_mul=8,
+                               map_name="3m_3m",
+                               intersection_global_view=False,
+                               seed=5,
+                               heuristic=True,
+                               obs_ignore_ally=False,
+                               obs_instead_of_state=False,
+                               continuing_episode=False,
+                               n_agents=3),
+                 tensorboard=True,
+                 name="33pp_comatest_dqn_new",
+                 target_critic_update_interval=200000 * 2000,  # DEBUG # 200000*20
+                 agent="basic",
+                 agent_model="DQN",
+                 observe=True,
+                 observe_db=True,
+                 action_selector="multinomial",
+                 use_blitzz=True,
+                 obs_last_action=True,
+                 test_interval=5000,
+                 epsilon_start=1.0,
+                 epsilon_finish=0.05,
+                 epsilon_time_length=100000,
+                 epsilon_decay="exp",
+                 test_nepisode=50,
+                 batch_size=1,  # 32,
+                 batch_size_run=1,  # 32,
+                 n_critic_learner_reps=200,
+                 runner="flounderl",
+                 n_loops_per_thread_or_sub_or_main_process=0,
+                 n_threads_per_subprocess_or_main_process=0,
+                 n_subprocesses=0,
+                 multiagent_controller="flounderl_mac",
+                 flounderl_agent_model="flounderl_agent",
+                 flounderl_agent_model_level1="flounderl_recurrent_agent_level1",
+                 flounderl_agent_model_level2="flounderl_recurrent_agent_level2",
+                 flounderl_agent_model_level3="flounderl_recurrent_agent_level3",
+                 flounderl_agent_use_past_actions=True,
+                 flounderl_critic='flounderl_critic',
+                 flounderl_critic_sample_size=1000,
+                 flounderl_critic_use_past_actions=True,
+                 flounderl_critic_use_sampling=False,
+                 flounderl_delegation_probability_bias=0.0,
+                 flounderl_entropy_loss_regularization_factor=5e-06,
+                 flounderl_epsilon_decay_mode_level1='exp',
+                 flounderl_epsilon_decay_mode_level2='exp',
+                 flounderl_epsilon_decay_mode_level3='exp',
+                 flounderl_epsilon_finish_level1=0.01,
+                 flounderl_epsilon_finish_level2=0.01,
+                 flounderl_epsilon_finish_level3=0.01,
+                 flounderl_epsilon_start_level1=0.5,
+                 flounderl_epsilon_start_level2=0.5,
+                 flounderl_epsilon_start_level3=0.5,
+                 flounderl_epsilon_time_length_level1=50000,
+                 flounderl_epsilon_time_length_level2=50000,
+                 flounderl_epsilon_time_length_level3=50000,
+                 flounderl_exploration_mode_level1="softmax",
+                 flounderl_exploration_mode_level2="softmax",
+                 flounderl_exploration_mode_level3="softmax",
+                 flounderl_use_entropy_regularizer=False,
+                 flounderl_use_obs_intersections=True,
+                 use_cuda=False,  # True,
+                 agent_level1_share_params=True,
+                 agent_level2_share_params=True,
+                 agent_level3_share_params=True,
+                 agents_hidden_state_size=64,
+                 debug_mode=True,
+                 n_pair_samples=1,
+                 debug_verbose=False,
+                 share_agent_params=True
+                 )
+
+    # required args
+    _required_args = dict(obs_epsilon=False,
+                          obs_agent_id=True,
+                          share_params=True,
+                          use_cuda=True,
+                          lr_critic=5e-4,
+                          lr_agent=5e-4,
+                          multiagent_controller="independent",
+                          td_lambda=1.0,
+                          gamma=0.99)
+    _logging_struct = None
+
+    args = convert(_args)
+    # set up train runner
+    runner_obj = r_REGISTRY[args.runner](args=args,
+                                         logging_struct=_logging_struct)
+    batch_history = runner_obj.run(test_mode=False)
+
+    action_selection_inputs, \
+    action_selection_inputs_tformat = runner_obj.episode_buffer.view(
+        dict_of_schemes=runner_obj.multiagent_controller.joint_scheme_dict,
+        to_cuda=runner_obj.args.use_cuda,
+        to_variable=True,
+        bs_ids=None,
+        fill_zero=True,  # TODO: DEBUG!!!
+    )
+
+    avail_actions, avail_actions_format = runner_obj.episode_buffer.get_col(col="avail_actions",
+                                                                            agent_ids=list(range(
+                                                                                runner_obj.n_agents)))
+
+    data_inputs, data_inputs_tformat = batch_history.view(
+        dict_of_schemes=runner_obj.multiagent_controller.joint_scheme_dict,
+        to_cuda=args.use_cuda,
+        to_variable=True,
+        bs_ids=None,
+        fill_zero=True)
+
+    bh = batch_history.to_pd()
+    nact = runner_obj.n_actions
+
+    ################## EXHAUSTIVELY SAMPLE JOINT ACTION SPACE
+
+    hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
+        len(batch_history))
+
+    data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=runner_obj.multiagent_controller.joint_scheme_dict,
+                                                          to_cuda=args.use_cuda,
+                                                          to_variable=True,
+                                                          bs_ids=None,
+                                                          fill_zero=True)
+
+    new_bs = batch_history._n_bs * (runner_obj.n_actions**runner_obj.n_agents)
+
+    # create new batch history object containing all we need in one batch
+    full_hist = BatchEpisodeBuffer(data_scheme=runner_obj.data_scheme,
+                                   n_bs=new_bs,
+                                   n_t=runner_obj.env_episode_limit+1,
+                                   n_agents=runner_obj.n_agents,
+                                   is_cuda=args.use_cuda,
+                                   is_shared_mem=False)
+
+    # # set transition data appropriately
+    # full_hist.data._transition = batch_history.data._transition.repeat(runner_obj.n_actions**runner_obj.n_agents, 1, 1)
+    # # set seq_lens appropriately
+    # full_hist.seq_lens = batch_history.seq_lens*(runner_obj.n_actions**runner_obj.n_agents)
+    # actions_vector =
+    # actions0
+    # full_hist.set_col(col="actions__agent0", data=actions0)
+    # # a1 = full_hist["actions__agent0"]
+
+    agent_controller_output, \
+    agent_controller_output_tformat = runner_obj.multiagent_controller.get_outputs(data_inputs,
+                                                                                   hidden_states = hidden_states,
+                                                                                   loss_fn = lambda policies, tformat: None,
+                                                                                   tformat = data_inputs_tformat,
+                                                                                   avail_actions = None,
+                                                                                   test_mode = False,
+                                                                                   batch_history = batch_history)
+
+    ################## EXHAUSTIVELY SAMPLE JOINT ACTION SPACE END
+
+    stats = {}
+    probs = {}
+    n_samples = 1000000
+    for _i in range(n_samples):
+
+        hidden_states, hidden_states_tformat = runner_obj.multiagent_controller.generate_initial_hidden_states(
+            len(batch_history))
+
+        hidden_states, selected_actions, action_selector_outputs, selected_actions_format = \
+            runner_obj.multiagent_controller.select_actions(inputs=action_selection_inputs,
+                                                            avail_actions=avail_actions,
+                                                            tformat=action_selection_inputs_tformat,
+                                                            info=dict(T_env=runner_obj.T_env),
+                                                            hidden_states=hidden_states,
+                                                            test_mode=False)
+
+        env_actions = [a["data"] for a in selected_actions if (a["name"] == "actions")][0]
+
+        actions_view = env_actions.cpu().view(runner_obj.n_agents, -1)
+        policies_view = agent_controller_output["policies"].cpu().view(1, -1)
+        for act in range(actions_view.shape[1]):
+            if not act in stats:
+                stats[act] = {}
+            act_tuple = tuple(actions_view[:, act].tolist())
+            if not act_tuple in stats[act]:
+                stats[act][act_tuple] = 1.0
+            else:
+                stats[act][act_tuple] += 1.0
+            if not act in probs:
+                probs[act] = {}
+            if not act_tuple in probs[act]:
+                probs[act][act_tuple] = policies_view[:, act].item()
+
+        if _i % 100 == (100 - 1):
+            print("step: {}".format(_i))
+
+        if _i % 10000 == (10000 - 1):
+            data = {k: {str(_k): "{} ({})".format(_v / float(_i), probs[k][_k]) for _k, _v in v.items()}
+                    for k, v in stats.items()}
+            pprint.pprint("_i ({}): \n {}".format(_i, data))
+            with open('data{}_test2.txt'.format(_i), 'w') as outfile:
+                json.dump(data, outfile)
 
 def test1_para():
 
@@ -892,7 +1111,7 @@ def test2_para():
 def test__evaljson():
     import json
     #home / cs / Documents / pymarl/src/test/other/data999999_test1.txt
-    with open("/home/cs/Documents/pymarl/src/test/other/data59999_test2.txt", "r") as f:#data999999_test1.txt", "r") as f:
+    with open("/home/cs/Documents/pymarl/src/test/other/3_agent_data79999_test1.txt", "r") as f:#data999999_test1.txt", "r") as f:
         a = json.load(f)
 
     res = []
@@ -917,14 +1136,38 @@ def test__evaljson():
     print(len(prob_fails))
     print(len(res))
 
+    probs = {}
+    probs_sum = {}
+    stats = {}
+    stats_sum = {}
+    for k, v in a.items():
+        for _k, _v in v.items():
+            prob = float(_v.split(" ")[1][1:-1])
+            stat = float(r.split(" ")[0])
+            if k not in probs:
+                probs[k] = []
+            probs[k].append(prob)
+            if k not in stats:
+                stats[k] = []
+            stats[k].append(prob)
+        probs_sum[k] = np.nansum(np.array(probs[k]))
+        stats_sum[k] = np.nansum(np.array(stats[k]))
+        if probs_sum[k] == 0.0:
+            print(np.array(probs[k]))
+
+    print("probs sum:")
+    pprint.pprint(probs_sum)
+    pprint.pprint(stats_sum)
+
 def main():
     # test1()
     # test1()
     # test2()
+    # test2_full()
     # test3()
-    test1_para() # broken mysteriously
+    # test1_para() # broken mysteriously
     # test2_para() # broken mysteriously
-    # test__evaljson()
+    test__evaljson()
     pass
 
 if __name__ == "__main__":
