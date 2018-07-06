@@ -335,7 +335,8 @@ class BatchEpisodeBuffer():
 
             # update seq_lens
             for bs_id in bs_ids: # maybe list comprehension but it's fast anyway
-                if bs_empty is not None and bs_id not in bs_empty:
+                #if bs_empty is not None and bs_id not in bs_empty:
+                if (bs_empty is not None and bs_id not in bs_empty) or bs_empty is None:
                     self.seq_lens[bs_id] = max(self.seq_lens[bs_id], max(t_ids)+1)
 
         elif scope in ["episode"]:
@@ -442,6 +443,7 @@ class BatchEpisodeBuffer():
                 cbh.data._episode[cbh.data._episode!=cbh.data._episode] = 0.0
 
             cbh.seq_lens=adjusted_seq_lens
+
             ret = cbh
             return ret
 
