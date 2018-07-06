@@ -581,7 +581,7 @@ def test1_para():
 
     from torch.multiprocessing import Queue
 
-    num_processes = 4
+    num_processes = 10
     n_samples = 1000000
     processes = []#
     q = Queue()
