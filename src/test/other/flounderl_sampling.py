@@ -1161,9 +1161,9 @@ def test__evaljson():
     pprint.pprint(stats_sum)
 
 def main():
-    test1()
     # test1()
-    # test2()
+    # test1()
+    test2()
     # test2_full()
     # test3()
     # test1_para() # broken mysteriously

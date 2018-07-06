@@ -392,6 +392,13 @@ class BatchEpisodeBuffer():
                 return _data
                 pass
 
+
+            # adjust sequence lengths
+            if t_id is None:
+                adjusted_seq_lens = [ self.seq_lens[_bs] for _bs in bs_ids ]
+            else:
+                adjusted_seq_lens = [1 if self.seq_lens[_bs] > t_id else 0 for _bs in bs_ids]
+
             # doing a bit of scheme-fu here: could certainly be done a bit nicer, but it's fast anyway so who cares
             output_sizes = scheme.get_output_sizes(self._data_scheme)
             scheme_renamed = deepcopy(scheme)
@@ -434,6 +441,7 @@ class BatchEpisodeBuffer():
                 cbh.data._transition[cbh.data._transition!=cbh.data._transition] = 0.0
                 cbh.data._episode[cbh.data._episode!=cbh.data._episode] = 0.0
 
+            cbh.seq_lens=adjusted_seq_lens
             ret = cbh
             return ret
 
