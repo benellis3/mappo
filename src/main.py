@@ -1,7 +1,6 @@
 import numpy as np
 import pymongo
 from sacred import Experiment, SETTINGS
-from sacred.arg_parser import parse_args
 from sacred.observers import FileStorageObserver
 from sacred.observers import MongoObserver
 from sacred.utils import apply_backspaces_and_linefeeds
