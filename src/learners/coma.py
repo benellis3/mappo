@@ -26,20 +26,21 @@ class COMAPolicyLoss(nn.Module):
     def forward(self, policies, advantages, actions, tformat):
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
-        policy_mask = (policies == 0.0)
-        log_policies = th.log(policies)
-        log_policies = log_policies.masked_fill(policy_mask, 0.0)
-
-        _adv = advantages.clone().detach()
-
         _act = actions.clone()
-        _act[_act!=_act] = 0.0 # mask NaNs in _act
+        nan_mask = _act != _act
 
-        _active_logits = th.gather(log_policies, _vdim(tformat), _act.long())
-        _active_logits[actions != actions] = 0.0 # mask logits for actions that are actually NaNs
-        _adv[actions != actions] = 0.0
+        _act[nan_mask] = 0.0  # mask NaNs in _act
+        pi_taken = th.gather(policies, _vdim(tformat), _act.long())
+        pi_taken[nan_mask] = 1.0
 
-        loss_mean = -(_active_logits.squeeze(_vdim(tformat)) * _adv.squeeze(_vdim(tformat))).mean(dim=_bsdim(tformat)) #DEBUG: MINUS?
+        log_pi_taken = th.log(pi_taken)
+
+        loss = -log_pi_taken * advantages.detach() * (1 - nan_mask).float()
+        norm = (1 - nan_mask).sum(_bsdim(tformat), keepdim=True)
+        norm[norm == 0.0] = 1.0
+        loss_mean = loss.sum(_bsdim(tformat), keepdim=True) / norm.float()
+        loss_mean = loss_mean.squeeze(_vdim(tformat)).squeeze(_bsdim(tformat))
+
         output_tformat = "a*t"
 
         return loss_mean, output_tformat
