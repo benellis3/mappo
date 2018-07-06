@@ -34,7 +34,8 @@ def test1():
                                n_prey=1,
                                agent_obs=(1,1),
                                episode_limit=10, # 40
-                               intersection_global_view=True),
+                               intersection_global_view=True,
+                               fully_observable=False),
                  tensorboard=True,
                  name="33pp_comatest_dqn_new",
                  target_critic_update_interval=200000*2000, # DEBUG # 200000*20
@@ -1160,7 +1161,7 @@ def test__evaljson():
     pprint.pprint(stats_sum)
 
 def main():
-    # test1()
+    test1()
     # test1()
     # test2()
     # test2_full()
