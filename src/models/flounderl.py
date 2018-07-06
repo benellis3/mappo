@@ -860,28 +860,31 @@ class FLOUNDERLAgent(nn.Module):
 
         # DEBUG: if prob is 0 throw a debug!
         # jakob debug
+        # 0 (0, 1)
+        # 1 (0, 2)
+        # 2 (1, 2)
 
         for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)): #_ordered_agent_pairings(self.n_agents)[:self.args.n_pair_samples] if hasattr("n_pair_samples", self.args) else _ordered_agent_pairings(self.n_agents)): #(_ordered_agent_pairings(self.n_agents)):
             # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
-            pi_a = pi[_a:_a+1]
-            pi_b = pi[_b:_b+1]
+            pi_a = pi[_a:_a+1].clone()
+            pi_b = pi[_b:_b+1].clone()
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
             actions_masked = actions.clone()
             actions_masked[actions!=actions] = 0.0
-            _actions_x, _actions_params, _actions_tformat = _to_batch(actions_masked[_a:_a+1], tformat["level3"])
-            _actions_y, _actions_params, _actions_tformat = _to_batch(actions_masked[_b:_b+1], tformat["level3"])
+            _actions_x, _actions_params, _actions_tformat = _to_batch(actions_masked[_a:_a+1].clone(), tformat["level3"])
+            _actions_y, _actions_params, _actions_tformat = _to_batch(actions_masked[_b:_b+1].clone(), tformat["level3"])
             _x = x.gather(1, _actions_x.long())
             _y = y.gather(1, _actions_y.long())
             z = _x * _y
             u = _from_batch(z, params_x, tformat_x)
             pi_a_cross_pi_b_list.append(u)
             # calculate p_ab_selected
-            _p_ab = p_ab[_i:_i+1]
+            _p_ab = p_ab[_i:_i+1].clone()
             joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
-            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long() + 1)
+            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long() + 1).clone()
             _z[avail_flags==0.0] = 0.0 # TODO: RENORMALIZE?
             pi_ab_list.append(_z)
             # calculate pi_c_prod
@@ -898,9 +901,9 @@ class FLOUNDERLAgent(nn.Module):
             _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)
             # Calculate corrective delegation (when unavailable actions are selected)
-            aa_a, _, _ = _to_batch(avail_actions_level3[_a:_a+1], tformat_level3)
-            aa_b, _, _ = _to_batch(avail_actions_level3[_b:_b+1], tformat_level3)
-            paa, params_paa, tformat_paa = _to_batch(pairwise_avail_actions[_i:_i+1], tformat_level3)
+            aa_a, _, _ = _to_batch(avail_actions_level3[_a:_a+1].clone(), tformat_level3)
+            aa_b, _, _ = _to_batch(avail_actions_level3[_b:_b+1].clone(), tformat_level3)
+            paa, params_paa, tformat_paa = _to_batch(pairwise_avail_actions[_i:_i+1].clone(), tformat_level3)
             _pi_a, _, _ = _to_batch(pi_a, tformat_level3)
             _pi_b, _, _ = _to_batch(pi_b, tformat_level3)
             # x = th.bmm(th.unsqueeze(aa_a, 2),  th.unsqueeze(aa_b, 1))
@@ -919,8 +922,8 @@ class FLOUNDERLAgent(nn.Module):
             # If neither component of the joint action is available both get resampled, with the probability of the independent actors.
             correction = both_unavailable_weight * pi_actions_selected[_a:_a + 1].view(-1,1) * pi_actions_selected[_b:_b + 1].view(-1,1)
 
-            act_a = actions_masked[_a:_a + 1].view(-1, 1,1).long()
-            act_b = actions_masked[_b:_b + 1].view(-1, 1,1).long()
+            act_a = actions_masked[_a:_a + 1].clone().view(-1, 1,1).long()
+            act_b = actions_masked[_b:_b + 1].clone().view(-1, 1,1).long()
             b_resamples = th.sum(th.gather(diff_matrix, 1, act_a.repeat([1,1, self.n_actions])),-1)
             b_resamples = b_resamples * pi_actions_selected[_b:_b + 1].view(-1,1)
 
