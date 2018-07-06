@@ -256,10 +256,10 @@ class FLOUNDERLMultiagentController():
                                                pairwise_avail_actions.shape[2], 1).fill_(1.0), requires_grad=False)
             pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=_vdim(tformat))
 
-            mask = pairwise_avail_actions.data.clone().fill_(0.0)
-            mask[:,:,:,-1] = 1.0
-            mask.scatter_(_adim(inputs_level2_tformat), sampled_pair_ids.repeat(1,1,1,pairwise_avail_actions.shape[-1]).long(), pairwise_avail_actions.data)
-            pairwise_avail_actions = Variable(mask, requires_grad=False)
+            # mask = pairwise_avail_actions.data.clone().fill_(0.0)
+            # mask[:,:,:,-1] = 1.0
+            # mask.scatter_(_adim(inputs_level2_tformat), sampled_pair_ids.repeat(1,1,1,pairwise_avail_actions.shape[-1]).long(), pairwise_avail_actions.data)
+            # pairwise_avail_actions = Variable(mask, requires_grad=False)
 
             out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.model.models["level2_{}".format(0)](inputs_level2["agent_input_level2"],
                                                                                                                         hidden_states=hidden_states["level2"],
