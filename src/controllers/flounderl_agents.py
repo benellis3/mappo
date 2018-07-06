@@ -343,18 +343,18 @@ class FLOUNDERLMultiagentController():
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
             self.avail_actions = avail_actions_level3.clone()
 
-            active = action_tensor.clone() # action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
-            active[active == active] = 0.0
-            active[active != active] = 1.0
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0] = \
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0].fill_(0.0)
-            avail_actions_level3[:, :, :, -1:] = 1.0 - active
-
-
-            av = avail_actions_level3.clone().view(-1, avail_actions_level3.shape[3]).cpu().numpy() # DEBUG
-            at_old = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
-            at_old_shp = action_tensor.clone().cpu().view(action_tensor.shape[0], -1, action_tensor.shape[3])
-            act = active.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
+            # active = action_tensor.clone() # action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
+            # active[active == active] = 0.0
+            # active[active != active] = 1.0
+            # avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0] = \
+            # avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0].fill_(0.0)
+            # avail_actions_level3[:, :, :, -1:] = 1.0 - active
+            #
+            #
+            # av = avail_actions_level3.clone().view(-1, avail_actions_level3.shape[3]).cpu().numpy() # DEBUG
+            # at_old = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
+            # at_old_shp = action_tensor.clone().cpu().view(action_tensor.shape[0], -1, action_tensor.shape[3])
+            # act = active.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
 
             inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3,
                                                                             requires_grad=False)
