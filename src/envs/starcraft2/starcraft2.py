@@ -20,7 +20,6 @@ from s2clientprotocol import debug_pb2 as d_pb
 
 from utils.dict2namedtuple import convert
 
-
 from absl import flags
 import sys
 
@@ -203,20 +202,20 @@ class SC2(MultiAgentEnv):
         else:
             self.game_version = "4.1.2" # latest release, uses visualisations
             if self.map_type == 'stalker_zaelot':
-                self.stalker_id = 1922
-                self.zealot_id = 1923
+                self.stalker_id = 1923
+                self.zealot_id = 1924
             elif self.map_type == 'ssz':
-                self.sentry_id = 1922
-                self.stalker_id = 1923
-                self.zealot_id = 1924
+                self.sentry_id = 1923
+                self.stalker_id = 1924
+                self.zealot_id = 1925
             elif self.map_type == 'csz':
-                self.colossus_id = 1922
-                self.stalker_id = 1923
-                self.zealot_id = 1924
+                self.colossus_id = 1923
+                self.stalker_id = 1924
+                self.zealot_id = 1925
             elif self.map_type == 'MMM':
-                self.marauder_id = 1922
-                self.marine_id = 1923
-                self.medivac_id = 1924
+                self.marauder_id = 1923
+                self.marine_id = 1924
+                self.medivac_id = 1925
 
     def _launch(self):
 
@@ -1129,6 +1128,9 @@ class SC2(MultiAgentEnv):
                     self.enemies[len(self.enemies)] = unit
                     if self._episode_count == 1: # TODO check this
                         self.max_reward += unit.health_max + unit.shield_max
+
+            #print("Agent types", [unit.unit_type for unit in self.agents.values()])
+            #print("Enemy types", [unit.unit_type for unit in self.enemies.values()])
 
             if len(self.agents) == self.n_agents and len(self.enemies) == self.n_enemies:
                 # All good
