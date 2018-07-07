@@ -20,6 +20,13 @@ from s2clientprotocol import debug_pb2 as d_pb
 
 from utils.dict2namedtuple import convert
 
+
+from absl import flags
+import sys
+
+FLAGS = flags.FLAGS
+FLAGS(['main.py'])
+
 # Copyright 2018, Mika Samvelyan
 
 _possible_results = {
@@ -76,6 +83,7 @@ map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60},
 class SC2(MultiAgentEnv):
 
     def __init__(self, **kwargs):
+
         args = kwargs["env_args"]
         if isinstance(args, dict):
             args = convert(args)
