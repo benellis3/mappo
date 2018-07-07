@@ -557,6 +557,8 @@ class NStepRunner():
         # copy initial transition into episode buffer
         self.episode_buffer.insert(self.transition_buffer, t_ids=0, bs_ids=list(range(0, self.batch_size)))
 
+        # c = self.transition_buffer.to_pd() #DEBUG
+
         # re-initialize the hidden states
         self.hidden_states, self.hidden_states_format = self.multiagent_controller.generate_initial_hidden_states(self.batch_size)
 

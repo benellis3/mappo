@@ -105,7 +105,7 @@ class BatchEpisodeBuffer():
 
         pass
 
-    def get_col(self, col, scope="transition", agent_ids=None, t=None, stack=True, bs=None, fill_zero=False):
+    def get_col(self, col, scope="transition", agent_ids=None, t=None, stack=True, bs=None):
         """
         retrieve a single column from buffer (or a list of columns, labelled by agent_ids)
 
@@ -151,52 +151,16 @@ class BatchEpisodeBuffer():
             if stack:
                 ret = th.stack(ret)
                 tformat  = "a*" + tformat
-                if isinstance(bs, (list, tuple)):
-                    bs_ids = bs
-                elif isinstance(bs, slice):
-                    bs_ids = range(slice.start, slice.stop, slice.step if slice.step is not None else 1)
-                elif bs is None:
-                    bs_ids = list(range(self._n_bs))
-                else:
-                    bs_ids = [bs]
-                for _bs in bs_ids:
-                    first_nan_t = self.seq_lens[_bs]
-                    if isinstance(t, slice):
-                        first_nan_t = math.ceil((self.seq_lens[_bs] - t.start) / (t.step if t.step is not None else 1.0))
-                    if first_nan_t < ret.shape[2]:
-                        ret[:, :, first_nan_t:, :] = 0.0
-
             else:
                 tformat = "[a]*" + tformat
         else:
-            ret = _get_col(_col=col,
-                           _t=t,
-                           _bs=bs,
-                           _scope=scope)
+            ret = _get_col(_col=col, _t=t, _bs=bs, _scope=scope)
             if scope in ["transition"]:
                 tformat = "bs*t*v"
-                if fill_zero:
-                    if isinstance(bs, (list, tuple)):
-                        bs_ids = bs
-                    elif isinstance(bs, slice):
-                        bs_ids = range(slice.start, slice.stop, slice.step if slice.step is not None else 1)
-                    elif bs is None:
-                        bs_ids = list(range(self._n_bs))
-                    else:
-                        bs_ids = [bs]
-                    for _bs in bs_ids:
-                        first_nan_t = self.seq_lens[_bs]
-                        if isinstance(t, slice):
-                            first_nan_t = math.ceil((self.seq_lens[_bs] - t.start) / (t.step if t.step is not None else 1.0))
-                        if first_nan_t < ret.shape[1]:
-                            ret[:, first_nan_t:, :] = 0.0
-
             elif scope in ["episode"]:
                 tformat = "bs*v"
-                # assert not fill_zero, "fill_zero=True makes no sense for episode scope!"
             else:
                 assert False, "unknown scope!"
-
 
         return ret, tformat
 
@@ -233,7 +197,10 @@ class BatchEpisodeBuffer():
                 col_slice = slice(self.columns._transition[_col][0], self.columns._transition[_col][1])
                 if not isinstance(bs, (tuple, list)):
                     assert bs_slice.stop <= self.data._transition.shape[0] and t_slice.stop <= self.data._transition.shape[1], "indices out of range!"
-                    self.data._transition[bs_slice, t_slice, col_slice] = _data
+                    try:
+                        self.data._transition[bs_slice, t_slice, col_slice] = _data
+                    except Exception as e:
+                        pass
 
                     # modify sequence lengths
                     for _bs in range(bs_slice.start, bs_slice.stop):
@@ -368,6 +335,7 @@ class BatchEpisodeBuffer():
 
             # update seq_lens
             for bs_id in bs_ids: # maybe list comprehension but it's fast anyway
+                #if bs_empty is not None and bs_id not in bs_empty:
                 if (bs_empty is not None and bs_id not in bs_empty) or bs_empty is None:
                     self.seq_lens[bs_id] = max(self.seq_lens[bs_id], max(t_ids)+1)
 
@@ -425,6 +393,13 @@ class BatchEpisodeBuffer():
                 return _data
                 pass
 
+
+            # adjust sequence lengths
+            if t_id is None:
+                adjusted_seq_lens = [ self.seq_lens[_bs] for _bs in bs_ids ]
+            else:
+                adjusted_seq_lens = [1 if self.seq_lens[_bs] > t_id else 0 for _bs in bs_ids]
+
             # doing a bit of scheme-fu here: could certainly be done a bit nicer, but it's fast anyway so who cares
             output_sizes = scheme.get_output_sizes(self._data_scheme)
             scheme_renamed = deepcopy(scheme)
@@ -449,8 +424,7 @@ class BatchEpisodeBuffer():
                 _data, _data_format = self.get_col(col=scheme_item["name"],
                                                    scope=scope,
                                                    t=t_slice,
-                                                   bs=bs_ids,
-                                                   fill_zero=fill_zero)
+                                                   bs=bs_ids)
 
                 data = _apply_transform(scheme_item=scheme_item,
                                         _data=_data,
@@ -464,11 +438,11 @@ class BatchEpisodeBuffer():
 
                 cbh.set_col(scheme_item.get("rename", scheme_item.get("name")), data, scope=scope)
 
-            # if fill_zero: # fill NaNs due to early termination with zeros if requested
-            #    for _bs in range(len(bs_ids)):
-            #        #cbh.data._transition[cbh.data._transition!=cbh.data._transition] = 0.0
-            #        cbh.data._transition[_bs,cbh.seq_lens,:]
-            #    # cbh.data._episode[cbh.data._episode!=cbh.data._episode] = 0.0
+            if fill_zero: # fill NaNs with zeros if requested
+                cbh.data._transition[cbh.data._transition!=cbh.data._transition] = 0.0
+                cbh.data._episode[cbh.data._episode!=cbh.data._episode] = 0.0
+
+            cbh.seq_lens=adjusted_seq_lens
 
             ret = cbh
             return ret
@@ -561,17 +535,6 @@ class BatchEpisodeBuffer():
                                                      gamma=gamma,
                                                      td_lambda=td_lambda)
             return stats, tformat
-        elif label in ["n_step_return"]:
-            gamma = kwargs.get("gamma")
-            n = kwargs.get("n")
-            n_agents = kwargs.get("n_agents", self.n_agents)
-            value_function_values = kwargs.get("value_function_values") # else may get weird variable sharing errors
-
-            stats, tformat = self._n_step_return(value_function_values,
-                                                 n_agents=n_agents,
-                                                 gamma=gamma,
-                                                 n=n)
-            return stats, tformat
         else:
             assert False, "Unknown batch statistic: {}".format(label)
         pass
@@ -620,9 +583,6 @@ class BatchEpisodeBuffer():
 
         G_buffer = R_tensor.clone() * float("nan")
         G_buffer[:, :, h - 1, :] = R_tensor[:, :, h, :]
-
-        #a = G_buffer[:, :, h - 1:h, :]
-        #b = gamma * V_tensor[:, :, h:, :] * truncated_tensor
         G_buffer[:, :, h - 1:h, :] += gamma * V_tensor[:, :, h:, :] * truncated_tensor
 
         for t in range(h - 1, 0, -1):
@@ -630,57 +590,4 @@ class BatchEpisodeBuffer():
             G_buffer[:, :, t - 1, :] = new_G
 
         G_buffer = _align_left(G_buffer, h, seq_lens)
-        return G_buffer, "a*bs*t*v"
-
-    def _n_step_return(self, value_function_values, n_agents, gamma, n):
-        """
-        uses efficient update rule for calculating consecutive G_t_n_lambda in reverse (see docs)
-        """
-
-        V_tensor = value_function_values
-        if isinstance(V_tensor, Variable):
-            V_tensor = V_tensor.data
-        V_tensor = V_tensor.clone()
-
-        R_tensor, _ = self.get_col(col="reward")
-        if isinstance(R_tensor, Variable):
-            R_tensor = R_tensor.data
-        R_tensor = R_tensor.clone().unsqueeze(0).repeat(n_agents, 1, 1, 1)
-        h = self._n_t-1 # horizon (index)
-
-        # create truncation tensor
-        truncated, _ = self.get_col(col="truncated")
-        truncated = truncated.clone() # clone this because we are de-NaNing in place
-        truncated[truncated!=truncated] = 0.0 # need to mask NaNs
-        truncated_tensor = truncated.sum(dim=1, keepdim=True).unsqueeze(0).repeat(n_agents,1,1,1)
-
-        seq_lens = self.seq_lens
-
-        # def _align_right(tensor, h, lengths):
-        #     for _i, _l in enumerate(lengths):
-        #         if _l < h + 1 and _l > 0:
-        #             tensor[:, _i, -_l:, :] = tensor[:, _i, :_l, :].clone() # clone is super important as otherwise, cyclical reference!
-        #             tensor[:, _i, :(h + 1 - _l), :] = float("nan")  # not strictly necessary as will shift back anyway later...
-        #     return tensor
-        #
-        # def _align_left(tensor, h, lengths):
-        #     for _i, _l in enumerate(lengths):
-        #         if _l < h + 1 and _l > 0:
-        #             tensor[:, _i, :_l, :] = tensor[:, _i, -_l:, :].clone() # clone is super important as otherwise, cyclical reference!
-        #             tensor[:, _i, -(h + 1 - _l):, :] = float(
-        #                 "nan")  # not strictly necessary as will shift back anyway later...
-        #     return tensor
-        #
-        # R_tensor = _align_right(R_tensor, h, seq_lens)
-        # V_tensor = _align_right(V_tensor, h, seq_lens)
-        #
-        # G_buffer = R_tensor.clone() * float("nan")
-        # G_buffer[:, :, h - 1, :] = R_tensor[:, :, h, :]
-        # G_buffer[:, :, h - 1:h, :] += gamma * V_tensor[:, :, h:, :] * truncated_tensor
-        #
-        # for t in range(h - 1, 0, -1):
-        #     new_G = gamma * td_lambda * G_buffer[:, :, t, :] + gamma*(1-td_lambda) * V_tensor[:, :, t, :] + R_tensor[:, :, t, :]
-        #     G_buffer[:, :, t - 1, :] = new_G
-        #
-        # G_buffer = _align_left(G_buffer, h, seq_lens)
         return G_buffer, "a*bs*t*v"

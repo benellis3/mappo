@@ -9,7 +9,8 @@ from components.scheme import Scheme
 from components.episode_buffer import BatchEpisodeBuffer
 from components.transforms import _build_model_inputs, _join_dicts, \
     _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim, _vdim, _agent_flatten, _check_nan, \
-    _to_batch, _from_batch, _vdim, _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean
+    _to_batch, _from_batch, _vdim, _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean, \
+    _pad_nan
 
 from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
@@ -183,7 +184,7 @@ class FLOUNDERLMultiagentController():
         """
         sample from the FLOUNDERL tree
         """
-        cd = inputs["agent_input_level2__agent0"].to_pd() # DEBUG
+        # cd = inputs["agent_input_level2__agent0"].to_pd() # DEBUG
 
         T_env = info["T_env"]
         test_suffix = "" if not test_mode else "_test"
@@ -198,13 +199,16 @@ class FLOUNDERLMultiagentController():
                                                                        inputs_tformat=tformat)
             if self.args.debug_mode:
                 _check_nan(inputs_level1)
+
             out_level1, hidden_states_level1, losses_level1, tformat_level1 = self.model.model_level1(inputs_level1["agent_input_level1"],
-                                                                                                                        hidden_states=hidden_states["level1"],
-                                                                                                                        loss_fn=None,
-                                                                                                                        tformat=inputs_level1_tformat,
-                                                                                                                        n_agents=self.n_agents,
-                                                                                                                        test_mode=test_mode,
-                                                                                                                        **kwargs)
+                                                                                                      hidden_states=hidden_states["level1"],
+                                                                                                      loss_fn=None,
+                                                                                                      tformat=inputs_level1_tformat,
+                                                                                                      n_agents=self.n_agents,
+                                                                                                      test_mode=test_mode,
+                                                                                                      **kwargs)
+
+
             if self.args.debug_mode:
                 _check_nan(inputs_level1)
 
@@ -227,6 +231,7 @@ class FLOUNDERLMultiagentController():
             self.actions_level1 = sampled_pair_ids.clone()
             self.selected_actions_format = selected_actions_format_level1
             self.policies_level1 = modified_inputs_level1.squeeze(0).clone()
+
 
             inputs_level2, inputs_level2_tformat = _build_model_inputs(self.input_columns_level2,
                                                                        inputs,
@@ -251,10 +256,10 @@ class FLOUNDERLMultiagentController():
                                                pairwise_avail_actions.shape[2], 1).fill_(1.0), requires_grad=False)
             pairwise_avail_actions = th.cat([delegation_avails, pairwise_avail_actions], dim=_vdim(tformat))
 
-            mask = pairwise_avail_actions.data.clone().fill_(0.0)
-            mask[:,:,:,-1] = 1.0
-            mask.scatter_(_adim(inputs_level2_tformat), sampled_pair_ids.repeat(1,1,1,pairwise_avail_actions.shape[-1]).long(), pairwise_avail_actions.data)
-            pairwise_avail_actions = Variable(mask, requires_grad=False)
+            # mask = pairwise_avail_actions.data.clone().fill_(0.0)
+            # mask[:,:,:,-1] = 1.0
+            # mask.scatter_(_adim(inputs_level2_tformat), sampled_pair_ids.repeat(1,1,1,pairwise_avail_actions.shape[-1]).long(), pairwise_avail_actions.data)
+            # pairwise_avail_actions = Variable(mask, requires_grad=False)
 
             out_level2, hidden_states_level2, losses_level2, tformat_level2 = self.model.models["level2_{}".format(0)](inputs_level2["agent_input_level2"],
                                                                                                                         hidden_states=hidden_states["level2"],
@@ -330,15 +335,27 @@ class FLOUNDERLMultiagentController():
             action_tensor.scatter_(0, pair_id1, actions1)
             action_tensor.scatter_(0, pair_id2, actions2)
 
-            # l1 = action_tensor.clone().squeeze() # DEBUG
-            # a = np.nanmax(action_matrix.cpu().numpy())# DEBUG
+            dbg = action_tensor.clone() # DEBUG
+            dbg[dbg!=dbg] = -float("inf") # DEBUG
+            mmm = dbg.max().cpu().numpy() # DEBUG
+            assert mmm < self.n_actions, "no-op in env action at mmm!" # DEBUG
+
             avail_actions_level3 = inputs_level3["agent_input_level3"]["avail_actions"].clone().data
-            active = action_tensor.clone() # action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
-            active[active == active] = 0.0
-            active[active != active] = 1.0
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0] = \
-            avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0].fill_(0.0)
-            avail_actions_level3[:, :, :, -1:] = 1.0 - active
+            self.avail_actions = avail_actions_level3.clone()
+
+            # active = action_tensor.clone() # action_matrix.view(self.n_agents, pair_sampled_actions.shape[_bsdim(tformat)], pair_sampled_actions.shape[_tdim(tformat)], -1).clone() #.unsqueeze(2).clone()
+            # active[active == active] = 0.0
+            # active[active != active] = 1.0
+            # avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0] = \
+            # avail_actions_level3[active.repeat(1, 1, 1, avail_actions_level3.shape[_vdim(tformat)]) == 0.0].fill_(0.0)
+            # avail_actions_level3[:, :, :, -1:] = 1.0 - active
+            #
+            #
+            # av = avail_actions_level3.clone().view(-1, avail_actions_level3.shape[3]).cpu().numpy() # DEBUG
+            # at_old = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
+            # at_old_shp = action_tensor.clone().cpu().view(action_tensor.shape[0], -1, action_tensor.shape[3])
+            # act = active.clone().cpu().view(-1, action_tensor.shape[3]).numpy() # DEBUG
+
             inputs_level3["agent_input_level3"]["avail_actions"] = Variable(avail_actions_level3,
                                                                             requires_grad=False)
 
@@ -365,10 +382,21 @@ class FLOUNDERLMultiagentController():
             #                                                 individual_actions.shape[_tdim(tformat_level3)],
             #                                                 1)
             self.actions_level3 = individual_actions
-
-            #action_matrix[action_matrix != action_matrix] = individual_actions_sq[action_matrix != action_matrix]
             action_tensor[action_tensor != action_tensor] = individual_actions[action_tensor != action_tensor]
-            # b = action_matrix.cpu().numpy().max() # DEBUG
+
+            # set states beyond episode termination to NaN
+            action_tensor = _pad_nan(action_tensor, tformat=tformat_level3, seq_lens=inputs["agent_input_level1"].seq_lens) # DEBUG
+
+            dbg = action_tensor.clone() # DEBUG
+            dbg[dbg!=dbg] = -float("inf") # DEBUG
+            mmm2 = dbg.max().cpu().numpy() # DEBUG
+            try:
+                assert mmm2 < self.n_actions, "no-op in env action at mmm2!" # DEBUG
+            except:
+                at_new = action_tensor.clone().cpu().view(-1, action_tensor.shape[3]).numpy()
+                indv = individual_actions.clone().cpu().view(-1, individual_actions.shape[3]).numpy()
+                av_env = self.avail_actions.clone().view(-1, self.avail_actions.shape[3]).cpu().numpy()
+                pass
 
             # l2 = action_tensor.squeeze()  # DEBUG
             if self.args.debug_mode in ["level3_actions_only"]:
@@ -387,7 +415,7 @@ class FLOUNDERLMultiagentController():
             #self.actions_level3 = individual_actions.clone()
             self.selected_actions_format_level3 = selected_actions_format_level3
             self.policies_level3 = modified_inputs_level3.clone()
-            self.avail_actions = avail_actions_level3.data
+            self.avail_actions_active = avail_actions_level3.data
 
             selected_actions_list = []
             for _i in range(_n_agent_pair_samples(self.n_agents) if self.args.n_pair_samples is None else self.args.n_pair_samples): #_n_agent_pair_samples(self.n_agents)):
@@ -415,12 +443,16 @@ class FLOUNDERLMultiagentController():
             modified_inputs_list += [dict(name="policies_level3",
                                           select_agent_ids=list(range(self.n_agents)),
                                           data=self.policies_level3)]
+            modified_inputs_list += [dict(name="avail_actions_active",
+                                          select_agent_ids=list(range(self.n_agents)),
+                                          data=self.avail_actions_active)]
             modified_inputs_list += [dict(name="avail_actions",
                                           select_agent_ids=list(range(self.n_agents)),
                                           data=self.avail_actions)]
-            modified_inputs_list += [dict(name="avail_actions",
-                                          select_agent_ids=list(range(self.n_agents)),
-                                          data=self.avail_actions)]
+
+            #modified_inputs_list += [dict(name="avail_actions",
+            #                              select_agent_ids=list(range(self.n_agents)),
+            #                              data=self.avail_actions)]
 
             hidden_states = dict(level1=hidden_states_level1,
                                  level2=hidden_states_level2,

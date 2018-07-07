@@ -841,7 +841,7 @@ class FLOUNDERLAgent(nn.Module):
         # actions[actions!=actions] = 0.0
 
         p_d = out_level2[:, :, :, 0:1]
-        p_ab = out_level2[:, :, :, 1:]
+        p_ab = out_level2[:, :, :, 1:-1]
 
         _actions = actions.clone()
         _actions[actions != actions] = 0.0
@@ -852,32 +852,44 @@ class FLOUNDERLAgent(nn.Module):
         avail_actions_level3 = inputs["level3"]["agent_input_level3"]["avail_actions"].clone().data
         avail_actions_selected = avail_actions_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
 
+        # RENORMALIZE THIS STUFF
         pi_a_cross_pi_b_list = []
         pi_ab_list = []
         pi_c_prod_list = []
         pi_corr_list = []
-        for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)):
+
+        # DEBUG: if prob is 0 throw a debug!
+        # jakob debug
+        # 0 (0, 1)
+        # 1 (0, 2)
+        # 2 (1, 2)
+
+        for _i, (_a, _b) in enumerate(_ordered_agent_pairings(self.n_agents)): #_ordered_agent_pairings(self.n_agents)[:self.args.n_pair_samples] if hasattr("n_pair_samples", self.args) else _ordered_agent_pairings(self.n_agents)): #(_ordered_agent_pairings(self.n_agents)):
             # calculate pi_a_cross_pi_b # TODO: Set disallowed joint actions to NaN!
-            pi_a = pi[_a:_a+1]
-            pi_b = pi[_b:_b+1]
+            pi_a = pi[_a:_a+1].clone()
+            pi_b = pi[_b:_b+1].clone()
             x, params_x, tformat_x = _to_batch(out_level3[_a:_a+1], tformat["level3"])
             y, params_y, tformat_y  = _to_batch(out_level3[_b:_b+1], tformat["level3"])
             actions_masked = actions.clone()
             actions_masked[actions!=actions] = 0.0
-            _actions_x, _actions_params, _actions_tformat = _to_batch(actions_masked[_a:_a+1], tformat["level3"])
-            _actions_y, _actions_params, _actions_tformat = _to_batch(actions_masked[_b:_b+1], tformat["level3"])
+            _actions_x, _actions_params, _actions_tformat = _to_batch(actions_masked[_a:_a+1].clone(), tformat["level3"])
+            _actions_y, _actions_params, _actions_tformat = _to_batch(actions_masked[_b:_b+1].clone(), tformat["level3"])
             _x = x.gather(1, _actions_x.long())
             _y = y.gather(1, _actions_y.long())
             z = _x * _y
             u = _from_batch(z, params_x, tformat_x)
             pi_a_cross_pi_b_list.append(u)
             # calculate p_ab_selected
-            _p_ab = p_ab[_i:_i+1]
-            joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
+            _p_ab = p_ab[_i:_i+1].clone()
+            try:
+                joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
+            except Exception as e:
+                a = 5
+                pass
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
-            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long())
-            _z[avail_flags==0.0] = 0.0
+            avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long() + 1).clone()
+            _z[avail_flags==0.0] = 0.0 # TODO: RENORMALIZE?
             pi_ab_list.append(_z)
             # calculate pi_c_prod
             _pi_actions_selected = pi_actions_selected.clone()
@@ -886,21 +898,43 @@ class FLOUNDERLAgent(nn.Module):
             _pi_actions_selected[_a:_a + 1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
             _pi_actions_selected[avail_actions_selected==0.0] = 0.0 # should never happen!
+            # if th.sum(avail_actions_selected==0.0):
+            #     a=5
+            #     pass
             # Set probabilities corresponding to individually disallowed actions to 0.0
             _k = th.prod(_pi_actions_selected, dim=_adim(tformat_level3), keepdim=True)
             pi_c_prod_list.append(_k)
             # Calculate corrective delegation (when unavailable actions are selected)
-            aa_a, _, _ = _to_batch(avail_actions_level3[_a:_a+1], tformat_level3)
-            aa_b, _, _ = _to_batch(avail_actions_level3[_b:_b+1], tformat_level3)
-            paa, params_paa, tformat_paa = _to_batch(pairwise_avail_actions[_i:_i+1], tformat_level3)
+            aa_a, _, _ = _to_batch(avail_actions_level3[_a:_a+1].clone(), tformat_level3)
+            aa_b, _, _ = _to_batch(avail_actions_level3[_b:_b+1].clone(), tformat_level3)
+            paa, params_paa, tformat_paa = _to_batch(pairwise_avail_actions[_i:_i+1].clone(), tformat_level3)
             _pi_a, _, _ = _to_batch(pi_a, tformat_level3)
             _pi_b, _, _ = _to_batch(pi_b, tformat_level3)
             # x = th.bmm(th.unsqueeze(aa_a, 2),  th.unsqueeze(aa_b, 1))
+            # At least one action unavailable.
             diff_matrix =  th.relu(paa[:, 1:-1].view(-1, self.n_actions, self.n_actions) -
                                    th.bmm(th.unsqueeze(aa_a[:, :-1], 2),  th.unsqueeze(aa_b[:, :-1], 1)))
-            pi_a_int = th.pow(_pi_a[:, :-1], aa_a[:, :-1]*(-1.0) + 1)
-            pi_b_int = th.pow(_pi_b[:, :-1], aa_b[:, :-1]*(-1.0) + 1)
-            correction = th.bmm( th.bmm( th.unsqueeze(pi_a_int, 1), diff_matrix), th.unsqueeze(pi_b_int, 2) ).squeeze(2)
+
+            diff_matrix = diff_matrix * _p_ab.view(-1, self.n_actions, self.n_actions)
+
+            both_unavailable = th.relu(paa[:, 1:-1].view(-1, self.n_actions, self.n_actions) -
+                                  th.add(th.unsqueeze(aa_a[:, :-1], 2), th.unsqueeze(aa_b[:, :-1], 1)))
+
+            both_unavailable = both_unavailable * _p_ab.view(-1, self.n_actions, self.n_actions)
+            both_unavailable_weight = th.sum(both_unavailable.view(-1, self.n_actions*self.n_actions), -1, keepdim=True)
+
+            # If neither component of the joint action is available both get resampled, with the probability of the independent actors.
+            correction = both_unavailable_weight * pi_actions_selected[_a:_a + 1].view(-1,1) * pi_actions_selected[_b:_b + 1].view(-1,1)
+
+            act_a = actions_masked[_a:_a + 1].clone().view(-1, 1,1).long()
+            act_b = actions_masked[_b:_b + 1].clone().view(-1, 1,1).long()
+            b_resamples = th.sum(th.gather(diff_matrix, 1, act_a.repeat([1,1, self.n_actions])),-1)
+            b_resamples = b_resamples * pi_actions_selected[_b:_b + 1].view(-1,1)
+
+            a_resamples = th.sum(th.gather(diff_matrix, 2, act_b.repeat([1, self.n_actions,1])), 1)
+            a_resamples = a_resamples * pi_actions_selected[_a:_a + 1].view(-1,1)
+
+            correction = correction + b_resamples + a_resamples
             pi_corr_list.append(_from_batch(correction, params_paa, tformat_paa))
 
         pi_a_cross_pi_b = th.cat(pi_a_cross_pi_b_list, dim=0)
@@ -916,6 +950,10 @@ class FLOUNDERLAgent(nn.Module):
         _tmp =  out_level1.transpose(_adim(tformat_level1), _vdim(tformat_level1))
         _tmp[_tmp!=_tmp] = 0.0
         p_a_b_c = (p_prod * _tmp).sum(dim=_adim(tformat_level1), keepdim=True)
+
+        if th.sum(p_a_b_c == 0.0) > 0.0:
+            a= 5
+            pass
 
         if self.args.debug_mode in ["check_probs"]:
             if not hasattr(self, "action_table"):
@@ -961,6 +999,7 @@ class FLOUNDERLAgent(nn.Module):
                         }
 
         loss = loss_fn(policies=p_a_b_c, tformat=tformat_level3)
+
         # loss = p_a_b_c.sum(), "a*bs*t*v"
         #loss[0].sum().backward(retain_graph=True)
         # loss[0].backward(retain_graph=True)

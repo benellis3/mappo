@@ -29,6 +29,10 @@ env_args:
   step_mul: 8
   map_name: 3m_3m
   intersection_global_view: False
+  heuristic: False
+  obs_ignore_ally: False
+  obs_instead_of_state: False
+  continuing_episode: True
 gamma: 0.99
 learner: mackrel
 lr_agent_level1: 0.0005
