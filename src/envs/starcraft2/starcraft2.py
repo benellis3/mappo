@@ -1100,13 +1100,14 @@ class SC2(MultiAgentEnv):
 
             debug_create_command.append(cmd)
 
-        self.controller.debug(sc_pb.RequestDebug(debug = debug_create_command))
+        self.controller.debug(debug_create_command)
 
     def kill_all_units(self):
 
         units_alive = [unit.tag for unit in self.agents.values() if unit.health > 0] + [unit.tag for unit in self.enemies.values() if unit.health > 0]
         debug_command = [d_pb.DebugCommand(kill_unit = d_pb.DebugKillUnit(tag = units_alive))]
-        self.controller.debug(sc_pb.RequestDebug(debug = debug_command))
+        #self.controller.debug(debug_command) # TODO use this when deepmind pull request my changes
+        self.controller._client.send(debug=sc_pb.RequestDebug(debug = debug_command))
 
     def init_units(self):
 
