@@ -43,17 +43,17 @@ class FLOUNDERLMultiagentController():
             self.action_selector = action_selector
 
         # b = _n_agent_pairings(self.n_agents)
-        self.agent_scheme_level1 = Scheme([dict(name="actions",
-                                                rename="past_actions",
-                                                select_agent_ids=list(range(self.n_agents)),
-                                                transforms=[("shift", dict(steps=1)),
-                                                              ("one_hot", dict(range=(0, self.n_actions)))],
-                                                switch=self.args.flounderl_agent_use_past_actions),
+        self.agent_scheme_level1 = Scheme([#dict(name="actions",
+        #                                         rename="past_actions",
+        #                                         select_agent_ids=list(range(self.n_agents)),
+        #                                         transforms=[("shift", dict(steps=1)),
+        #                                                       ("one_hot", dict(range=(0, self.n_actions)))],
+        #                                         switch=self.args.flounderl_agent_use_past_actions),
                                            dict(name="flounderl_epsilons_central_level1",
                                                 scope="episode"),
-                                           dict(name="observations",
-                                                select_agent_ids=list(range(self.n_agents)))
-                                           if not self.args.flounderl_use_obs_intersections else
+                                           #dict(name="observations",
+                                           #     select_agent_ids=list(range(self.n_agents)))
+                                           #if not self.args.flounderl_use_obs_intersections else
                                            dict(name="obs_intersection_all")
                                            ])
 
@@ -71,9 +71,9 @@ class FLOUNDERLMultiagentController():
                                                                              #      select_agent_ids=[_agent_id1, _agent_id2],
                                                                              #      switch=not self.args.flounderl_use_obs_intersections),
                                                                              dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                                                  switch=self.args.flounderl_use_obs_intersections),
+                                                                                  ),
                                                                              dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
-                                                                                  switch=self.args.flounderl_use_obs_intersections),
+                                                                                  ),
                                                                              dict(name="flounderl_epsilons_central_level2",
                                                                                   scope="episode"),
                                                                              dict(name="actions",
