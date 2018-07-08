@@ -1130,8 +1130,8 @@ class SC2(MultiAgentEnv):
                     if self._episode_count == 1: # TODO check this
                         self.max_reward += unit.health_max + unit.shield_max
 
-            #print("Agent types", [unit.unit_type for unit in self.agents.values()])
-            #print("Enemy types", [unit.unit_type for unit in self.enemies.values()])
+            print("Agent types", [unit.unit_type for unit in self.agents.values()])
+            print("Enemy types", [unit.unit_type for unit in self.enemies.values()])
 
             if len(self.agents) == self.n_agents and len(self.enemies) == self.n_enemies:
                 # All good
