@@ -848,7 +848,7 @@ class FLOUNDERLAgent(nn.Module):
         pi = out_level3
         pi_actions_selected = out_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
         # pi_actions_selected[pi_actions_selected  != pi_actions_selected ] = 0.0 #float("nan")
-        pi_actions_selected[actions != actions] = float("nan")
+        pi_actions_selected_mask = (actions != actions)
         avail_actions_level3 = inputs["level3"]["agent_input_level3"]["avail_actions"].clone().data
         avail_actions_selected = avail_actions_level3.gather(_vdim(tformat_level3), _actions.long()).clone()
 
@@ -881,11 +881,8 @@ class FLOUNDERLAgent(nn.Module):
             pi_a_cross_pi_b_list.append(u)
             # calculate p_ab_selected
             _p_ab = p_ab[_i:_i+1].clone()
-            try:
-                joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
-            except Exception as e:
-                a = 5
-                pass
+
+            joint_actions = _action_pair_2_joint_actions((actions_masked[_a:_a+1], actions_masked[_b:_b+1]), self.n_actions)
             _z = _p_ab.gather(_vdim(tformat_level2), joint_actions.long())
             # Set probabilities corresponding to jointly-disallowed actions to 0.0
             avail_flags = pairwise_avail_actions[_i:_i+1].gather(_vdim(tformat_level2), joint_actions.long() + 1).clone()
@@ -893,7 +890,8 @@ class FLOUNDERLAgent(nn.Module):
             pi_ab_list.append(_z)
             # calculate pi_c_prod
             _pi_actions_selected = pi_actions_selected.clone()
-            _pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 0.0
+            #_pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 0.0 # DEBUG
+            _pi_actions_selected[pi_actions_selected_mask] = 0.0
             #_pi_actions_selected[_pi_actions_selected!=_pi_actions_selected] = 1.0 # mask shit
             _pi_actions_selected[_a:_a + 1] = 1.0
             _pi_actions_selected[_b:_b + 1] = 1.0
@@ -942,7 +940,7 @@ class FLOUNDERLAgent(nn.Module):
         pi_c_prod = th.cat(pi_c_prod_list, dim=0)
         pi_corr = th.cat(pi_corr_list, dim=0)
 
-        p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected + pi_corr
+        p_a_b = p_d * pi_a_cross_pi_b + pi_ab_selected + pi_corr # DEBUG
         # next, calculate p_a_b * prod(p, -a-b)
         p_prod = p_a_b * pi_c_prod
 
