@@ -1,6 +1,6 @@
 import numpy as np
 from components.scheme import Scheme
-from components.transforms import _seq_mean, _vdim
+from components.transforms import _seq_mean, _vdim, _check_nan
 from copy import deepcopy
 from itertools import combinations
 from scipy.stats.stats import pearsonr
@@ -177,15 +177,13 @@ class FLOUNDERLRunner(NStepRunner):
                         suffix=test_suffix)
 
         actions_level2, _ = self.episode_buffer.get_col(col="actions_level2__sample{}".format(0))
-        delegation_rate = (th.sum(actions_level2==0.0) / (actions_level2.contiguous().view(-1).shape[0] - th.sum(actions_level2!=actions_level2))).item()
+        delegation_rate = (th.sum(actions_level2==0.0).float() / (actions_level2.contiguous().view(-1).shape[0] - th.sum(actions_level2!=actions_level2)).float()).item()
         self._add_stat("level2_delegation_rate",
                        delegation_rate,
                        T_env=T_env,
                        suffix=test_suffix)
 
         # common knowledge overlap between all agents
-        # a = self.episode_buffer["obs_intersection_all"]
-        # b = (self.episode_buffer["obs_intersection_all"][0] != 0.0)
         overlap_all = th.sum((self.episode_buffer["obs_intersection_all"][0] > 0.0), dim=_vdim("bs*t*v")).float().mean().item()
         self._add_stat("obs_intersection_all_rate",
                        overlap_all,
@@ -351,6 +349,7 @@ class FLOUNDERLRunner(NStepRunner):
                                                                        t_id=self.t_episode,
                                                                        fill_zero=True, # TODO: DEBUG!!!
                                                                        )
+            # _check_nan(action_selection_inputs)
 
             # retrieve avail_actions from episode_buffer
             avail_actions, avail_actions_format = self.episode_buffer.get_col(bs=ids_envs_not_terminated,
