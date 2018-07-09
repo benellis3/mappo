@@ -306,13 +306,10 @@ class FLOUNDERLRunner(NStepRunner):
                                                                                          agent_ids=list(range(self.n_agents))
                                                                                          )
 
-                try:
-                    ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
-                                                             if selected_actions.is_cuda else ids_envs_not_terminated_tensor.cpu(), :, :],
-                                    ids=ids_envs_not_terminated)
-                except Exception as e:
-                    cbh = self.episode_buffer.to_pd()
-                    pass
+                ret = self.step(actions=selected_actions[:, ids_envs_not_terminated_tensor.cuda()
+                                                         if selected_actions.is_cuda else ids_envs_not_terminated_tensor.cpu(), :, :],
+                                ids=ids_envs_not_terminated)
+
 
                 # retrieve ids of all envs that have not yet terminated.
                 # NOTE: for efficiency reasons, will perform final action selection in terminal state
@@ -332,12 +329,12 @@ class FLOUNDERLRunner(NStepRunner):
                                            t_ids=self.t_episode,
                                            bs_empty=[_i for _i in range(self.batch_size) if _i not in ids_envs_not_terminated])
 
-                bb = self.transition_buffer.to_pd() # DEBUG
-                a = 5
+                #bb = self.transition_buffer.to_pd() # DEBUG
+                #a = 5
 
                 # update episode time counter
-                #if not self.test_mode:
-                #    self.T_env += len(ids_envs_not_terminated)
+                if not self.test_mode:
+                    self.T_env += len(ids_envs_not_terminated)
 
 
             # generate multiagent_controller inputs for policy forward pass
