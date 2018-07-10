@@ -32,6 +32,7 @@ env_args:
     reward_collision: 0.0
     reward_scare: 0.0
     reward_time: -0.1
+    fully_observable: False
 gamma: 0.99
 learner: coma
 lr_agent: 0.0005
@@ -62,3 +63,4 @@ use_tensorboard: False
 use_full_observability: False
 share_agent_params: True
 critic_share_params: True
+coma_critic_update_per_t: False

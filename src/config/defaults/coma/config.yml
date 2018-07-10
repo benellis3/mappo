@@ -24,6 +24,7 @@ use_full_observability: False
 use_replay_buffer: False
 use_full_observability: False
 critic_share_params: True
+coma_critic_update_per_t: False
 
 
 
