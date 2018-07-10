@@ -568,7 +568,7 @@ def test3():
         if _i % 100 == (100 - 1):
             print("step: {}".format(_i))
 
-        if _i % 10000 == (10000 - 1):
+        if _i % 1000 == (1000 - 1):
             data = {k: {str(_k): "{} ({})".format(_v / float(_i), probs[k][_k]) for _k, _v in v.items()}
                     for k, v in stats.items()}
             pprint.pprint("_i ({}): \n {}".format(_i, data))
