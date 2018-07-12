@@ -1,4 +1,5 @@
 import logging
+from components.episode_buffer import BatchEpisodeBuffer
 from sacred.observers import FileStorageObserver
 from sacred.commandline_options import CommandLineOption
 import os
@@ -100,7 +101,7 @@ class ResultDir(CommandLineOption):
         observer = CustomIdObserver.create(args)
         run.observers = [ observer ]
 
-from components.episode_buffer import BatchEpisodeBuffer
+
 
 class HDFLogger():
 
@@ -108,14 +109,53 @@ class HDFLogger():
         from tables import open_file
         self.path = path
         self.h5file = open_file("{}.h5".format(name), mode="w", title="Experiment results: {}".format(name))
+        group = self.h5file.create_group("/", 'detector', 'Detector information')
         pass
 
-    def log(self, item):
+    def log(self, key, item, T_env):
 
         if isinstance(item, BatchEpisodeBuffer):
-            
+            if not hasattr(self.h5file.root, "learner_samples"):
+                self.h5file.create_group("/", "learner_samples", 'Learner samples')
 
+            if not hasattr(self.h5file.root, "learner_samples"):
+                self.h5file.create_group("/learner_samples/", "{}".format(T_env), 'Learner samples T_env:{}'.format(T_env))
 
+            if not hasattr(getattr(self.h5file.root.learner_samples, "{}".format(T_env)), "_transition"):
+                self.h5file.create_group("/learner_samples/{}".format(T_env), "_transition", 'Transition-wide data')
 
+            if not hasattr(getattr(self.h5file.root.learner_samples, "{}".format(T_env)), "_episode"):
+                self.h5file.create_group("/learner_samples/{}".format(T_env), "_episode", 'Episode-wide data')
 
-    from tables import *
+            # if table layout has not been created yet, do it now:
+            for _c, _pos in item.columns._transition.items():
+                if not hasattr(self.h5file.root.learner_samples, _c):
+                    self.h5file.root.learner_samples.create_earray(getattr(self.h5file.root.learner_samples, "{}".format(T_env))._transition,
+                                                                   _c, obj=item[_c])
+                else:
+                    getattr(self.h5file.root.learner_samples._transition, _c).append(item[_c])
+
+            # if table layout has not been created yet, do it now:
+            for _c, _pos in item.columns._episode.items():
+                if not hasattr(self.h5file.root.learner_samples, _c):
+                    self.h5file.root.learner_samples.create_earray(getattr(self.h5file.root.learner_samples, "{}".format(T_env))._episode,
+                                                                   _c, obj=item[_c])
+                else:
+                    getattr(self.h5file.root.learner_samples._episode, _c).append(item[_c])
+
+        else:
+            # item needs to be scalar!
+
+            if not hasattr(self.h5file.root, "log_values"):
+                self.h5file.create_group("/", "log_values", 'Log Values')
+
+            if not hasattr(self.h5file.root.log_values, key):
+                from tables import Float32Atom, IntAtom
+                self.h5file.root.learner_samples.create_earray(self.h5file.root.log_values,
+                                                               key, atom=Float32Atom, shape=[1])
+                self.h5file.root.learner_samples.create_earray(self.h5file.root.log_values,
+                                                               "{}_T_env".format(key), atom=IntAtom, shape=[1])
+            else:
+                getattr(self.h5file.root.log_values, key).append(item)
+                getattr(self.h5file.root.log_values, "{}_T_env".format(key)).append(T_env)
+
