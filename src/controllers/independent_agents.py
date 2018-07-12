@@ -151,11 +151,11 @@ class IndependentMultiagentController():
 
     def save_models(self, path, token, T):
         if self.args.share_agent_params:
-            th.save(self.self.agents[0].model.state_dict(),
+            th.save(self.agents[0].model.state_dict(),
                     "results/models/{}/{}_agentsp__{}_T.weights".format(token, self.args.learner, T))
         else:
             for _agentid, agent in enumerate(self.agents):
-                th.save(self.self.agents[_agentid].model.state_dict(),
+                th.save(self.agents[_agentid].model.state_dict(),
                         "results/models/{}/{}_agent{}__{}_T.weights".format(token, self.args.learner, _agentid, T))
         pass
 
