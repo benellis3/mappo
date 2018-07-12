@@ -216,7 +216,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         if episode_sample is not None:
             if args.save_episode_samples:
                 assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
-                _logging_struct.hdf_logger.log(episode_sample)
+                _logging_struct.hdf_logger.log("", episode_sample, runner_obj.T_env)
             learner_obj.train(episode_sample, T_env=runner_obj.T_env)
 
         # Execute test runs once in a while

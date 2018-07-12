@@ -15,8 +15,11 @@ coma_epsilon_start: 0.5
 coma_epsilon_time_length: 50000
 coma_exploration_mode: softmax
 coma_use_entropy_regularizer: False
+critic_share_params: True
+coma_critic_update_per_t: False
 debug_mode: None
 debug_verbose: False
+defaults: default
 env: pred_prey
 env_args:
     agent_obs: [1, 1]
@@ -62,5 +65,4 @@ use_replay_buffer: False
 use_tensorboard: False
 use_full_observability: False
 share_agent_params: True
-critic_share_params: True
-coma_critic_update_per_t: False
+

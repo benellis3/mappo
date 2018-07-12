@@ -108,54 +108,71 @@ class HDFLogger():
     def __init__(self, path, name):
         from tables import open_file
         self.path = path
-        self.h5file = open_file("{}.h5".format(name), mode="w", title="Experiment results: {}".format(name))
-        group = self.h5file.create_group("/", 'detector', 'Detector information')
+        hdf_path = os.path.join(path, "hdf")
+        if not os.path.isdir(hdf_path):
+            os.makedirs(hdf_path)
+        self.h5file = open_file(os.path.join(hdf_path, "{}.h5".format(name)), mode="w", title="Experiment results: {}".format(name))
         pass
 
     def log(self, key, item, T_env):
+        from tables import Filters
 
         if isinstance(item, BatchEpisodeBuffer):
             if not hasattr(self.h5file.root, "learner_samples"):
                 self.h5file.create_group("/", "learner_samples", 'Learner samples')
 
-            if not hasattr(self.h5file.root, "learner_samples"):
-                self.h5file.create_group("/learner_samples/", "{}".format(T_env), 'Learner samples T_env:{}'.format(T_env))
+            if not hasattr(self.h5file.root.learner_samples, "T{}".format(T_env)):
+                self.h5file.create_group("/learner_samples/", "T{}".format(T_env), 'Learner samples T_env:{}'.format(T_env))
 
-            if not hasattr(getattr(self.h5file.root.learner_samples, "{}".format(T_env)), "_transition"):
-                self.h5file.create_group("/learner_samples/{}".format(T_env), "_transition", 'Transition-wide data')
+            if not hasattr(getattr(self.h5file.root.learner_samples, "T{}".format(T_env)), "_transition"):
+                self.h5file.create_group("/learner_samples/T{}".format(T_env), "_transition", 'Transition-wide data')
 
-            if not hasattr(getattr(self.h5file.root.learner_samples, "{}".format(T_env)), "_episode"):
-                self.h5file.create_group("/learner_samples/{}".format(T_env), "_episode", 'Episode-wide data')
+            if not hasattr(getattr(self.h5file.root.learner_samples, "T{}".format(T_env)), "_episode"):
+                self.h5file.create_group("/learner_samples/T{}".format(T_env), "_episode", 'Episode-wide data')
+
+            filters = Filters(complevel=5, complib='blosc')
 
             # if table layout has not been created yet, do it now:
             for _c, _pos in item.columns._transition.items():
+                it = item.get_col(_c)[0].cpu().numpy()
                 if not hasattr(self.h5file.root.learner_samples, _c):
-                    self.h5file.root.learner_samples.create_earray(getattr(self.h5file.root.learner_samples, "{}".format(T_env))._transition,
-                                                                   _c, obj=item[_c])
+                    self.h5file.create_carray(getattr(self.h5file.root.learner_samples, "T{}".format(T_env))._transition,
+                                                            _c, obj=it, filters=filters)
                 else:
-                    getattr(self.h5file.root.learner_samples._transition, _c).append(item[_c])
+                    getattr(self.h5file.root.learner_samples._transition, _c).append(it)
 
             # if table layout has not been created yet, do it now:
             for _c, _pos in item.columns._episode.items():
+                it = item.get_col(_c, scope="episode")[0].cpu().numpy()
                 if not hasattr(self.h5file.root.learner_samples, _c):
-                    self.h5file.root.learner_samples.create_earray(getattr(self.h5file.root.learner_samples, "{}".format(T_env))._episode,
-                                                                   _c, obj=item[_c])
+                    self.h5file.create_carray(getattr(self.h5file.root.learner_samples, "T{}".format(T_env))._episode,
+                                                                   _c, obj=it, filters=filters)
                 else:
-                    getattr(self.h5file.root.learner_samples._episode, _c).append(item[_c])
+                    getattr(self.h5file.root.learner_samples._episode, _c).append(it)
 
         else:
-            # item needs to be scalar!
+            key = "__".join(key.split(" "))
+            # item needs to be scalar!#
+            import torch as th
+            import numpy as np
+            if isinstance(item, th.Tensor):
+                item = np.array([item.cpu().clone().item()])
+            elif not isinstance(item, np.ndarray):
+                item = np.array([item])
+            try:
+                if not hasattr(self.h5file.root, "log_values"):
+                    self.h5file.create_group("/", "log_values", 'Log Values')
 
-            if not hasattr(self.h5file.root, "log_values"):
-                self.h5file.create_group("/", "log_values", 'Log Values')
-
-            if not hasattr(self.h5file.root.log_values, key):
-                from tables import Float32Atom, IntAtom
-                self.h5file.root.learner_samples.create_earray(self.h5file.root.log_values,
-                                                               key, atom=Float32Atom, shape=[1])
-                self.h5file.root.learner_samples.create_earray(self.h5file.root.log_values,
-                                                               "{}_T_env".format(key), atom=IntAtom, shape=[1])
-            else:
-                getattr(self.h5file.root.log_values, key).append(item)
-                getattr(self.h5file.root.log_values, "{}_T_env".format(key)).append(T_env)
+                if not hasattr(self.h5file.root.log_values, key):
+                    from tables import Float32Atom, IntAtom
+                    self.h5file.create_earray(self.h5file.root.log_values,
+                                                                   key, atom=Float32Atom(), shape=[0])
+                    self.h5file.create_earray(self.h5file.root.log_values,
+                                                                   "{}_T_env".format(key), atom=IntAtom(), shape=[0])
+                else:
+                    getattr(self.h5file.root.log_values, key).append(item)
+                    getattr(self.h5file.root.log_values, "{}_T_env".format(key)).append(np.array([T_env]))
+            except Exception as e:
+                a = type(item)
+                pass
 

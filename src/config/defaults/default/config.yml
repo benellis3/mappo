@@ -17,4 +17,6 @@ use_tensorboard: True
 t_max: 100000000
 use_cuda: True
 share_agent_params: True
+save_episode_samples: False
+use_hdf_logger: False
 
