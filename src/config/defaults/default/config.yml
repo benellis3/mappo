@@ -10,6 +10,7 @@ observe: True
 observe_db: True
 run_mode: sequential
 save_model: False
+save_model_interval: 100000
 tensorboard: True
 test_interval: 8000
 test_nepisode: 50
@@ -19,4 +20,6 @@ use_cuda: True
 share_agent_params: True
 save_episode_samples: False
 use_hdf_logger: False
+
+
 

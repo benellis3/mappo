@@ -195,6 +195,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     T = 0
     episode = 0
     last_test_T = 0
+    model_save_time = 0
     # start_time = time.time()
 
     _logging_struct.py_logger.info("Beginning training for {} timesteps".format(args.t_max))
@@ -234,15 +235,15 @@ def run_sequential(args, _logging_struct, _run, unique_token):
             learner_obj.log()
 
         # save model once in a while
-        if args.save_model and runner_obj.T_env - model_save_time >= args.t_max // args.save_model_interval:
+        if args.save_model and (runner_obj.T_env - model_save_time >= args.t_max // args.save_model_interval) or model_save_time == 0.0:
             model_save_time = runner_obj.T_env
             _logging_struct.py_logger.info("Saving models")
 
-            save_path = "results/models/{}".format(unique_token)
+            save_path = os.path.join(args.local_results_path, "models") #"results/models/{}".format(unique_token)
             os.makedirs(save_path, exist_ok=True)
 
             # learner obj will save all agent and further models used
-            learner_obj.save_models(path=save_path, token=unique_token, time=runner_obj.T_env)
+            learner_obj.save_models(path=save_path, token=unique_token, T=runner_obj.T_env)
 
         episode += 1
 
