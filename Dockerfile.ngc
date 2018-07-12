@@ -105,6 +105,10 @@ RUN mkdir /pool && echo "export PATH=$PATH:'/pool/pool'" >> ~/.bashrc
 
 RUN pip3 install cloudpickle ruamel.yaml
 
+RUN apt-get install -y libhdf5-serial-dev cmake
+RUN git clone https://github.com/Blosc/c-blosc.git /install/c-blosc && cd /install/c-blosc && cmake -DCMAKE_INSTALL_PREFIX=/usr/local && cmake --build . --target install
+RUN pip3 install tables
+
 EXPOSE 8888
 
 WORKDIR /pymarl
