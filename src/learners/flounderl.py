@@ -521,6 +521,7 @@ class FLOUNDERLLearner(BasicLearner):
 
     def save_models(self, path, token, T):
 
+        token = "__".join(token.split("/")) # escape forward slashes in name
         if not os.path.isdir(os.path.join(path, token)):
             os.makedirs(os.path.join(path, token))
 
