@@ -106,6 +106,8 @@ class ResultDir(CommandLineOption):
 class HDFLogger():
 
     def __init__(self, path, name):
+        name = "__".join(name.split("/")) # escape slash character in name
+
         from tables import open_file
         self.path = path
         hdf_path = os.path.join(path, "hdf")
