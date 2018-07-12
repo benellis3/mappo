@@ -9,7 +9,7 @@ import threading
 import torch as th
 from types import SimpleNamespace as SN
 from utils.dict2namedtuple import convert
-from utils.logging import get_logger, append_scalar, log_stats
+from utils.logging import get_logger, append_scalar, log_stats, HDFLogger
 from utils.timehelper import time_left, time_str
 
 from components.replay_buffer import ReplayBuffer
@@ -52,11 +52,17 @@ def run(_run, _config, _log, pymongo_client):
         file_tb_path = os.path.join(dirname(dirname(abspath(__file__))), "tb_logs")
         configure(os.path.join(file_tb_path, "{}").format(unique_token))
 
+    # configure trajectory logger
+
+
     # set up logging object to be passed on from now on
     logging_struct = SN(py_logger=_log,
                         sacred_log_scalar_fn=partial(append_scalar, run=_run))
     if args.use_tensorboard:
         logging_struct.tensorboard_log_scalar_fn=log_value
+
+    if args.use_hdf_logger:
+        logging_struct.hdf_logger = HDFLogger(path=args.local_results_path, name=args.name)
 
     # ----- execute runners
     # run framework in run_mode selected
@@ -208,6 +214,9 @@ def run_sequential(args, _logging_struct, _run, unique_token):
             episode_sample = episode_rollout
 
         if episode_sample is not None:
+            if args.save_episode_samples:
+                assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
+                _logging_struct.hdf_logger.log(episode_sample)
             learner_obj.train(episode_sample, T_env=runner_obj.T_env)
 
         # Execute test runs once in a while

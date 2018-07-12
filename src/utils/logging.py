@@ -99,3 +99,23 @@ class ResultDir(CommandLineOption):
         # this overrides the default observer
         observer = CustomIdObserver.create(args)
         run.observers = [ observer ]
+
+from components.episode_buffer import BatchEpisodeBuffer
+
+class HDFLogger():
+
+    def __init__(self, path, name):
+        from tables import open_file
+        self.path = path
+        self.h5file = open_file("{}.h5".format(name), mode="w", title="Experiment results: {}".format(name))
+        pass
+
+    def log(self, item):
+
+        if isinstance(item, BatchEpisodeBuffer):
+            
+
+
+
+
+    from tables import *

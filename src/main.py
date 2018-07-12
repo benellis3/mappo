@@ -1,4 +1,6 @@
 import numpy as np
+import os
+from os.path import dirname, abspath
 import pymongo
 from sacred import Experiment, SETTINGS
 from sacred.observers import FileStorageObserver
@@ -18,9 +20,11 @@ ex = Experiment("deepmarl")
 ex.logger = logger
 ex.captured_out_filter = apply_backspaces_and_linefeeds
 
+results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
+
 mongo_client = None
 
-def setup_mongodb(conf_str):
+def setup_mongodb(conf_str, results_path):
     # The central mongodb for our deepmarl experiments
     # You need to set up local port forwarding to ensure this local port maps to the server
     # if conf_str == "":
@@ -49,14 +53,10 @@ def setup_mongodb(conf_str):
             logger.warning("Couldn't connect to MongoDB.")
             logger.info("Fallback to FileStorageObserver in results/sacred.")
             mongodb_fail = True
-            # import os
-            # os._exit(1)
 
     #if mongodb_fail:
     if mongodb_fail:
-        import os
-        from os.path import dirname, abspath
-        file_obs_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
+        file_obs_path = os.path.join(results_path, "sacred")
         logger.info("Using the FileStorageObserver in results/sacred")
         ex.observers.append(FileStorageObserver.create(file_obs_path))
     return client
@@ -122,6 +122,9 @@ if __name__ == '__main__':
     if exp_name is not None:
         config_dic = _merge_dicts(config_dic, exp_dic)
 
+    # add results path to config
+    config_dic["local_results_path"] = results_path
+
     # now add all the config to sacred
     ex.add_config(config_dic)
 
@@ -129,6 +132,6 @@ if __name__ == '__main__':
     for _i in sorted(del_indices, reverse=True):
         del params[_i]
 
-    mongo_client = setup_mongodb(config_dic["mongodb_profile"])
+    mongo_client = setup_mongodb(config_dic["mongodb_profile"], results_path)
     ex.run_commandline(params)
 
