@@ -40,11 +40,13 @@ WORKDIR /install
 RUN pip3 install pymongo
 
 #### -------------------------------------------------------------------
-#### install pysc2 (from Mika fork)
+#### install pysc2 #(from Mika fork)
 #### -------------------------------------------------------------------
 
-RUN git clone https://github.com/samvelyan/pysc2.git /install/pysc2
-RUN pip3 install /install/pysc2/
+# RUN git clone https://github.com/samvelyan/pysc2.git /install/pysc2
+RUN git clone https://github.com/deepmind/pysc2.git /install/pysc2 && cd /install/pysc2 && git checkout 65f8badf1b3cbc0d711a8d4c87e4501225b1c0fa
+
+#RUN pip3 install /install/pysc2/
 
 #### -------------------------------------------------------------------
 #### install Sacred (from OxWhirl fork)
