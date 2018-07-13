@@ -122,7 +122,7 @@ class HDFLogger():
 
         from tables import open_file
         self.h5file = open_file(os.path.join(self.hdf_path, "{}.h5".format(self.name)),
-                                mode="w", title="Experiment results: {}".format(self.name))
+                                mode="a", title="Experiment results: {}".format(self.name))
         from tables import Filters
 
         if isinstance(item, BatchEpisodeBuffer):
