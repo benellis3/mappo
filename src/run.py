@@ -235,7 +235,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
             learner_obj.log()
 
         # save model once in a while
-        if args.save_model and (runner_obj.T_env - model_save_time >= args.t_max // args.save_model_interval) or model_save_time == 0.0:
+        if args.save_model and (runner_obj.T_env - model_save_time >= args.t_max // args.save_model_interval or model_save_time == 0.0):
             model_save_time = runner_obj.T_env
             _logging_struct.py_logger.info("Saving models")
 
