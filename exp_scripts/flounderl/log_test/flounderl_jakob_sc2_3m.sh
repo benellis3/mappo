@@ -17,6 +17,6 @@ N_UPPER=`expr $N_GPUS - 1`
 for i in $(seq 1 $N_REPEAT); do
   GPU_ID=`shuf -i0-${N_UPPER} -n1`
   echo "Starting repeat number $i on GPU $GPU_ID"
-  NV_GPU=${GPU_ID} ../../.././docker.sh python3 /pymarl/src/main.py --exp_name="flounderl/moneyshot_5m" with name=${TAG}__${filename}__${TIMESTAMP}__repeat${i} use_tensorboard=False  env_args.fully_observable=True use_hdf_logger=True save_episode_samples=True save_model=True save_model_interval=100000 &
+  NV_GPU=${GPU_ID} ../../.././docker.sh python3 /pymarl/src/main.py --exp_name="flounderl/moneyshot" with name=${TAG}__${filename}__${TIMESTAMP}__repeat${i} use_tensorboard=False  env_args.fully_observable=False use_hdf_logger=True save_episode_samples=True save_model=True save_model_interval=100000 &
   sleep 10s
 done
