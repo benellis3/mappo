@@ -110,13 +110,19 @@ class HDFLogger():
 
         from tables import open_file
         self.path = path
-        hdf_path = os.path.join(path, "hdf")
-        if not os.path.isdir(hdf_path):
-            os.makedirs(hdf_path)
-        self.h5file = open_file(os.path.join(hdf_path, "{}.h5".format(name)), mode="w", title="Experiment results: {}".format(name))
+        self.name = name
+        self.hdf_path = os.path.join(path, "hdf")
+        if not os.path.isdir(self.hdf_path):
+            os.makedirs(self.hdf_path)
+        self.h5file = open_file(os.path.join(self.hdf_path, "{}.h5".format(name)), mode="w", title="Experiment results: {}".format(name))
+        self.h5file.close()
         pass
 
     def log(self, key, item, T_env):
+
+        from tables import open_file
+        self.h5file = open_file(os.path.join(self.hdf_path, "{}.h5".format(self.name)),
+                                mode="w", title="Experiment results: {}".format(self.name))
         from tables import Filters
 
         if isinstance(item, BatchEpisodeBuffer):
@@ -142,6 +148,7 @@ class HDFLogger():
                                                             _c, obj=it, filters=filters)
                 else:
                     getattr(self.h5file.root.learner_samples._transition, _c).append(it)
+                    getattr(self.h5file.root.learner_samples._transition, _c).flush()
 
             # if table layout has not been created yet, do it now:
             for _c, _pos in item.columns._episode.items():
@@ -151,6 +158,7 @@ class HDFLogger():
                                                                    _c, obj=it, filters=filters)
                 else:
                     getattr(self.h5file.root.learner_samples._episode, _c).append(it)
+                    getattr(self.h5file.root.learner_samples._episode, _c).flush()
 
         else:
             key = "__".join(key.split(" "))
@@ -173,8 +181,14 @@ class HDFLogger():
                                                                    "{}_T_env".format(key), atom=IntAtom(), shape=[0])
                 else:
                     getattr(self.h5file.root.log_values, key).append(item)
+                    getattr(self.h5file.root.log_values, key).flush()
+
                     getattr(self.h5file.root.log_values, "{}_T_env".format(key)).append(np.array([T_env]))
+                    getattr(self.h5file.root.log_values, "{}_T_env".format(key)).flush()
             except Exception as e:
                 a = type(item)
                 pass
+
+        self.h5file.close()
+        return
 
