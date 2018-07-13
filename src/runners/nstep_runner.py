@@ -746,6 +746,12 @@ class NStepRunner():
                        suffix=test_suffix)
         self._add_stat("episode_length", np.mean(self.episode_buffer.get_stat("episode_length", bs_ids=None)),
                        T_env=T_env, suffix=test_suffix)
+
+        if self.test_mode:
+            if self.args.save_episode_samples:
+                assert self.args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
+                self.logging_struct.hdf_logger.log("_test", self.episode_buffer, self.T_env)
+
         pass
 
     def _add_stat(self, name, value, T_env, suffix=""):
@@ -774,6 +780,10 @@ class NStepRunner():
         # log to tensorboard if enabled
         if hasattr(self.logging_struct, "tensorboard_log_scalar_fn"):
             self.logging_struct.tensorboard_log_scalar_fn(_underscore_to_cap(name), value, T_env)
+
+        # log to hdf if enabled
+        if hasattr(self.logging_struct, "hdf_logger"):
+            self.logging_struct.hdf_logger.log(_underscore_to_cap(name), value, T_env)
 
         # log to hdf if enabled
         if hasattr(self.logging_struct, "hdf_logger"):

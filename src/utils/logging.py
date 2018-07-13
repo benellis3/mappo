@@ -126,39 +126,40 @@ class HDFLogger():
         from tables import Filters
 
         if isinstance(item, BatchEpisodeBuffer):
-            if not hasattr(self.h5file.root, "learner_samples"):
-                self.h5file.create_group("/", "learner_samples", 'Learner samples')
+            group = "learner_samples"+key
+            if not hasattr(self.h5file.root, group):
+                self.h5file.create_group("/", group, 'Learner samples')
 
-            if not hasattr(self.h5file.root.learner_samples, "T{}".format(T_env)):
-                self.h5file.create_group("/learner_samples/", "T{}".format(T_env), 'Learner samples T_env:{}'.format(T_env))
+            if not hasattr(getattr(self.h5file.root, group), "T{}".format(T_env)):
+                self.h5file.create_group("/{}/".format(group), "T{}".format(T_env), 'Learner samples T_env:{}'.format(T_env))
 
-            if not hasattr(getattr(self.h5file.root.learner_samples, "T{}".format(T_env)), "_transition"):
-                self.h5file.create_group("/learner_samples/T{}".format(T_env), "_transition", 'Transition-wide data')
+            if not hasattr(getattr(getattr(self.h5file.root, group), "T{}".format(T_env)), "_transition"):
+                self.h5file.create_group("/{}/T{}".format(group, T_env), "_transition", 'Transition-wide data')
 
-            if not hasattr(getattr(self.h5file.root.learner_samples, "T{}".format(T_env)), "_episode"):
-                self.h5file.create_group("/learner_samples/T{}".format(T_env), "_episode", 'Episode-wide data')
+            if not hasattr(getattr(getattr(self.h5file.root, group), "T{}".format(T_env)), "_episode"):
+                self.h5file.create_group("/{}/T{}".format(group, T_env), "_episode", 'Episode-wide data')
 
             filters = Filters(complevel=5, complib='blosc')
 
             # if table layout has not been created yet, do it now:
             for _c, _pos in item.columns._transition.items():
                 it = item.get_col(_c)[0].cpu().numpy()
-                if not hasattr(self.h5file.root.learner_samples, _c):
-                    self.h5file.create_carray(getattr(self.h5file.root.learner_samples, "T{}".format(T_env))._transition,
+                if not hasattr(getattr(self.h5file.root, group), _c):
+                    self.h5file.create_carray(getattr(getattr(self.h5file.root, group), "T{}".format(T_env))._transition,
                                                             _c, obj=it, filters=filters)
                 else:
-                    getattr(self.h5file.root.learner_samples._transition, _c).append(it)
-                    getattr(self.h5file.root.learner_samples._transition, _c).flush()
+                    getattr(getattr(self.h5file.root, group)._transition, _c).append(it)
+                    getattr(getattr(self.h5file.root, group)._transition, _c).flush()
 
             # if table layout has not been created yet, do it now:
             for _c, _pos in item.columns._episode.items():
                 it = item.get_col(_c, scope="episode")[0].cpu().numpy()
-                if not hasattr(self.h5file.root.learner_samples, _c):
-                    self.h5file.create_carray(getattr(self.h5file.root.learner_samples, "T{}".format(T_env))._episode,
+                if not hasattr(getattr(self.h5file.root, group), _c):
+                    self.h5file.create_carray(getattr(getattr(self.h5file.root, group), "T{}".format(T_env))._episode,
                                                                    _c, obj=it, filters=filters)
                 else:
-                    getattr(self.h5file.root.learner_samples._episode, _c).append(it)
-                    getattr(self.h5file.root.learner_samples._episode, _c).flush()
+                    getattr(getattr(self.h5file.root, group)._episode, _c).append(it)
+                    getattr(getattr(self.h5file.root, group)._episode, _c).flush()
 
         else:
             key = "__".join(key.split(" "))
