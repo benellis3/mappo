@@ -33,25 +33,6 @@ RUN mkdir /install
 WORKDIR /install
 
 #### -------------------------------------------------------------------
-#### install pytorch
-#### -------------------------------------------------------------------
-
-# RUN git clone https://github.com/csarofeen/pytorch /install/pytorch && cd /install/pytorch 
-# RUN pip3 install numpy pyyaml mkl setuptools cffi
-# RUN apt-get install -y cmake gcc 
-# RUN cd /install/pytorch && python3 setup.py install
-#RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl 
-RUN pip3 install torch
-#RUN pip3 install http://download.pytorch.org/whl/cu90/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
-RUN pip3 install torchvision snakeviz
-
-#### -------------------------------------------------------------------
-#### install tensorflow
-#### -------------------------------------------------------------------
-RUN pip3 install tensorflow-gpu
-#RUN pip3 install --upgrade https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.6.0-cp34-cp34m-linux_x86_64.whl
-
-#### -------------------------------------------------------------------
 #### install MongoDB (for Sacred)
 #### -------------------------------------------------------------------
 
@@ -59,11 +40,14 @@ RUN pip3 install tensorflow-gpu
 RUN pip3 install pymongo
 
 #### -------------------------------------------------------------------
-#### install pysc2 (from Mika fork)
+#### install pysc2 #(from Mika fork)
 #### -------------------------------------------------------------------
 
-RUN git clone https://github.com/samvelyan/pysc2.git /install/pysc2
+# RUN git clone https://github.com/samvelyan/pysc2.git /install/pysc2
+RUN git clone https://github.com/deepmind/pysc2.git /install/pysc2 && cd /install/pysc2 && git checkout 65f8badf1b3cbc0d711a8d4c87e4501225b1c0fa
 RUN pip3 install /install/pysc2/
+
+#RUN pip3 install /install/pysc2/
 
 #### -------------------------------------------------------------------
 #### install Sacred (from OxWhirl fork)
@@ -104,6 +88,30 @@ RUN mkdir /pool && echo "export PATH=$PATH:'/pool/pool'" >> ~/.bashrc
 # RUN cd /pool && git clone https://github.com/oxwhirl/pool.git pool-repo &&  ln -s pool-repo/pool && git submodule update --init --recursive
 
 RUN pip3 install cloudpickle ruamel.yaml
+
+RUN apt-get install -y libhdf5-serial-dev cmake
+RUN git clone https://github.com/Blosc/c-blosc.git /install/c-blosc && cd /install/c-blosc && cmake -DCMAKE_INSTALL_PREFIX=/usr/local && cmake --build . --target install
+RUN pip3 install tables
+
+#### -------------------------------------------------------------------
+#### install tensorflow
+#### -------------------------------------------------------------------
+RUN pip3 install tensorflow-gpu
+#RUN pip3 install --upgrade https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.6.0-cp34-cp34m-linux_x86_64.whl
+
+#### -------------------------------------------------------------------
+#### install pytorch
+#### -------------------------------------------------------------------
+
+# RUN git clone https://github.com/csarofeen/pytorch /install/pytorch && cd /install/pytorch 
+# RUN pip3 install numpy pyyaml mkl setuptools cffi
+# RUN apt-get install -y cmake gcc 
+# RUN cd /install/pytorch && python3 setup.py install
+#RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl 
+RUN pip3 install torch
+#RUN pip3 install http://download.pytorch.org/whl/cu90/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
+RUN pip3 install torchvision snakeviz
+RUN apt-get install -y htop iotop
 
 EXPOSE 8888
 

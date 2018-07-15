@@ -1,5 +1,6 @@
 from copy import deepcopy
 import numpy as np
+import os
 from torch.autograd import Variable
 import torch as th
 
@@ -572,13 +573,10 @@ class FLOUNDERLMultiagentController():
         pass
 
     def save_models(self, path, token, T):
-        if self.args.share_agent_params:
-            th.save(self.agent_model.state_dict(),
-                    "results/models/{}/{}_agentsp__{}_T.weights".format(token, self.args.learner, T))
-        else:
-            for _agent_id in range(self.args.n_agents):
-                th.save(self.agent_models["agent__agent{}".format(_agent_id)].state_dict(),
-                        "results/models/{}/{}_agent{}__{}_T.weights".format(token, self.args.learner, _agent_id, T))
+        if not os.path.isdir(os.path.join(path, token)):
+            os.makedirs(os.path.join(path, token))
+        th.save(self.model.state_dict(),
+                os.path.join(path, token, "{}_agentsp__{}_T.weights".format(self.args.learner, T)))
         pass
 
     def _add_stat(self, name, value, T_env, suffix="", to_sacred=True, to_tb=True):

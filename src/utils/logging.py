@@ -1,4 +1,5 @@
 import logging
+from components.episode_buffer import BatchEpisodeBuffer
 from sacred.observers import FileStorageObserver
 from sacred.commandline_options import CommandLineOption
 import os
@@ -100,22 +101,95 @@ class ResultDir(CommandLineOption):
         observer = CustomIdObserver.create(args)
         run.observers = [ observer ]
 
-from components.episode_buffer import BatchEpisodeBuffer
+
 
 class HDFLogger():
 
     def __init__(self, path, name):
+        name = "__".join(name.split("/")) # escape slash character in name
+
         from tables import open_file
         self.path = path
-        self.h5file = open_file("{}.h5".format(name), mode="w", title="Experiment results: {}".format(name))
+        self.name = name
+        self.hdf_path = os.path.join(path, "hdf")
+        if not os.path.isdir(self.hdf_path):
+            os.makedirs(self.hdf_path)
+        self.h5file = open_file(os.path.join(self.hdf_path, "{}.h5".format(name)), mode="w", title="Experiment results: {}".format(name))
+        self.h5file.close()
         pass
 
-    def log(self, item):
+    def log(self, key, item, T_env):
+
+        from tables import open_file
+        self.h5file = open_file(os.path.join(self.hdf_path, "{}.h5".format(self.name)),
+                                mode="a", title="Experiment results: {}".format(self.name))
+        from tables import Filters
 
         if isinstance(item, BatchEpisodeBuffer):
-            
+            group = "learner_samples"+key
+            if not hasattr(self.h5file.root, group):
+                self.h5file.create_group("/", group, 'Learner samples')
 
+            if not hasattr(getattr(self.h5file.root, group), "T{}".format(T_env)):
+                self.h5file.create_group("/{}/".format(group), "T{}".format(T_env), 'Learner samples T_env:{}'.format(T_env))
 
+            if not hasattr(getattr(getattr(self.h5file.root, group), "T{}".format(T_env)), "_transition"):
+                self.h5file.create_group("/{}/T{}".format(group, T_env), "_transition", 'Transition-wide data')
 
+            if not hasattr(getattr(getattr(self.h5file.root, group), "T{}".format(T_env)), "_episode"):
+                self.h5file.create_group("/{}/T{}".format(group, T_env), "_episode", 'Episode-wide data')
 
-    from tables import *
+            filters = Filters(complevel=5, complib='blosc')
+
+            # if table layout has not been created yet, do it now:
+            for _c, _pos in item.columns._transition.items():
+                it = item.get_col(_c)[0].cpu().numpy()
+                if not hasattr(getattr(self.h5file.root, group), _c):
+                    self.h5file.create_carray(getattr(getattr(self.h5file.root, group), "T{}".format(T_env))._transition,
+                                                            _c, obj=it, filters=filters)
+                else:
+                    getattr(getattr(self.h5file.root, group)._transition, _c).append(it)
+                    getattr(getattr(self.h5file.root, group)._transition, _c).flush()
+
+            # if table layout has not been created yet, do it now:
+            for _c, _pos in item.columns._episode.items():
+                it = item.get_col(_c, scope="episode")[0].cpu().numpy()
+                if not hasattr(getattr(self.h5file.root, group), _c):
+                    self.h5file.create_carray(getattr(getattr(self.h5file.root, group), "T{}".format(T_env))._episode,
+                                                                   _c, obj=it, filters=filters)
+                else:
+                    getattr(getattr(self.h5file.root, group)._episode, _c).append(it)
+                    getattr(getattr(self.h5file.root, group)._episode, _c).flush()
+
+        else:
+            key = "__".join(key.split(" "))
+            # item needs to be scalar!#
+            import torch as th
+            import numpy as np
+            if isinstance(item, th.Tensor):
+                item = np.array([item.cpu().clone().item()])
+            elif not isinstance(item, np.ndarray):
+                item = np.array([item])
+            try:
+                if not hasattr(self.h5file.root, "log_values"):
+                    self.h5file.create_group("/", "log_values", 'Log Values')
+
+                if not hasattr(self.h5file.root.log_values, key):
+                    from tables import Float32Atom, IntAtom
+                    self.h5file.create_earray(self.h5file.root.log_values,
+                                                                   key, atom=Float32Atom(), shape=[0])
+                    self.h5file.create_earray(self.h5file.root.log_values,
+                                                                   "{}_T_env".format(key), atom=IntAtom(), shape=[0])
+                else:
+                    getattr(self.h5file.root.log_values, key).append(item)
+                    getattr(self.h5file.root.log_values, key).flush()
+
+                    getattr(self.h5file.root.log_values, "{}_T_env".format(key)).append(np.array([T_env]))
+                    getattr(self.h5file.root.log_values, "{}_T_env".format(key)).flush()
+            except Exception as e:
+                a = type(item)
+                pass
+
+        self.h5file.close()
+        return
+

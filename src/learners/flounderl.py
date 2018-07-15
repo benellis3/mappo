@@ -4,6 +4,7 @@ from itertools import combinations
 from models import REGISTRY as mo_REGISTRY
 import numpy as np
 from numpy.random import randint
+import os
 import torch as th
 from torch import nn
 from torch.autograd import Variable
@@ -520,11 +521,13 @@ class FLOUNDERLLearner(BasicLearner):
 
     def save_models(self, path, token, T):
 
+        token = "__".join(token.split("/")) # escape forward slashes in name
+        if not os.path.isdir(os.path.join(path, token)):
+            os.makedirs(os.path.join(path, token))
+
         self.multiagent_controller.save_models(path=path, token=token, T=T)
-        th.save(self.critic.state_dict(),"results/models/{}/{}_critic__{}_T.weights".format(self.args.learner,
-                                                                                            token,
-                                                                                            T))
-        th.save(self.target_critic.state_dict(), "results/models/{}/{}_target_critic__{}_T.weights".format(self.args.learner,
-                                                                                                           token,
-                                                                                                           T))
+        th.save(self.critic_model.state_dict(), os.path.join(path, token, "{}_critic__{}_T.weights".format(self.args.learner,
+                                                                                            T)))
+        th.save(self.target_critic_model.state_dict(), os.path.join(path, token, "{}_target_critic__{}_T.weights".format(self.args.learner,
+                                                                                                           T)))
         pass
