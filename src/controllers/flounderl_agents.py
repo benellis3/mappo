@@ -160,6 +160,12 @@ class FLOUNDERLMultiagentController():
                 self.input_columns_level2["agent_input_level2__agent{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))] \
                                             ["avail_actions_pair"] = Scheme([dict(name="avail_actions__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)),
                                                         switch=self.args.flounderl_use_obs_intersections)])
+            if hasattr(self.args, "flounderl_delegate_if_zero_ck") and self.args.flounderl_delegate_if_zero_ck:
+                self.input_columns_level2["agent_input_level2__agent{}".format(
+                    _agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["pair_ck"] = Scheme([dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)))])
+                self.input_columns_level2["agent_input_level2__agent{}".format(
+                    _agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents))]["actions_level1__sample0"] = Scheme([dict(name="obs_intersection__pair{}".format(_agent_ids_2_pairing_id((_agent_id1, _agent_id2), self.n_agents)))])
+
 
         # level 3
         self.input_columns_level3 = {}

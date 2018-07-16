@@ -202,7 +202,7 @@ class FLOUNDERLLearner(BasicLearner):
         # -------------------------------------------------------------------------------
 
         # Retrieve and view all data that can be retrieved from batch_history in a single step (caching efficient)
-
+        #b = batch_history.to_pd()
         data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=self.joint_scheme_dict,
                                                               to_cuda=self.args.use_cuda,
                                                               to_variable=True,

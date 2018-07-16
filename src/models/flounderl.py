@@ -396,6 +396,10 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
             #x.masked_fill_(avail_actions.long() == 0, float(np.finfo(np.float32).tiny))
             #x = th.div(x, x.sum(dim=1, keepdim=True))
 
+            if hasattr(self.args, "flounderl_fix_level1_pair") and self.args.flounderl_fix_level1_pair:
+                x.fill_(0.0)
+                x[:, 0] = 1.0
+
             if self.args.flounderl_exploration_mode_level1 in ["softmax"] and not test_mode:
                epsilons = inputs["epsilons_central_level1"].unsqueeze(_tdim("bs*t*v")).detach()
                epsilons, _, _ = _to_batch(epsilons, "bs*t*v")
@@ -613,11 +617,47 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
             h_list.append(h)
             x_list.append(x)
 
-        if loss_fn is not None:
-            _x = th.cat(x_list, dim=_tdim(tformat))
-            loss = loss_fn(_x, tformat=tformat)[0]
+        x_cat = th.cat(x_list, t_dim)
 
-        return th.cat(x_list, t_dim), \
+        if hasattr(self.args, "flounderl_delegate_if_zero_ck") and self.args.flounderl_delegate_if_zero_ck:
+            pair_ck = inputs["pair_ck"]
+            #sampled_pair_ids = kwargs["sampled_pair_ids"]
+            #selected_pair_ck = pair_ck.gather(0, sampled_pair_ids.repeat(1,1,1,pair_ck.shape[-1]).long())
+            if self.args.env == "pred_prey":
+                zero_ck_mask = (th.sum(pair_ck, dim=-1, keepdim=True) == (-1)*pair_ck.shape[-1]/2 )
+            elif self.args.env == "sc2":
+                if self.args.env_args["map_name"] in ["3m_3m"]:
+                    n_agents = 3
+                    n_enemies = 3
+                    nf_al = 4
+                    nf_en = 5
+                elif self.args.env_args["map_name"] in ["5m_5m"]:
+                    n_agents = 5
+                    n_enemies = 5
+                    nf_al = 4
+                    nf_en = 5
+                else:
+                    assert "zero CK not supported for this env / map!"
+                tmp_sum = th.sum(th.index_select(pair_ck, -1, th.LongTensor(list(range(nf_en * n_enemies)) + list(range(nf_en * n_enemies + nf_al * 1, nf_en * n_enemies + nf_al * n_agents)))), dim=-1, keepdim=True)
+                zero_ck_mask = ((tmp_sum == (-1) * (nf_en*n_enemies + nf_al*n_agents-1))).byte()
+            else:
+                assert "zero CK not supported for this env / map!"
+            zckm = zero_ck_mask.repeat(1, 1, 1, x_cat.shape[-1])
+            x_cat[zckm] = 0.0
+            zckm[:,:,:,1:] = 0.0
+            x_cat[zckm] = 1.0
+            n_zero_ck = th.sum(zckm).item()
+            if n_zero_ck != 0.0:
+                a = 5
+                pass
+            #pair_ck_numpy = pair_ck[0,:,0,:].cpu().numpy()
+
+        if loss_fn is not None:
+            #_x = th.cat(x_list, dim=_tdim(tformat))
+            #loss = loss_fn(_x, tformat=tformat)[0]
+            loss = loss_fn(x_cat, tformat=tformat)[0]
+
+        return x_cat, \
                th.cat(h_list[1:], t_dim), \
                loss, \
                tformat

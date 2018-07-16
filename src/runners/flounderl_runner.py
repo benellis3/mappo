@@ -161,7 +161,6 @@ class FLOUNDERLRunner(NStepRunner):
                        T_env=T_env,
                        suffix=test_suffix)
 
-
         for _i in range(_n_agent_pair_samples(self.n_agents)):
             tmp = self.episode_buffer["policies_level2__sample{}".format(_i)][0]
             entropy2 = np.nanmean(np.nansum((-th.log(tmp) * tmp).cpu().numpy(), axis=2))
@@ -226,12 +225,11 @@ class FLOUNDERLRunner(NStepRunner):
                        corr,
                        T_env=T_env,
                        suffix=test_suffix)
+
         self._add_stat("obs_overlap_corr_delegation_pvalue",
                        p_value,
                        T_env=T_env,
                        suffix=test_suffix)
-
-
 
         # TODO: Policy entropy across levels! (Use suffix)
         return
@@ -419,7 +417,7 @@ class FLOUNDERLRunner(NStepRunner):
 
         # calculate episode statistics
         self._add_episode_stats(T_env=self.T_env)
-        # a = self.episode_buffer.to_pd() # DEBUG
+        #a = self.episode_buffer.to_pd() # DEBUG
         # print("TENV: ", self.T_env)
         return self.episode_buffer
 
