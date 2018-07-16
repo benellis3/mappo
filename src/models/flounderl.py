@@ -639,7 +639,7 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
                 else:
                     assert "zero CK not supported for this env / map!"
                 tmp_sum = th.sum(th.index_select(pair_ck, -1, th.LongTensor(list(range(nf_en * n_enemies)) + list(range(nf_en * n_enemies + nf_al * 1, nf_en * n_enemies + nf_al * n_agents)))), dim=-1, keepdim=True)
-                zero_ck_mask = ((tmp_sum == (-1) * (nf_en*n_enemies + nf_al*n_agents-1))).byte()
+                zero_ck_mask = (tmp_sum == (-1) * (nf_en*n_enemies + nf_al*(n_agents-1))).byte()
             else:
                 assert "zero CK not supported for this env / map!"
             zckm = zero_ck_mask.repeat(1, 1, 1, x_cat.shape[-1])
@@ -647,9 +647,9 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
             zckm[:,:,:,1:] = 0.0
             x_cat[zckm] = 1.0
             n_zero_ck = th.sum(zckm).item()
-            if n_zero_ck != 0.0:
-                a = 5
-                pass
+            # if n_zero_ck != 0.0:
+            #    a = 5
+            #    pass
             #pair_ck_numpy = pair_ck[0,:,0,:].cpu().numpy()
 
         if loss_fn is not None:
