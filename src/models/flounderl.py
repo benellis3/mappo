@@ -623,6 +623,7 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
             pair_ck = inputs["pair_ck"]
             #sampled_pair_ids = kwargs["sampled_pair_ids"]
             #selected_pair_ck = pair_ck.gather(0, sampled_pair_ids.repeat(1,1,1,pair_ck.shape[-1]).long())
+            ttype = th.LongTensor if not pair_ck.is_cuda else th.cuda.LongTensor
             if self.args.env == "pred_prey":
                 zero_ck_mask = (th.sum(pair_ck, dim=-1, keepdim=True) == (-1)*pair_ck.shape[-1]/2 )
             elif self.args.env == "sc2":
@@ -638,7 +639,7 @@ class FLOUNDERLRecurrentAgentLevel2(nn.Module):
                     nf_en = 5
                 else:
                     assert "zero CK not supported for this env / map!"
-                tmp_sum = th.sum(th.index_select(pair_ck, -1, th.LongTensor(list(range(nf_en * n_enemies)) + list(range(nf_en * n_enemies + nf_al * 1, nf_en * n_enemies + nf_al * n_agents)))), dim=-1, keepdim=True)
+                tmp_sum = th.sum(th.index_select(pair_ck, -1, ttype(list(range(nf_en * n_enemies)) + list(range(nf_en * n_enemies + nf_al * 1, nf_en * n_enemies + nf_al * n_agents)))), dim=-1, keepdim=True)
                 zero_ck_mask = (tmp_sum == (-1) * (nf_en*n_enemies + nf_al*(n_agents-1))).byte()
             else:
                 assert "zero CK not supported for this env / map!"
