@@ -347,7 +347,13 @@ class FLOUNDERLRecurrentAgentLevel1(nn.Module):
         self.output = nn.Linear(self.layer_args["output"]["in"], self.layer_args["output"]["out"])
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
-        _check_inputs_validity(inputs, self.input_shapes, tformat)
+        try:
+            _check_inputs_validity(inputs, self.input_shapes, tformat)
+        except Exception as e:
+            print("Exception {} - have replaced NaNs with zeros".format(e))
+            for _k, _v in inputs.items():
+                inputs[_k][inputs[_k]!=inputs[_k]] = 0.0
+            pass
 
         test_mode = kwargs["test_mode"]
         n_agents = kwargs["n_agents"]
@@ -720,7 +726,14 @@ class FLOUNDERLRecurrentAgentLevel3(RecurrentAgent):
         args = args, ** kwargs)
 
     def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
-        _check_inputs_validity(inputs, self.input_shapes, tformat)
+
+        try:
+            _check_inputs_validity(inputs, self.input_shapes, tformat)
+        except Exception as e:
+            print("Exception {} - have replaced NaNs with zeros".format(e))
+            for _k, _v in inputs.items():
+                inputs[_k][inputs[_k]!=inputs[_k]] = 0.0
+            pass
 
         test_mode = kwargs["test_mode"]
 
