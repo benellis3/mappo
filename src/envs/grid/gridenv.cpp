@@ -7,6 +7,61 @@ using namespace std;
 
 bool DEBUG = true;
 
+signed long OUT_OF_BOUNDS = -1;
+
+template<typename T, size_t N>
+class GeometryTensorAccessor : public TensorAccessor<T,N> {
+    public:
+        string geometry;
+        bool out_of_bounds=false;
+        GeometryTensorAccessor(T * data_, const int64_t * sizes_, const int64_t * strides_, string geometry, bool out_of_bounds=false)
+            : TensorAccessor<T,N>(data_,sizes_,strides_) {
+                this->geometry = geometry;
+                this->out_of_bounds = out_of_bounds;
+            }
+
+        GeometryTensorAccessor<T,N-1> operator[](int64_t i) {
+            if (this->geometry=="flat"){
+                if (this->out_of_bounds or ((i < 0) or (i >= this->sizes_[0])))
+                    return GeometryTensorAccessor<T,N-1>(this->data_ + this->strides_[0]*i,this->sizes_+1,this->strides_+1, geometry, true);
+                return GeometryTensorAccessor<T,N-1>(this->data_ + this->strides_[0]*i,this->sizes_+1,this->strides_+1, geometry, false);
+            } else if (this->geometry=="toroidal"){
+                unsigned int j = (i%this->sizes_[0] + (abs(i/this->sizes_[0]) + 1)*this->sizes_[0])%this->sizes_[0];
+                return GeometryTensorAccessor<T,N-1>(this->data_ + this->strides_[0]*j,this->sizes_+1,this->strides_+1, geometry, false);
+            }
+        }
+
+        ~GeometryTensorAccessor(){}
+};
+
+template<typename T>
+class GeometryTensorAccessor<T,1> : public TensorAccessor<T,1> {
+    public:
+        string geometry;
+        bool out_of_bounds=false;
+        GeometryTensorAccessor(T * data_, const int64_t * sizes_, const   int64_t * strides_, string geometry, bool out_of_bounds)
+        : TensorAccessor<T,1>(data_,sizes_,strides_) {
+            this->geometry = geometry;
+            this->out_of_bounds = out_of_bounds;
+        }
+
+        T & operator[](int64_t i) {
+            if (this->geometry=="flat"){
+                // cout << "|<" << this->data_[this->strides_[0]*i] << ">|" << typeid(this->data_[this->strides_[0]*i]).name() << "??";
+                if (this->out_of_bounds or ((i < 0) or (i >= this->sizes_[0]))){
+                    return OUT_OF_BOUNDS;
+                }
+                return this->data_[this->strides_[0]*i];
+            } else if (this->geometry=="toroidal"){
+                unsigned int j = (i%this->sizes_[0] + (abs(i/this->sizes_[0]) + 1)*this->sizes_[0])%this->sizes_[0];
+                // cout << "|<" << this->data_[this->strides_[0]*j] << ">|" << typeid(this->data_[this->strides_[0]*j]).name();
+                return this->data_[this->strides_[0]*j];
+            }
+        }
+
+        ~GeometryTensorAccessor(){}
+};
+
 class GridEnv {
 
     public:
@@ -18,27 +73,42 @@ class GridEnv {
         unsigned short grid_dim_x;
         unsigned short grid_dim_y;
 
-        bool is_gpu;
-        unsigned short device_id;
+        unsigned char is_gpu;
+        unsigned char device_id;
 
         string grid_geometry;
         Tensor grid;
+        GeometryTensorAccessor<long,3>  *grid_a;
 
         void create_grid(void);
+
+        GeometryTensorAccessor<long,3> *accessor()  {
+            return new GeometryTensorAccessor<long,3>(this->grid.data<long>(),this->grid.sizes().data(),this->grid.strides().data(), this->grid_geometry);
+        }
+
 };
 
 void GridEnv::create_grid(void) {
-    auto deviceFunc = CUDA;
-    cout << this->is_gpu << "||";
-    if (!this->is_gpu) deviceFunc = CPU;
+    auto deviceFunc = CPU;
+    if (this->is_gpu){
+        throw runtime_error("CUDA not currently supported.");
+        deviceFunc = CUDA;
+    }
 
     auto dataType = kLong;
-    if (sizeof(char*) == 4) dataType = kInt;
+    if (sizeof(char*) == 4) throw runtime_error("x86 architecture not supported!"); //dataType = kInt;
 
-    //this->grid = deviceFunc(dataType).zeros({this->batch_size, this->grid_dim_x, this->grid_dim_y});
-    this->grid = CUDA(dataType).zeros({this->batch_size, this->grid_dim_x, this->grid_dim_y});
+    this->grid = deviceFunc(dataType).zeros({this->batch_size, this->grid_dim_x, this->grid_dim_y});
+    this->grid_a = this->accessor();
 
-    if (DEBUG) cout << "INIT GRID";
+    if (DEBUG) {
+        //this->grid_a_type = ToroidalTensorAccessor<long, 3>;
+        //(*static_cast<ToroidalTensorAccessor<long, 3>*>(this->grid_a))[0][2][2] = 5;
+        //long b = (*static_cast<ToroidalTensorAccessor<long, 3>*>(this->grid_a))[0][0][0];
+        long b = (*this->grid_a)[4][1][2];
+        cout << "b: " << b << endl;
+        if (DEBUG) cout << "INIT GRID";
+    }
 }
 
 
@@ -51,8 +121,6 @@ class PredatorPreyEnv : public GridEnv {
     private:
         unsigned short n_prey;
         unsigned short n_predators;
-        bool is_gpu;
-        unsigned short device_id;
 
         void init_grid(void);
 };
@@ -84,7 +152,7 @@ PredatorPreyEnv::PredatorPreyEnv(unsigned short batch_size,
 
 void PredatorPreyEnv::init_grid(){
 
-    cout << this->grid[0][0][0];
+    //cout << this->grid_a[0][0][0];
 
 }
 
