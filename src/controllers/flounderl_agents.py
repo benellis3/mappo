@@ -252,6 +252,7 @@ class FLOUNDERLMultiagentController():
             if "avail_actions_pair" in inputs_level2["agent_input_level2"]:
                 pairwise_avail_actions = inputs_level2["agent_input_level2"]["avail_actions_pair"]
             else:
+                assert False, "NOT SUPPORTED CURRENTLY."
                 avail_actions1, params_aa1, tformat_aa1 = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id1"], inputs_level2_tformat)
                 avail_actions2, params_aa2, _ = _to_batch(inputs_level2["agent_input_level2"]["avail_actions_id2"], inputs_level2_tformat)
                 pairwise_avail_actions = th.bmm(avail_actions1.unsqueeze(2), avail_actions2.unsqueeze(1))
@@ -378,9 +379,9 @@ class FLOUNDERLMultiagentController():
             individual_actions, \
             modified_inputs_level3, \
             selected_actions_format_level3 = self.action_selector.select_action({"policies":out_level3},
-                                                                                avail_actions=avail_actions_level3.data,
-                                                                                tformat=tformat_level3,
-                                                                                test_mode=test_mode)
+                                                                                 avail_actions=avail_actions_level3.data,
+                                                                                 tformat=tformat_level3,
+                                                                                 test_mode=test_mode)
 
             # fill into action matrix all the actions that are not NaN
             #individual_actions_sq = individual_actions.squeeze(_vdim(tformat_level3)).view(individual_actions.shape[_adim(tformat_level3)], -1)
