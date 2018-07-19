@@ -52,6 +52,8 @@ class MultinomialActionSelector():
         mask = (masked_policies_batch != masked_policies_batch)
         masked_policies_batch.masked_fill_(mask, 0.0)
         assert th.sum(masked_policies_batch < 0) == 0, "negative value in masked_policies_batch"
+
+        a = masked_policies_batch.cpu().numpy()
         try:
             _samples = Categorical(masked_policies_batch).sample().unsqueeze(1).float()
         except RuntimeError as e:
