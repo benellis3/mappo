@@ -183,39 +183,28 @@ class SC2(MultiAgentEnv):
         if sys.platform == 'linux':
             self.game_version = "3.16.1"
             os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
-
-            if self.map_type == 'stalker_zaelot':
-                self.stalker_id = 1885
-                self.zealot_id = 1886
-            elif self.map_type == 'ssz':
-                self.sentry_id = 1885
-                self.stalker_id = 1886
-                self.zealot_id = 1887
-            elif self.map_type == 'csz':
-                self.colossus_id = 1885
-                self.stalker_id = 1886
-                self.zealot_id = 1887
-            elif self.map_type == 'MMM':
-                self.marauder_id = 1885
-                self.marine_id = 1886
-                self.medivac_id = 1887
         else:
-            self.game_version = "4.1.2" # latest release, uses visualisations
-            if self.map_type == 'stalker_zaelot':
-                self.stalker_id = 1923
-                self.zealot_id = 1924
-            elif self.map_type == 'ssz':
-                self.sentry_id = 1923
-                self.stalker_id = 1924
-                self.zealot_id = 1925
-            elif self.map_type == 'csz':
-                self.colossus_id = 1923
-                self.stalker_id = 1924
-                self.zealot_id = 1925
-            elif self.map_type == 'MMM':
-                self.marauder_id = 1923
-                self.marine_id = 1924
-                self.medivac_id = 1925
+            self.game_version = "4.1.2"
+
+    def init_ally_unit_types(self, min_unit_type):
+        # This should be called once from the init_units function
+        # Don't need for marine maps
+
+        if self.map_type == 'stalker_zaelot':
+            self.stalker_id = min_unit_type
+            self.zealot_id = min_unit_type + 1
+        elif self.map_type == 'ssz':
+            self.sentry_id = min_unit_type
+            self.stalker_id = min_unit_type + 1
+            self.zealot_id = min_unit_type + 2
+        elif self.map_type == 'csz':
+            self.colossus_id = min_unit_type
+            self.stalker_id = min_unit_type + 1
+            self.zealot_id = min_unit_type + 2
+        elif self.map_type == 'MMM':
+            self.marauder_id = min_unit_type
+            self.marine_id = min_unit_type + 1
+            self.medivac_id = min_unit_type + 2
 
     def _launch(self):
 
@@ -1125,10 +1114,14 @@ class SC2(MultiAgentEnv):
                     print("Unit %d is %d, x = %.1f, y = %1.f"  % (len(self.agents), self.agents[i].unit_type, self.agents[i].pos.x, self.agents[i].pos.y))
 
             for unit in self._obs.observation.raw_data.units:
-                if unit.owner == 2: # agent
+                if unit.owner == 2:
                     self.enemies[len(self.enemies)] = unit
-                    if self._episode_count == 1: # TODO check this
+                    if self._episode_count == 1:
                         self.max_reward += unit.health_max + unit.shield_max
+
+            if self._episode_count == 1:
+                min_unit_type = min(unit.unit_type for unit in self.agents.values())
+                self.init_ally_unit_types(min_unit_type)
 
             # print("Agent types", [unit.unit_type for unit in self.agents.values()])
             # print("Enemy types", [unit.unit_type for unit in self.enemies.values()])
