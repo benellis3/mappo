@@ -131,8 +131,12 @@ if __name__ == '__main__':
 
     # Check if we don't want to save to sacred mongodb
     no_mongodb = False
-    if "--no-mongo" in sys.argv:
-        no_mongodb = True
+
+    for _i, _v in enumerate(params):
+        if "--no-mongo" == _v:
+            del_indices.append(_i)
+            no_mongodb = True
+            break
 
     # delete indices that contain custom experiment tags
     for _i in sorted(del_indices, reverse=True):
