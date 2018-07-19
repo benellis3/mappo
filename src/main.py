@@ -138,12 +138,6 @@ if __name__ == '__main__':
     for _i in sorted(del_indices, reverse=True):
         del params[_i]
 
-     for _i, _v in enumerate(params):
-        if _v.split("=")[0] == "--no_sacred":
-            del_indices.append(_i)
-            exp_name = _v.split("=")[1]
-            break
-
     if not no_mongodb:
         mongo_client = setup_mongodb(config_dic["mongodb_profile"])
 
