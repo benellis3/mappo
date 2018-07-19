@@ -24,7 +24,7 @@ results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
 mongo_client = None
 
-def setup_mongodb(conf_str, results_path):
+def setup_mongodb(conf_str):
     # The central mongodb for our deepmarl experiments
     # You need to set up local port forwarding to ensure this local port maps to the server
     # if conf_str == "":
@@ -37,10 +37,12 @@ def setup_mongodb(conf_str, results_path):
     db_name = mongo_conf["db_name"]
 
     client = None
-    mongodb_fail = False
-    if True:
+    mongodb_fail = True
+
+    # Try 5 times to connect to the mongodb
+    for tries in range(5):
         # First try to connect to the central server. If that doesn't work then just save locally
-        maxSevSelDelay = 10000  # Assume 1ms maximum server selection delay
+        maxSevSelDelay = 10000  # Assume 10s maximum server selection delay
         try:
             # Check whether server is accessible
             logger.info("Trying to connect to mongoDB '{}'".format(db_url))
@@ -49,16 +51,15 @@ def setup_mongodb(conf_str, results_path):
             # If this hasn't raised an exception, we can add the observer
             ex.observers.append(MongoObserver.create(url=db_url, db_name=db_name, ssl=True)) # db_name=db_name,
             logger.info("Added MongoDB observer on {}.".format(db_url))
+            mongodb_fail = False
+            break
         except pymongo.errors.ServerSelectionTimeoutError:
-            logger.warning("Couldn't connect to MongoDB.")
-            logger.info("Fallback to FileStorageObserver in results/sacred.")
-            mongodb_fail = True
+            logger.warning("Couldn't connect to MongoDB on try {}".format(tries + 1))
 
-    #if mongodb_fail:
     if mongodb_fail:
-        file_obs_path = os.path.join(results_path, "sacred")
-        logger.info("Using the FileStorageObserver in results/sacred")
-        ex.observers.append(FileStorageObserver.create(file_obs_path))
+        logger.error("Couldn't connect to MongoDB after 5 tries!")
+        # TODO: Maybe we want to end the script here sometimes?
+
     return client
 
 @ex.main
@@ -128,10 +129,28 @@ if __name__ == '__main__':
     # now add all the config to sacred
     ex.add_config(config_dic)
 
+    # Check if we don't want to save to sacred mongodb
+    no_mongodb = False
+    if "--no-mongo" in sys.argv:
+        no_mongodb = True
+
     # delete indices that contain custom experiment tags
     for _i in sorted(del_indices, reverse=True):
         del params[_i]
 
-    mongo_client = setup_mongodb(config_dic["mongodb_profile"], results_path)
+     for _i, _v in enumerate(params):
+        if _v.split("=")[0] == "--no_sacred":
+            del_indices.append(_i)
+            exp_name = _v.split("=")[1]
+            break
+
+    if not no_mongodb:
+        mongo_client = setup_mongodb(config_dic["mongodb_profile"])
+
+    # Save to disk by default for sacred, even if we are using the mongodb
+    logger.info("Saving to FileStorageObserver in results/sacred.")
+    file_obs_path = os.path.join(results_path, "sacred")
+    ex.observers.append(FileStorageObserver.create(file_obs_path))
+
     ex.run_commandline(params)
 
