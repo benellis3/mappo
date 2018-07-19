@@ -121,8 +121,14 @@ class SC2(MultiAgentEnv):
 
         self.continuing_episode = args.continuing_episode
 
-        # Configure map and platform-dependent settings
-        self.configure_settings()
+        self.map_settings()
+
+        if sys.platform == 'linux':
+            os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
+            self.game_version = args.game_version
+        else:
+            self.game_version = "4.1.2"
+
 
         # Launch the game
         self._launch()
@@ -144,7 +150,7 @@ class SC2(MultiAgentEnv):
         self.timeouts = 0
         self.force_restarts = 0
 
-    def configure_settings(self):
+    def map_settings(self):
 
         if self.map_name in stalker_zaelot_maps:
             self.map_type = 'stalker_zaelot'
@@ -179,12 +185,6 @@ class SC2(MultiAgentEnv):
 
         self.stalker_id = self.sentry_id = self.zealot_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
-
-        if sys.platform == 'linux':
-            self.game_version = "3.16.1"
-            os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
-        else:
-            self.game_version = "4.1.2"
 
     def init_ally_unit_types(self, min_unit_type):
         # This should be called once from the init_units function
