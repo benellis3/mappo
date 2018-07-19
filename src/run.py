@@ -35,7 +35,7 @@ def run(_run, _config, _log, pymongo_client):
     _log.info("\n\n" + experiment_params + "\n")
 
     import os
-    _log.info("OS ENVIRON KEYS: {}".format(os.environ))
+    _log.info("OS ENVIRON KEYS: {}\n\n".format(os.environ))
 
     if _config.get("debug_mode", None) is not None:
         _log.warning("ATTENTION DEBUG MODE: {}".format(_config["debug_mode"]))
@@ -49,7 +49,7 @@ def run(_run, _config, _log, pymongo_client):
             from tensorboard_logger import configure, log_value
         import os
         from os.path import dirname, abspath
-        file_tb_path = os.path.join(dirname(dirname(abspath(__file__))), "tb_logs")
+        file_tb_path = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
         configure(os.path.join(file_tb_path, "{}").format(unique_token))
 
     # configure trajectory logger
@@ -196,7 +196,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     episode = 0
     last_test_T = 0
     model_save_time = 0
-    # start_time = time.time()
+    start_time = time.time()
 
     _logging_struct.py_logger.info("Beginning training for {} timesteps".format(args.t_max))
 
@@ -222,9 +222,10 @@ def run_sequential(args, _logging_struct, _run, unique_token):
 
         # Execute test runs once in a while
         n_test_runs = max(1, args.test_nepisode // runner_obj.batch_size)
-        if ( runner_obj.T_env - last_test_T) / args.test_interval > 1.0:
+        if ( runner_obj.T_env - last_test_T) / args.test_interval >= 1.0:
 
-            _logging_struct.py_logger.info("T_env: {}".format(runner_obj.T_env))
+            _logging_struct.py_logger.info("T_env: {} / {}".format(runner_obj.T_env, args.t_max))
+            _logging_struct.py_logger.info("Estimated time left: {}".format(time_left(start_time, runner_obj.T_env, args.t_max)))
             runner_obj.log() # log runner statistics derived from training runs
 
             last_test_T =  runner_obj.T_env
