@@ -161,7 +161,7 @@ class IQLLearner(BasicLearner):
         # carry out optimization for agents
         self.agent_optimiser.zero_grad()
         IQL_loss.backward()
-        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, self.args.grad_norm_clip)
+        grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, self.args.grad_norm_clip)
         self.agent_optimiser.step() #DEBUG
 
         # increase episode counter
@@ -169,8 +169,11 @@ class IQLLearner(BasicLearner):
 
         # Calculate statistics
         self._add_stat("q_loss", IQL_loss.data.cpu().numpy(), T_env=T_env)
+        self._add_stat("td_error", IQL_loss.data.cpu().numpy()+, T_env=T_env) # TODO: Get the td_error and log it!
+        self._add_stat("grad_norm", grad_norm, T_env=T_env)
         self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
-        self._add_stat("T_q", self.T_q, T_env=T_env)
+        self._add_stat("q_mean", mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
+        # self._add_stat("T_q", self.T_q, T_env=T_env)
 
         pass
 
@@ -197,11 +200,9 @@ class IQLLearner(BasicLearner):
             # Stats is empty, don't have anything to log
             return
         logging_dict =  dict(q_loss = _seq_mean(stats["q_loss"]),
-                             target_q_mean = _seq_mean(stats["target_q_mean"]),
-                             T_q=self.T_q
-                            )
-        logging_str = "T_q={:g}, ".format(logging_dict["T_q"])
-        logging_str += _make_logging_str(_copy_remove_keys(logging_dict, ["T_q"]))
+                             target_q_mean = _seq_mean(stats["target_q_mean"]))
+
+        logging_str = _make_logging_str(logging_dict)
 
         if log_directly:
             self.logging_struct.py_logger.info("{} LEARNER INFO: {}".format(self.args.learner.upper(), logging_str))

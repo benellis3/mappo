@@ -92,6 +92,7 @@ class IQLRunner(NStepRunner):
         # self._add_stat("qvalues_entropy", self.episode_buffer.get_stat("qvalues_entropy"),
         #                T_env=T_env,
         #                suffix=test_suffix)
+        self._add_stat("epsilon", self.iql_epsilon_decay_schedule.eval(self.T_env), T_env=T_env)
         return
 
     def reset(self):

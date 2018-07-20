@@ -225,7 +225,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         if ( runner_obj.T_env - last_test_T) / args.test_interval >= 1.0:
 
             _logging_struct.py_logger.info("T_env: {} / {}".format(runner_obj.T_env, args.t_max))
-            _logging_struct.py_logger.info("Estimated time left: {}".format(time_left(start_time, runner_obj.T_env, args.t_max)))
+            _logging_struct.py_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner_obj.T_env, args.t_max), time_str(time.time() - start_time)))
             runner_obj.log() # log runner statistics derived from training runs
 
             last_test_T =  runner_obj.T_env
