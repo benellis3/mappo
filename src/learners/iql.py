@@ -102,10 +102,10 @@ class IQLLearner(BasicLearner):
         # ------------------------------------------------------------------------------
 
         # Update target if necessary
-        if (self.T_q - self.last_target_update_T) / self.target_update_interval > 1.0:
+        if (T_env - self.last_target_update_T) / self.target_update_interval >= 1.0:
             self.update_target_nets()
-            self.last_target_update_T = self.T_q
-            print("updating target net!")
+            self.last_target_update_T = T_env
+            self.logging_struct.py_logger.info("Updating target network at T: {}".format(T_env))
 
         # create one single batch_history view suitable for all
         data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=self.joint_scheme_dict,
@@ -161,7 +161,7 @@ class IQLLearner(BasicLearner):
         # carry out optimization for agents
         self.agent_optimiser.zero_grad()
         IQL_loss.backward()
-        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, 50)
+        policy_grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, self.args.grad_norm_clip)
         self.agent_optimiser.step() #DEBUG
 
         # increase episode counter
@@ -193,6 +193,9 @@ class IQLLearner(BasicLearner):
         Logging is triggered in run.py
         """
         stats = self.get_stats()
+        if stats == []:
+            # Stats is empty, don't have anything to log
+            return
         logging_dict =  dict(q_loss = _seq_mean(stats["q_loss"]),
                              target_q_mean = _seq_mean(stats["target_q_mean"]),
                              T_q=self.T_q
