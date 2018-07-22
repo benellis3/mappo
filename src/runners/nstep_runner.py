@@ -458,7 +458,13 @@ class NStepRunner():
             state = _env.get_state()
             avail_actions = _env.get_avail_actions()
             terminated = terminated
-            truncated = terminated and env_info.get("episode_limit", False)
+            truncated = env_info.get("episode_limit", False)
+
+            if env_info.get("episode_limit", False):
+                # The episode terminated because of a time limit
+                terminated = False
+            env_finished = terminated or truncated
+
             ret_dict = dict(state=state,
                             reward=reward,
                             terminated=terminated,
@@ -472,7 +478,7 @@ class NStepRunner():
             buffer_insert_fn(id=id, buffer=output_buffer, data_dict=ret_dict, column_scheme=column_scheme)
 
             # Signal back that queue element was finished processing
-            ret_msg = dict(id=id, payload=dict(msg="STEP DONE", terminated=terminated))
+            ret_msg = dict(id=id, payload=dict(msg="STEP DONE", terminated=env_finished))
             if out_queue is None:
                 return ret_msg
             else:

@@ -27,34 +27,41 @@ class IQLLoss(nn.Module):
 
         assert tformat in ["a*bs*t*v"], "invalid input format!"
 
-        # actions which are nans are basically just ignored
+        # Need to shift the target and chosen Q-Values to ensure they are properly aligned
+        qvalues = qvalues[:,:,:-1,:]
+        actions = actions[:,:,:-1,:]
+        target = target[:,:,1:,:]
+
+        # NaN actions are turned into 0 for convenience, they should be masked out through the target masking anyway
         action_mask = (actions!=actions)
         actions[action_mask] = 0.0
 
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
 
-        chosen_qvalues[action_mask] = 0.0
-        target[action_mask] = 0.0
+        # chosen_qvalues[action_mask] = 0.0
+        # target[action_mask] = 0.0
 
-        nans = (target != target)
-        target[nans] = 0.0
-        chosen_qvalues[nans] = 0.0
+        # targets with a NaN are padded elements, mask them out
+        target_mask = (target != target)
+        target[target_mask] = 0.0
+        chosen_qvalues[target_mask] = 0.0
+        non_nan_elements = (1 - target_mask).sum().type_as(th.FloatTensor())
+
+        info = {}
+        # td_error
+        td_error = (chosen_qvalues - target.detach())
+        mean_td_error = td_error.sum() / non_nan_elements
+        info["td_error"] = mean_td_error
 
         # calculate mean-square loss
-        ret = (chosen_qvalues - target.detach())**2
+        total_loss = td_error**2
 
-        # average over whole sequences
-        ret = ret.mean(dim=_tdim(tformat), keepdim=True)
-
-        # average over agents
-        ret = ret.mean(dim=_adim(tformat), keepdim=True)
-
-        # average over batches
-        ret = ret.mean(dim=_bsdim(tformat), keepdim=True)
+        # average over non-nan elements
+        mean_loss = total_loss.sum() / non_nan_elements
 
         output_tformat = "s" # scalar
-        return ret, output_tformat
+        return mean_loss, output_tformat, info
 
 class IQLLearner(BasicLearner):
 
@@ -96,10 +103,6 @@ class IQLLearner(BasicLearner):
         pass
 
     def train(self, batch_history, T_env=None):
-        # ------------------------------------------------------------------------------
-        # |  We follow the algorithmic description of COMA as supplied in Algorithm 1  |
-        # |  (Counterfactual Multi-Agent Policy Gradients, Foerster et al 2018)        |
-        # ------------------------------------------------------------------------------
 
         # Update target if necessary
         if (T_env - self.last_target_update_T) / self.target_update_interval >= 1.0:
@@ -125,21 +128,28 @@ class IQLLearner(BasicLearner):
                                                                            test_mode=False,
                                                                            target_mode=True)
 
-        vvalues, _ = target_mac_output["qvalues"].detach().max(dim=_vdim(target_mac_output_tformat), keepdim=True)
+        target_qvalues, _ = target_mac_output["qvalues"].detach().max(dim=_vdim(target_mac_output_tformat), keepdim=True)
 
         # calculate targets
-        td_targets, \
-        td_targets_tformat = batch_history.get_stat("td_lambda_targets",
-                                                    bs_ids=None,
-                                                    td_lambda=self.args.td_lambda,
-                                                    gamma=self.args.gamma,
-                                                    value_function_values=vvalues,
-                                                    to_variable=True,
-                                                    to_cuda=self.args.use_cuda)
+        rewards, rewards_tformat = batch_history.get_col(col="reward")
+        terminated, term_tformat = batch_history.get_col(col="terminated")
+
+        bootstrapping_mask = (1 - terminated).round() # To ensure it is 0 or 1, probably a better/safer way
+        expanded_bs_mask = bootstrapping_mask.expand([self.n_agents, -1, -1, -1])
+
+        td_targets = rewards + self.args.gamma * target_qvalues * expanded_bs_mask
+
+        # td_targets, \
+        # td_targets_tformat = batch_history.get_stat("td_lambda_targets",
+        #                                             bs_ids=None,
+        #                                             td_lambda=self.args.td_lambda,
+        #                                             gamma=self.args.gamma,
+        #                                             value_function_values=qvalues,
+        #                                             to_variable=True,
+        #                                             to_cuda=self.args.use_cuda)
 
         actions, actions_tformat = batch_history.get_col(col="actions",
                                                          agent_ids=list(range(self.n_agents)))
-        actions[actions!=actions] = 0.0 # so those are ignored in that kind of loss
 
         iql_loss_fn = partial(IQLLoss(),
                               target=Variable(td_targets, requires_grad=False),
@@ -150,18 +160,22 @@ class IQLLearner(BasicLearner):
         mac_output, \
         mac_output_tformat = self.multiagent_controller.get_outputs(data_inputs,
                                                                     hidden_states=hidden_states,
-                                                                    loss_fn=iql_loss_fn,
+                                                                    loss_fn=None,
                                                                     tformat=data_inputs_tformat,
                                                                     test_mode=False,
                                                                     target_mode=False)
 
-        IQL_loss = mac_output["losses"]
+        q_values = mac_output["qvalues"]
+
+        IQL_loss, loss_tformat, loss_info = iql_loss_fn(qvalues=q_values, tformat="a*bs*t*v")
+        td_error = loss_info["td_error"]
+
         IQL_loss = IQL_loss.mean()
 
         # carry out optimization for agents
         self.agent_optimiser.zero_grad()
         IQL_loss.backward()
-        grad_norm = th.nn.utils.clip_grad_norm(self.agent_parameters, self.args.grad_norm_clip)
+        grad_norm = th.nn.utils.clip_grad_norm_(self.agent_parameters, self.args.grad_norm_clip)
         self.agent_optimiser.step() #DEBUG
 
         # increase episode counter
@@ -169,7 +183,7 @@ class IQLLearner(BasicLearner):
 
         # Calculate statistics
         self._add_stat("q_loss", IQL_loss.data.cpu().numpy(), T_env=T_env)
-        self._add_stat("td_error", IQL_loss.data.cpu().numpy()+, T_env=T_env) # TODO: Get the td_error and log it!
+        self._add_stat("td_error", td_error.data.cpu().numpy(), T_env=T_env) # TODO: Get the td_error and log it!
         self._add_stat("grad_norm", grad_norm, T_env=T_env)
         self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
         self._add_stat("q_mean", mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
