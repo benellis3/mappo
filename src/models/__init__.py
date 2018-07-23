@@ -35,9 +35,9 @@ from .coma_joint import COMAJointNonRecurrentMultiAgentNetwork
 # REGISTRY["coma_joint_recurrent_nn"] = COMAJointRecurrentMultiAgentNetwork
 REGISTRY["coma_joint_non-recurrent_multiagent_nn"] = COMAJointNonRecurrentMultiAgentNetwork
 
-from .vdn import VDNMixingNetwork, VDNMixer
+from .vdn import VDNMixingNetwork, VDNMixer, VDNMixerSimple
 REGISTRY["vdn_mixing_network"] = VDNMixingNetwork
-REGISTRY["vdn_mixer"] = VDNMixer
+REGISTRY["vdn_mixer"] = VDNMixerSimple
 
 from .qmix import QMIXMixingNetwork, QMIXMixer
 REGISTRY["qmix_mixing_network"] = QMIXMixingNetwork

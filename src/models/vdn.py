@@ -8,6 +8,11 @@ from components.transforms import _check_inputs_validity, _to_batch, _from_batch
 from models import REGISTRY as m_REGISTRY
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
+class VDNMixerSimple(nn.Module):
+
+    def forward(self, qvalues, tformat):
+        return qvalues.sum(dim=_adim(tformat), keepdim=True)
+
 class VDNMixer(nn.Module):
 
     def __init__(self, n_agents, input_shapes, output_shapes={}, layer_args={}, args=None):

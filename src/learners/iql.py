@@ -41,8 +41,8 @@ class IQLLoss(nn.Module):
 
         # The mixer is for VDN and QMIX
         if self.mixer is not None:
-            chosen_qvalues = mixer(chosen_qvalues)
-            target = mixer(target)
+            chosen_qvalues = self.mixer(chosen_qvalues, tformat=tformat)
+            target = self.mixer(target, tformat=tformat)
 
         # targets with a NaN are padded elements, mask them out
         target_mask = (target != target)
