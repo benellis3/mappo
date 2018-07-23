@@ -21,12 +21,12 @@ env_args:
   truncate_episodes: True
 iql_epsilon_start: 1.0
 iql_epsilon_finish: 0.05
-iql_epsilon_time_length: 10000
+iql_epsilon_time_length: 20000
 iql_epsilon_decay_mode: "linear"
 test_nepisode: 20
 test_interval: 1000
 use_replay_buffer: True
 target_update_interval: 1000
-agents_encoder_size: 16
-agents_hidden_state_size: 16
+agents_encoder_size: 32
+agents_hidden_state_size: 32
 t_max: 100000

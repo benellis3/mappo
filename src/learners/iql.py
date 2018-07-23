@@ -39,12 +39,10 @@ class IQLLoss(nn.Module):
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
 
-        # TODO: Move this into a mixer/vdn class
-        # This is only for quickly testing VDN
-        if False:
-            target = target.sum(dim=_adim(tformat))
-            chosen_qvalues = chosen_qvalues.sum(dim=_adim(tformat))
-
+        # The mixer is for VDN and QMIX
+        if self.mixer is not None:
+            chosen_qvalues = mixer(chosen_qvalues)
+            target = mixer(target)
 
         # targets with a NaN are padded elements, mask them out
         target_mask = (target != target)
@@ -81,8 +79,9 @@ class IQLLearner(BasicLearner):
         self.logging_struct = logging_struct
         self.last_target_update_T = 0
 
+        self.loss_func = IQLLoss
+
         self.args_sanity_check()
-        pass
 
     def args_sanity_check(self):
         """
@@ -159,7 +158,7 @@ class IQLLearner(BasicLearner):
         actions, actions_tformat = batch_history.get_col(col="actions",
                                                          agent_ids=list(range(self.n_agents)))
 
-        iql_loss_fn = partial(IQLLoss(),
+        iql_loss_fn = partial(self.loss_func(),
                               target=Variable(td_targets, requires_grad=False),
                               actions=Variable(actions, requires_grad=False))
 
