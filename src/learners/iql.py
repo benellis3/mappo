@@ -39,8 +39,12 @@ class IQLLoss(nn.Module):
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
 
-        # chosen_qvalues[action_mask] = 0.0
-        # target[action_mask] = 0.0
+        # TODO: Move this into a mixer/vdn class
+        # This is only for quickly testing VDN
+        if False:
+            target = target.sum(dim=_adim(tformat))
+            chosen_qvalues = chosen_qvalues.sum(dim=_adim(tformat))
+
 
         # targets with a NaN are padded elements, mask them out
         target_mask = (target != target)
@@ -128,6 +132,10 @@ class IQLLearner(BasicLearner):
                                                                            test_mode=False,
                                                                            target_mode=True)
 
+        avail_actions, avail_actions_tformat = batch_history.get_col(col="avail_actions", agent_ids=list(range(self.n_agents)))
+        avail_actions_byte = (1 - avail_actions).type_as(th.ByteTensor())
+        target_mac_output["qvalues"][avail_actions_byte] = -50000000 # TODO: Safer/better way to do this?
+
         target_qvalues, _ = target_mac_output["qvalues"].detach().max(dim=_vdim(target_mac_output_tformat), keepdim=True)
 
         # calculate targets
@@ -183,10 +191,10 @@ class IQLLearner(BasicLearner):
 
         # Calculate statistics
         self._add_stat("q_loss", IQL_loss.data.cpu().numpy(), T_env=T_env)
-        self._add_stat("td_error", td_error.data.cpu().numpy(), T_env=T_env) # TODO: Get the td_error and log it!
+        self._add_stat("td_error", td_error.data.cpu().numpy(), T_env=T_env)
         self._add_stat("grad_norm", grad_norm, T_env=T_env)
-        self._add_stat("target_q_mean", target_mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
-        self._add_stat("q_mean", mac_output["qvalues"].data.cpu().numpy().mean(), T_env=T_env)
+        self._add_stat("target_q_mean", target_qvalues.data.cpu().numpy().mean(), T_env=T_env)
+        self._add_stat("q_mean", q_values.data.cpu().numpy().mean(), T_env=T_env)
         # self._add_stat("T_q", self.T_q, T_env=T_env)
 
         pass
