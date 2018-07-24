@@ -17,5 +17,6 @@ shared_params = {
 
 extend_param_dicts(param_dicts, shared_params,
     {
+        "name": "qmix_sc2_3m"
     },
     repeats=8)
