@@ -27,3 +27,6 @@ git reset --hard origin/tabz -q
 
 # Rebuild the docker container
 ./build.sh
+
+# Install sc2
+./install_sc2.sh
