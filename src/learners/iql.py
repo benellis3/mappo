@@ -17,7 +17,7 @@ class IQLLoss(nn.Module):
 
     def __init__(self):
         super(IQLLoss, self).__init__()
-    def forward(self, qvalues, actions, target, tformat):
+    def forward(self, qvalues, actions, target, tformat, states):
         """
         calculate sum_i ||r_{t+1} + max_a Q^i(s_{t+1}, a) - Q^i(s_{t}, a_{t})||_2^2
         where i is agent_id
@@ -39,16 +39,22 @@ class IQLLoss(nn.Module):
         # targets may legitimately have NaNs - want to zero them out, and also zero out inputs at those positions
         chosen_qvalues = th.gather(qvalues, _vdim(tformat), actions.long())
 
+        # DEBUG STUFF
+        # target_mask = (target != target)
+        # non_nan_elements_before = (1 - target_mask).sum().type_as(th.FloatTensor())
+        # tar_before = target.clone()
+        # DEBUG
+
         # The mixer is for VDN and QMIX
         if self.mixer is not None:
-            chosen_qvalues = self.mixer(chosen_qvalues, tformat=tformat)
-            target = self.mixer(target, tformat=tformat)
+            chosen_qvalues = self.mixer(chosen_qvalues, tformat=tformat, states=states[:,:-1,:])
+            target = self.mixer(target, tformat=tformat, states=states[:,1:,:])
 
         # targets with a NaN are padded elements, mask them out
         target_mask = (target != target)
         target[target_mask] = 0.0
         chosen_qvalues[target_mask] = 0.0
-        non_nan_elements = (1 - target_mask).sum().type_as(th.FloatTensor())
+        non_nan_elements = (1 - target_mask).sum().type_as(th.FloatTensor()).detach()
 
         info = {}
         # td_error
@@ -158,9 +164,12 @@ class IQLLearner(BasicLearner):
         actions, actions_tformat = batch_history.get_col(col="actions",
                                                          agent_ids=list(range(self.n_agents)))
 
-        iql_loss_fn = partial(self.loss_func(),
+        # To make the mixing easier for VDN and QMIX
+        states, states_tformat = batch_history.get_col(col="state")
+        iql_loss_fn = partial(self.loss_func,
                               target=Variable(td_targets, requires_grad=False),
-                              actions=Variable(actions, requires_grad=False))
+                              actions=Variable(actions, requires_grad=False),
+                              states=Variable(states, requires_grad=False))
 
         hidden_states, hidden_states_tformat = self.multiagent_controller.generate_initial_hidden_states(len(batch_history))
 

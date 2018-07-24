@@ -39,9 +39,9 @@ from .vdn import VDNMixingNetwork, VDNMixer, VDNMixerSimple
 REGISTRY["vdn_mixing_network"] = VDNMixingNetwork
 REGISTRY["vdn_mixer"] = VDNMixerSimple
 
-from .qmix import QMIXMixingNetwork, QMIXMixer
+from .qmix import QMIXMixingNetwork, QMIXMixer, QMIXMixerSimple
 REGISTRY["qmix_mixing_network"] = QMIXMixingNetwork
-REGISTRY["qmix_mixer"] = VDNMixer
+REGISTRY["qmix_mixer"] = QMIXMixerSimple
 
 from .mackrel import MACKRELCriticLevel1, MACKRELCriticLevel2, MACKRELCriticLevel3
 REGISTRY["mackrel_critic_level1"] = MACKRELCriticLevel1

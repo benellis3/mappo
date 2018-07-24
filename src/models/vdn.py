@@ -10,7 +10,7 @@ from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
 class VDNMixerSimple(nn.Module):
 
-    def forward(self, qvalues, tformat):
+    def forward(self, qvalues, tformat, states=None):
         return qvalues.sum(dim=_adim(tformat), keepdim=True)
 
 class VDNMixer(nn.Module):

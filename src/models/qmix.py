@@ -9,6 +9,44 @@ from components.transforms import _check_inputs_validity, _to_batch, _from_batch
 from models import REGISTRY as m_REGISTRY
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
+class QMIXMixerSimple(nn.Module):
+
+    def __init__(self, state_size, n_agents, mixing_dim):
+        super(QMIXMixerSimple, self).__init__()
+        self.state_size = state_size
+        self.n_agents = n_agents
+        self.mixing_dim = mixing_dim
+
+        self.w1_hypernet = nn.Linear(state_size, n_agents * mixing_dim)
+        self.b1_hypernet = nn.Linear(state_size, mixing_dim)
+        self.w2_hypernet = nn.Linear(state_size, mixing_dim * 1)
+        self.b2_hypernet = nn.Sequential(*[nn.Linear(state_size, mixing_dim), nn.ReLU(), nn.Linear(mixing_dim, 1)])
+
+    def forward(self, qvalues, tformat=None, states=None):
+
+        states = states.reshape(-1, self.state_size)
+        # Produce the weights and biases
+        w1 = th.abs(self.w1_hypernet(states))
+        b1 = self.b1_hypernet(states)
+        w2 = th.abs(self.w2_hypernet(states))
+        b2 = self.b2_hypernet(states)
+
+        # Reshape the tensors involved
+        w1 = w1.view(-1, self.n_agents, self.mixing_dim)
+        w2 = w2.view(-1, self.mixing_dim, 1)
+        b1 = b1.view(-1, 1, self.mixing_dim)
+        b2 = b2.view(-1, 1, 1)
+
+        # qvalues_transpose = qvalues.reshape(-1, 1, self.n_agents)
+        qvalues_transpose = qvalues.transpose(_vdim(tformat),_adim(tformat)).reshape(-1, 1, self.n_agents)
+
+        x = F.elu(th.bmm(qvalues_transpose, w1) + b1)
+
+        x = th.bmm(x, w2) + b2
+
+        return x
+
+
 class HyperLinear():
     """
     Linear network layers that allows for two additional complications:

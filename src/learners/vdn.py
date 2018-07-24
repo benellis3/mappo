@@ -14,5 +14,5 @@ class VDNLearner(IQLLearner):
     def __init__(self, multiagent_controller, logging_struct=None, args=None):
         super(VDNLearner, self).__init__(multiagent_controller, logging_struct, args)
 
-        self.loss_func = VDNLoss
+        self.loss_func = VDNLoss() # Maybe we want to make it elsewhere
         # TODO: Maybe we want some extra logging for other stuff as well
