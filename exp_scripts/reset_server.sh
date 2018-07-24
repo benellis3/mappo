@@ -19,7 +19,7 @@ fi
 
 cd $EXP_DIR/pymarl
 
-git fetch -q origin
+git fetch -q tabz
 
 # Kill the docker container
 ./kill.sh
