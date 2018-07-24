@@ -35,6 +35,10 @@ class QMIXLearner(IQLLearner):
         self.state_size = transition_scheme.get_by_name("state")["size"]
         self.loss_func = self.loss_func(self.state_size, self.n_agents, self.args.mixing_network_dim)
 
+        # Move mixer model to gpu if required
+        if self.args.use_cuda:
+            self.loss_func.mixer.cuda()
+
         # To make minimal changes its still called agent_optimiser and agent_parameters
         self.agent_parameters.extend(self.loss_func.parameters())
 

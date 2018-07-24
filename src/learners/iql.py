@@ -62,7 +62,7 @@ class IQLLoss(nn.Module):
         target_mask = (target != target)
         # target[target_mask] = 0.0
         # chosen_qvalues[target_mask] = 0.0
-        non_nan_elements = (1 - target_mask).sum().type_as(th.FloatTensor()).detach()
+        non_nan_elements = (1 - target_mask).sum().type_as(th.FloatTensor()).item()
 
         info = {}
         # td_error
