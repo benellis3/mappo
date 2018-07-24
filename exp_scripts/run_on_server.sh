@@ -3,7 +3,7 @@
 
 usage()
 {
-    echo "bash exp_scripts/run_on_server.sh SERVER GPU_ID N_REPEAT CFG or SERVER reset"
+    echo "bash exp_scripts/run_on_server.sh SERVER GPU_ID N_REPEAT CFG or SERVER reset 0"
 }
 
 if [ -z "$1" ]; then usage; exit 1;
