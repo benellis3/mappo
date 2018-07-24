@@ -9,6 +9,9 @@ fi
 echo "EXP_DIR: $EXP_DIR"
 cd $EXP_DIR/pymarl
 
+mkdir 3rdparty
+cd 3rdparty
+
 export SC2PATH=`pwd`'/StarCraftII'
 echo 'SC2PATH is set to '$SC2PATH
 
