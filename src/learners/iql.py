@@ -45,20 +45,30 @@ class IQLLoss(nn.Module):
         # tar_before = target.clone()
         # DEBUG
 
+        # targets with a NaN are padded elements, mask them out
+        # 0-out stuff before mixing
+        target_mask = (target != target)
+        chosen_qvalues[target_mask] = 0
+        target_mask[target_mask] = 0
+
         # The mixer is for VDN and QMIX
         if self.mixer is not None:
+            state_mask = (states != states)
+            states[state_mask] = 0
             chosen_qvalues = self.mixer(chosen_qvalues, tformat=tformat, states=states[:,:-1,:])
             target = self.mixer(target, tformat=tformat, states=states[:,1:,:])
 
-        # targets with a NaN are padded elements, mask them out
         target_mask = (target != target)
-        target[target_mask] = 0.0
-        chosen_qvalues[target_mask] = 0.0
+        # target[target_mask] = 0.0
+        # chosen_qvalues[target_mask] = 0.0
         non_nan_elements = (1 - target_mask).sum().type_as(th.FloatTensor()).detach()
 
         info = {}
         # td_error
         td_error = (chosen_qvalues - target.detach())
+
+        td_error[target_mask] = 0
+
         mean_td_error = td_error.sum() / non_nan_elements
         info["td_error"] = mean_td_error
 
@@ -167,7 +177,7 @@ class IQLLearner(BasicLearner):
         # To make the mixing easier for VDN and QMIX
         states, states_tformat = batch_history.get_col(col="state")
         iql_loss_fn = partial(self.loss_func,
-                              target=Variable(td_targets, requires_grad=False),
+                              target=Variable(td_targets.detach(), requires_grad=False),
                               actions=Variable(actions, requires_grad=False),
                               states=Variable(states, requires_grad=False))
 
@@ -186,7 +196,7 @@ class IQLLearner(BasicLearner):
         IQL_loss, loss_tformat, loss_info = iql_loss_fn(qvalues=q_values, tformat="a*bs*t*v")
         td_error = loss_info["td_error"]
 
-        IQL_loss = IQL_loss.mean()
+        # IQL_loss = IQL_loss.mean()
 
         # carry out optimization for agents
         self.agent_optimiser.zero_grad()

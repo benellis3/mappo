@@ -30,4 +30,5 @@ target_update_interval: 1000
 agents_encoder_size: 32
 agents_hidden_state_size: 32
 t_max: 100000
-mixing_network_dim: 16
+learner: "qmix"
+mixing_network_dim: 8
