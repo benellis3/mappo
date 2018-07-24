@@ -17,6 +17,7 @@ class IQLLoss(nn.Module):
 
     def __init__(self):
         super(IQLLoss, self).__init__()
+        self.mixer = None
     def forward(self, qvalues, actions, target, tformat, states):
         """
         calculate sum_i ||r_{t+1} + max_a Q^i(s_{t+1}, a) - Q^i(s_{t}, a_{t})||_2^2
@@ -95,7 +96,9 @@ class IQLLearner(BasicLearner):
         self.logging_struct = logging_struct
         self.last_target_update_T = 0
 
-        self.loss_func = IQLLoss
+        self.loss_func = IQLLoss()
+
+        self.episodes = 0
 
         self.args_sanity_check()
 
@@ -124,10 +127,11 @@ class IQLLearner(BasicLearner):
     def train(self, batch_history, T_env=None):
 
         # Update target if necessary
-        if (T_env - self.last_target_update_T) / self.target_update_interval >= 1.0:
+        if (self.episodes - self.last_target_update_T) / self.target_update_interval >= 1.0:
             self.update_target_nets()
-            self.last_target_update_T = T_env
+            self.last_target_update_T = self.episodes
             self.logging_struct.py_logger.info("Updating target network at T: {}".format(T_env))
+        self.episodes += 1
 
         # create one single batch_history view suitable for all
         data_inputs, data_inputs_tformat = batch_history.view(dict_of_schemes=self.joint_scheme_dict,

@@ -799,7 +799,7 @@ class NStepRunner():
 
     def log(self,log_directly = True):
         """
-        Each learner has it's own logging routine, which logs directly to the python-wide logger if log_directly==True,
+        Each l0earner has it's own logging routine, which logs directly to the python-wide logger if log_directly==True,
         and returns a logging string otherwise
 
         Logging is triggered in run.py
