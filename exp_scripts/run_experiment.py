@@ -105,7 +105,7 @@ def main(config_name, run=False):
                         break
                     params = all_experiments[exp_idx]
                     # params += "server=" + server +" gpu=" + str(gpu)
-                    params = "{} {}".format(exp_name, params)
+                    params = "{} {} LABEL={}".format(exp_name, params, config.LABEL)
                     log.append(params)
                     # print(params)
                     if not run:
