@@ -31,6 +31,8 @@ echo 'MAP_DIR is set to '$MAP_DIR
 if [ ! -d $MAP_DIR ]; then
         mkdir -p $MAP_DIR
 fi
+
+cd ..
 cp src/envs/starcraft2/maps/* $MAP_DIR
 
 echo 'StarCraftII is installed.'
