@@ -4,9 +4,9 @@ server_list = [
     ("brown", [0,1,2,3,4,5,6,7], 2),
 ]
 
-LABEL = "QMIX_sc2_test_24July2018"
+LABEL = "QMIX_sc2_test_26July2018"
 
-n_repeat = 2
+n_repeat = 1
 
 param_dicts = []
 
