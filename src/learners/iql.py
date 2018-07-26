@@ -217,7 +217,7 @@ class IQLLearner(BasicLearner):
         self._add_stat("grad_norm", grad_norm, T_env=T_env)
         self._add_stat("target_q_mean", target_qvalues.data.cpu().numpy().mean(), T_env=T_env)
         self._add_stat("q_mean", q_values.data.cpu().numpy().mean(), T_env=T_env)
-        # self._add_stat("T_q", self.T_q, T_env=T_env)
+        self._add_stat("T_learner", T_env, T_env=T_env) # For convenience
 
         pass
 

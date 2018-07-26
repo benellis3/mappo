@@ -791,10 +791,6 @@ class NStepRunner():
         if hasattr(self.logging_struct, "hdf_logger"):
             self.logging_struct.hdf_logger.log(_underscore_to_cap(name), value, T_env)
 
-        # log to hdf if enabled
-        if hasattr(self.logging_struct, "hdf_logger"):
-            self.logging_struct.hdf_logger.log(_underscore_to_cap(name), value, T_env)
-
         return
 
     def log(self,log_directly = True):
