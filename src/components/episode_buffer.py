@@ -57,16 +57,20 @@ class EpisodeBatch:
             else:
                 self.data.transition_data[field_key] = th.zeros((batch_size, max_seq_length, *shape), dtype=dtype)
 
-    def update_transition_data(self, data, b_slice, t_slice):
-        self.data.transition_data["filled"][b_slice, t_slice] = 1
+    #TODO: expose these with __setitem__, support more indexing options?
+    def update_transition_data(self, data, bs=slice(None), ts=slice(None)):
+        slices = self._parse_slices([bs, ts])
+        self.data.transition_data["filled"][slices] = 1
         for k, v in data.items():
             if k in self.data.transition_data:
-                self.data.transition_data[k][b_slice, t_slice] = v
+                #TODO: guard to make sure we're only viewing to add singleton b/v dims if needed.
+                self.data.transition_data[k][slices] = v.view_as(self.data.transition_data[k][slices])
 
-    def update_episode_data(self, data, b_slice):
+    def update_episode_data(self, data, bs):
+        bs = self._parse_slices([bs])
         for k, v in data.items():
             if k in self.data.episode_data:
-                self.data.episode_data[k][b_slice] = v
+                self.data.episode_data[k][bs] = v.view_as(self.data.episode_data[k][bs])
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -77,17 +81,44 @@ class EpisodeBatch:
             else:
                 raise ValueError
         elif isinstance(item, list) and all([isinstance(it, str) for it in item]):
-            # return dict with just these keys. update scheme.
-        else:
-            # assert meaningful slices
-            # slice on batch and time
-            assert 1 <= len(item) <= 2
-            ret = EpisodeBatch(self.scheme, self.groups, self.max_seq_length, self.batch_size, data=self.data)
-            for k, v in ret.data.transition_data.items():
-                ret.data.transition_data[k] = v[item]
-            for k, v in ret.data.episode_data.items():
-                ret.data.episode_data[k] = v[item[0]]
+            new_data = self._new_data_sn()
+            for key in item:
+                if key in self.data.transition_data:
+                    new_data.transition_data[key] = self.data.transition_data[key]
+                elif key in self.data.episode_data:
+                    new_data.episode_data[key] = self.data.episode_data[key]
+                else:
+                    raise KeyError("Unrecognised key {}".format(key))
+            ret = EpisodeBatch(self.scheme, self.groups, self.max_seq_length, self.batch_size, data=new_data)
+            #TODO: update scheme? do we need scheme after initialisation?
             return ret
+        else:
+            item = self._parse_slices(item)
+            assert 1 <= len(item) <= 2
+            new_data = self._new_data_sn()
+            for k, v in self.data.transition_data.items():
+                new_data.transition_data[k] = v[item]
+            for k, v in self.data.episode_data.items():
+                new_data.episode_data[k] = v[item[0]]
+
+            ret = EpisodeBatch(self.scheme, self.groups, self.max_seq_length, self.batch_size, data=new_data)
+            return ret
+
+    def _new_data_sn(self):
+        new_data = SN()
+        new_data.transition_data = {}
+        new_data.episode_data = {}
+        return new_data
+
+    def _parse_slices(self, items):
+        parsed = []
+        for item in items:
+            if isinstance(item, int):
+                parsed.append(slice(item, item+1))
+            else:
+                parsed.append(item)
+        return parsed
+
 
 class ReplayBuffer(EpisodeBatch):
     def __init__(self, scheme, groups, max_seq_length, buffer_size):
@@ -110,32 +141,43 @@ class ReplayBuffer(EpisodeBatch):
             self.insert_episode_batch(ep_batch[buffer_left:])
 
 
-# if __name__ == "__main__":
-groups = {"agents": 2,}
-# "input": {"vshape": (shape), "episode_const": bool, "group": (name), "dtype": dtype}
-scheme = {
-    "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},
-    "obs": {"vshape": (3,), "group": "agents"},
-    "state": {"vshape": (5,5)},
-    "epsilon": {"vshape": (1,), "episode_const": True}
-}
+if __name__ == "__main__":
+    bs = 4
+    groups = {"agents": 2,}
+    # "input": {"vshape": (shape), "episode_const": bool, "group": (name), "dtype": dtype}
+    scheme = {
+        "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},
+        "obs": {"vshape": (3,), "group": "agents"},
+        "state": {"vshape": (3,3)},
+        "epsilon": {"vshape": (1,), "episode_const": True}
+    }
 
-print("HI")
-ep_batch = EpisodeBatch(scheme, groups, 3, 4)
+    ep_batch = EpisodeBatch(scheme, groups, 3, bs)
 
-env_data = {
-    "obs": th.ones(2, 3),
-    "state": th.eye(5)
-}
-# bs=4 x t=3 x v=5*5
+    env_data = {
+        "obs": th.ones(2, 3),
+        "state": th.eye(3)
+    }
+    batch_data = {
+        "obs": th.ones(2, 3).unsqueeze(0).repeat(bs,1,1),
+        "state": th.eye(3).unsqueeze(0).repeat(bs,1,1),
+    }
+    # bs=4 x t=3 x v=3*3
 
-ep_batch.update_transition_data(env_data, slice(0,1), slice(0,1))
-ep_batch.update_transition_data(env_data, slice(0,1), slice(2,3))
+    ep_batch.update_transition_data(env_data, 0, 0)
 
-env_data = {
-    "obs": th.ones(2, 3),
-    "state": th.eye(5)*2
-}
-ep_batch.update_transition_data(env_data, slice(3,4), slice(0,1))
+    ep_batch[:, 1].update_transition_data(batch_data)
+    ep_batch.update_transition_data(batch_data, slice(None), 2)
 
-ep_batch[[0, 0], [0,1]]
+    print(ep_batch["filled"])
+
+    ep_batch.update_transition_data(env_data, slice(0,1), slice(2,3))
+
+    env_data = {
+        "obs": th.ones(2, 3),
+        "state": th.eye(3)*2
+    }
+    ep_batch.update_transition_data(env_data, slice(3,4), slice(0,1))
+
+    b2 = ep_batch[slice(0,1),slice(1,2)]
+    b2.update_transition_data(env_data, slice(0,1), slice(0,1))
