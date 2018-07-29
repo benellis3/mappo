@@ -12,9 +12,10 @@ from utils.dict2namedtuple import convert
 from utils.logging import get_logger, append_scalar, log_stats, HDFLogger
 from utils.timehelper import time_left, time_str
 
-from components.replay_buffer import ReplayBuffer
 from learners import REGISTRY as le_REGISTRY
 from runners import REGISTRY as r_REGISTRY
+from controllers import MultiAgentController
+from components.episode_buffer import ReplayBuffer
 
 
 def run(_run, _config, _log, pymongo_client):
@@ -83,16 +84,31 @@ def run(_run, _config, _log, pymongo_client):
 
 def run_sequential(args, _logging_struct, _run, unique_token):
 
-    # Set up train runner
+    # Init runner so we can get env info
     runner_obj = r_REGISTRY[args.runner](args=args,
                                          logging_struct=_logging_struct)
 
-    # Set up schemes and groups here (need the environment info first)
+    # Set up schemes and groups here
     env_info = runner_obj.get_env_info()
 
-    # Give runner the scheme
+    # Default/Base scheme
+    scheme = {
+        "state": {"vshape": env_info["state_shape"]},
+        "obs": {"vshape": env_info["obs_shape"], "group": "agents"},
+        "actions": {"vshape": env_info["n_actions"], "group": "agents", "dtype": th.long},  # One hot
+        "avail_actions": {"vshape": env_info["n_actions"], "group": "agents", "dtype": th.long},  # One hot
+        "reward": {"vshape": (1,)},
+        "terminated": {"vshape": (1,)}
+    }
+    groups = {
+        "agents": env_info["n_agents"]
+    }
 
-    # Setup multiagent controller here (not in the runner)
+    # Setup multiagent controller here
+    mac = MultiAgentController(env_info["n_agents"], scheme, groups, args)  # Dummy for testing
+
+    # Give runner the scheme
+    runner_obj.setup(scheme=scheme, groups=groups, mac=mac)
 
     # create the learner
     learner_obj = le_REGISTRY[args.learner](multiagent_controller=runner_obj.multiagent_controller,
@@ -102,20 +118,10 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     # create non-agent models required by learner
     learner_obj.create_models(runner_obj.data_scheme)
 
-    # set up replay buffer (if enabled)
-    buffer = None
-    if args.use_replay_buffer:
-        buffer = ReplayBuffer(data_scheme=runner_obj.data_scheme,
-                              n_bs=args.buffer_size,
-                              n_t=runner_obj.env_episode_limit + 1,
-                              n_agents=runner_obj.n_agents,
-                              batch_size=args.batch_size,
-                              is_cuda=args.use_cuda,
-                              is_shared_mem=not args.use_cuda,
-                              logging_struct=_logging_struct)
+    # replay buffer
+    buffer = ReplayBuffer(scheme, groups, env_info["episode_limit"], args.buffer_size)
 
     # start training
-
     episode = 0
     last_test_T = 0
     model_save_time = 0
@@ -126,18 +132,12 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     while runner_obj.T_env <= args.t_max:
 
         # Run for a whole episode at a time
-        episode_rollout = runner_obj.run(test_mode=False)
+        episode_batch = runner_obj.run(test_mode=False)
+        buffer.insert_episode_batch(episode_batch)
 
-        episode_sample = None
-        if args.use_replay_buffer:
-            buffer.put(episode_rollout)
+        if buffer.can_sample(args.batch_size):
+            episode_sample = buffer.sample(args.batch_size)
 
-            if buffer.can_sample(args.batch_size):
-                episode_sample = buffer.sample(args.batch_size, seq_len=0)
-        else:
-            episode_sample = episode_rollout
-
-        if episode_sample is not None:
             if args.save_episode_samples:
                 assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
                 _logging_struct.hdf_logger.log("", episode_sample, runner_obj.T_env)
@@ -151,7 +151,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
             _logging_struct.py_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner_obj.T_env, args.t_max), time_str(time.time() - start_time)))
             runner_obj.log() # log runner statistics derived from training runs
 
-            last_test_T =  runner_obj.T_env
+            last_test_T = runner_obj.T_env
             for _ in range(n_test_runs):
                 runner_obj.run(test_mode=True)
 

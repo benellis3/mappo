@@ -31,3 +31,15 @@ REGISTRY["mackrel_fo_mac"] = MACKRELFOMultiagentController
 
 from .flounderl_agents import FLOUNDERLMultiagentController
 REGISTRY["flounderl_mac"] = FLOUNDERLMultiagentController
+
+
+class MultiAgentController:
+
+    def __init__(self, n_agents, scheme, groups, args):
+        self.n_agents = n_agents
+        self.scheme = scheme
+        self.groups = groups
+        self.args = args
+
+    def select_actions(self, inputs, test_mode=False):
+        return {"actions": [0 for _ in range(self.n_agents)]}  # Dummy for quick testing
