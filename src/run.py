@@ -16,12 +16,8 @@ from components.replay_buffer import ReplayBuffer
 from learners import REGISTRY as le_REGISTRY
 from runners import REGISTRY as r_REGISTRY
 
+
 def run(_run, _config, _log, pymongo_client):
-    #------------------------------------------------------------------------------------------------------------------
-    # Launch point for DeepMARL framework
-    # Christian Schroeder de Witt 2018, caschroeder@outlook.com
-    #
-    #------------------------------------------------------------------------------------------------------------------
 
     # check args sanity
     _config = args_sanity_check(_config, _log)
@@ -40,7 +36,7 @@ def run(_run, _config, _log, pymongo_client):
     if _config.get("debug_mode", None) is not None:
         _log.warning("ATTENTION DEBUG MODE: {}".format(_config["debug_mode"]))
 
-    # ----- configure logging
+    # configure logging
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     if args.use_tensorboard:
@@ -52,10 +48,7 @@ def run(_run, _config, _log, pymongo_client):
         file_tb_path = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
         configure(os.path.join(file_tb_path, "{}").format(unique_token))
 
-    # configure trajectory logger
-
-
-    # set up logging object to be passed on from now on
+    # set up logging objects to be passed on from now on
     logging_struct = SN(py_logger=_log,
                         sacred_log_scalar_fn=partial(append_scalar, run=_run))
     if args.use_tensorboard:
@@ -64,17 +57,13 @@ def run(_run, _config, _log, pymongo_client):
     if args.use_hdf_logger:
         logging_struct.hdf_logger = HDFLogger(path=args.local_results_path, name=args.name)
 
-    # ----- execute runners
-    # run framework in run_mode selected
-    if args.run_mode in ["parallel_subproc"]:
-        run_parallel(args=args, _run=_run, _logging_struct=logging_struct, unique_token=unique_token)
-    else:
-        run_sequential(args=args, _run=_run, _logging_struct=logging_struct, unique_token=unique_token)
+    # Run and train
+    run_sequential(args=args, _run=_run, _logging_struct=logging_struct, unique_token=unique_token)
 
-    #Clean up after finishing
+    # Clean up after finishing
     print("Exiting Main")
 
-    if pymongo_client is not None: #args.use_mongodb:
+    if pymongo_client is not None:
         print("Attempting to close mongodb client")
         pymongo_client.close()
         print("Mongodb client closed")
@@ -91,84 +80,19 @@ def run(_run, _config, _log, pymongo_client):
     # Making sure framework really exits
     os._exit(os.EX_OK)
 
-def args_sanity_check(config, _log):
-
-    # set CUDA flags
-    # config["use_cuda"] = True # Use cuda whenever possible!
-    if config["use_cuda"] and not th.cuda.is_available():
-        config["use_cuda"] = False
-        _log.warning("CUDA flag use_cuda was switched OFF automatically because no CUDA devices are available!")
-
-    assert (config["run_mode"] in ["parallel_subproc"] and config["use_replay_buffer"]) or (not config["run_mode"] in ["parallel_subproc"]),  \
-        "need to use replay buffer if running in parallel mode!"
-
-    assert not (not config["use_replay_buffer"] and (config["batch_size_run"]!=config["batch_size"]) ) , "if not using replay buffer, require batch_size and batch_size_run to be the same."
-
-    if config["learner"] == "coma":
-       assert (config["run_mode"] in ["parallel_subproc"]  and config["batch_size_run"]==config["batch_size"]) or \
-       (not config["run_mode"] in ["parallel_subproc"]  and not config["use_replay_buffer"]), \
-           "cannot use replay buffer for coma, unless in parallel mode, when it needs to have exactly have size batch_size."
-
-    return config
-
-def run_parallel(args, _logging_struct, _run, unique_token):
-    """
-     this run mode runs runner and learner in parallel subprocesses and uses a specially protected shared replay buffer in between
-     TODO: under construction!
-     """
-    from torch import multiprocessing as mp
-    def runner_process(self, args):
-        """
-        TODO: add inter-process communication
-        :return:
-        """
-        runner_train_obj = r_REGISTRY[args.runner](args=args)
-        while True:
-            runner_train_obj.run()
-        pass
-
-    def learner_process():
-        """
-        TODO: add inter-process communication
-        :return:
-        """
-        runner_test_obj = r_REGISTRY[args.runner](multiagent_controller=runner_train_obj.multiagent_controller,
-                                                  args=args,
-                                                  test_mode=True)
-        while True:
-            runner_test_obj.run()
-        pass
-
-    runner_obj = NStepRunner(args=args)
-    runner_obj.share_memory()
-
-    test_runner_obj = NStepRunner(multiagent_controller=runner_obj.multiagent_controller,
-                                  args=args)
-    test_runner_obj.share_memory()
-
-    # TODO: Create a data scheme registry (possibly with yaml files or sth)
-    replay_buffer = ReplayBuffer(scheme, args.buffer_size, is_cuda=True, is_shared_mem=True)
-
-    mp.set_start_method('forkserver')
-    runner_proc = mp.Process(target=runner_process, args=(runner_obj, replay_buffer,))
-    learner_proc = mp.Process(target=learner_process, args=(learner_obj, replay_buffer,))
-    runner_proc.start()
-    learner_proc.start()
-
-    ###
-    #  Main process keeps train / runner ratios roughly in sync, caters for logging and termination
-    ###
-    while True:
-        break
-
-    runner_proc.join()
-    learner_proc.join()
 
 def run_sequential(args, _logging_struct, _run, unique_token):
 
-    # set up train runner
+    # Set up train runner
     runner_obj = r_REGISTRY[args.runner](args=args,
                                          logging_struct=_logging_struct)
+
+    # Set up schemes and groups here (need the environment info first)
+    env_info = runner_obj.get_env_info()
+
+    # Give runner the scheme
+
+    # Setup multiagent controller here (not in the runner)
 
     # create the learner
     learner_obj = le_REGISTRY[args.learner](multiagent_controller=runner_obj.multiagent_controller,
@@ -190,9 +114,8 @@ def run_sequential(args, _logging_struct, _run, unique_token):
                               is_shared_mem=not args.use_cuda,
                               logging_struct=_logging_struct)
 
-    #---- start training
+    # start training
 
-    T = 0
     episode = 0
     last_test_T = 0
     model_save_time = 0
@@ -249,4 +172,25 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         episode += 1
 
     _logging_struct.py_logger.info("Finished Training")
-    # end of parallel / anti-parallel branch
+
+
+# TODO: Clean this up
+def args_sanity_check(config, _log):
+
+    # set CUDA flags
+    # config["use_cuda"] = True # Use cuda whenever possible!
+    if config["use_cuda"] and not th.cuda.is_available():
+        config["use_cuda"] = False
+        _log.warning("CUDA flag use_cuda was switched OFF automatically because no CUDA devices are available!")
+
+    assert (config["run_mode"] in ["parallel_subproc"] and config["use_replay_buffer"]) or (not config["run_mode"] in ["parallel_subproc"]),  \
+        "need to use replay buffer if running in parallel mode!"
+
+    assert not (not config["use_replay_buffer"] and (config["batch_size_run"]!=config["batch_size"]) ) , "if not using replay buffer, require batch_size and batch_size_run to be the same."
+
+    if config["learner"] == "coma":
+       assert (config["run_mode"] in ["parallel_subproc"]  and config["batch_size_run"]==config["batch_size"]) or \
+       (not config["run_mode"] in ["parallel_subproc"]  and not config["use_replay_buffer"]), \
+           "cannot use replay buffer for coma, unless in parallel mode, when it needs to have exactly have size batch_size."
+
+    return config
