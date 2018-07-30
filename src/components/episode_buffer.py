@@ -17,13 +17,12 @@ class EpisodeBatch:
         if data is not None:
             self.data = data
         else:
+            self.data = SN()
+            self.data.transition_data = {}
+            self.data.episode_data = {}
             self._setup_data(self.scheme, self.groups, max_seq_length, batch_size)
 
     def _setup_data(self, scheme, groups, max_seq_length, batch_size):
-        self.data = SN()
-        self.data.transition_data = {}
-        self.data.episode_data = {}
-
         assert "filled" not in scheme, '"filled" is a reserved key for masking.'
         scheme.update({
             "filled": {"vshape": (1,)},
@@ -59,18 +58,11 @@ class EpisodeBatch:
     def update_transition_data(self, data, bs=slice(None), ts=slice(None)):
         slices = self._parse_slices((bs, ts))
 
-        # This only applies when inserting environmental data.
-        # Will be overwritten when adding EpisodeBatch data to the replay buffer
+        # This should be applied when inserting new data.
+        # When updating from a dict with a "filled" key, this will be overwritten in loop below (correct behaviour)
         self.data.transition_data["filled"][slices] = 1
 
-        if isinstance(data, dict):
-            data_items = data.items()
-        elif isinstance(data, EpisodeBatch):
-            data_items = data.data.transition_data.items()
-        else:
-            raise ValueError("Must update transition data with dict or EpisodeBatch, not {}".format(str(type(data))))
-
-        for k, v in data_items:
+        for k, v in data.items():
             if k in self.data.transition_data:
                 #TODO: guard to make sure we're only viewing to add singleton b/v dims if needed.
                 self.data.transition_data[k][slices] = v.view_as(self.data.transition_data[k][slices])
@@ -78,14 +70,7 @@ class EpisodeBatch:
     def update_episode_data(self, data, bs=slice(None)):
         bs = self._parse_slices((bs, slice(None)))
 
-        if isinstance(data, dict):
-            data_items = data.items()
-        elif isinstance(data, EpisodeBatch):
-            data_items = data.data.episode_data.items()
-        else:
-            raise ValueError("Must update episode data with dict or EpisodeBatch, not {}".format(str(type(data))))
-
-        for k, v in data_items:
+        for k, v in data.items():
             if k in self.data.episode_data:
                 self.data.episode_data[k][bs] = v.view_as(self.data.episode_data[k][bs])
 
@@ -243,11 +228,11 @@ if __name__ == "__main__":
     ep_batch.update({"epsilon": th.ones(bs)*.05}, episode_const=True)
 
     ep_batch[:, 1].update_transition_data(batch_data)
-    ep_batch.update_transition_data(batch_data, ts=2)
+    ep_batch.update_transition_data(batch_data, ts=1)
 
-    print(ep_batch["filled"])
+    # print(ep_batch["filled"])
 
-    ep_batch.update_transition_data(env_data, 0, 2)
+    ep_batch.update_transition_data(env_data, 0, 1)
 
     env_data = {
         "obs": th.ones(2, 3),
@@ -266,4 +251,5 @@ if __name__ == "__main__":
 
     sampled = replay_buffer.sample(3)
 
-    print("sampled bs", sampled.batch_size)
+    print(sampled.max_seq_length)
+    print(sampled[:,:1].max_seq_length)
