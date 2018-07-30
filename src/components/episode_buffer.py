@@ -97,14 +97,24 @@ class EpisodeBatch:
 
             dtype = self.scheme[k].get("dtype", th.float32)
             v = th.tensor(v, dtype=dtype, device=self.device)
-            # TODO: guard to make sure we're only viewing to add singleton b/v dims if needed.
+            self._check_safe_view(v, target[k][_slices])
             target[k][_slices] = v.view_as(target[k][_slices])
 
             if k in self.preprocess:
                 new_k = self.preprocess[k][0]
+                v = target[k][_slices]
                 for transform in self.preprocess[k][1]:
                     v = transform.transform(v)
                 target[new_k][_slices] = v.view_as(target[new_k][_slices])
+
+    def _check_safe_view(self, v, dest):
+        idx = len(v.shape) - 1
+        for s in dest.shape[::-1]:
+            if v.shape[idx] != s:
+                if s != 1:
+                    raise ValueError("Unsafe reshape of {} to {}".format(v.shape, dest.shape))
+            else:
+                idx -= 1
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -148,16 +158,8 @@ class EpisodeBatch:
         if isinstance(indexing_item, list) or isinstance(indexing_item, np.ndarray):
             return len(indexing_item)
         elif isinstance(indexing_item, slice):
-            # TODO: Is there a cleaner way to do this?
-            if indexing_item.start is None and indexing_item.stop is None:
-                ret_bs = max_size
-            elif indexing_item.start is None:
-                ret_bs = indexing_item.stop
-            elif indexing_item.stop is None:
-                ret_bs = max_size - indexing_item.start
-            else:
-                ret_bs = indexing_item.stop - indexing_item.start
-            return ret_bs
+            _range = indexing_item.indices(max_size)
+            return 1 + (_range[1] - _range[0] - 1)//_range[2]
 
     def _new_data_sn(self):
         new_data = SN()
@@ -179,6 +181,7 @@ class EpisodeBatch:
             raise IndexError("Indexing across Time must be contiguous")
 
         for item in items:
+            #TODO: stronger checks to ensure only supported options get through
             if isinstance(item, int):
                 # Convert single indices to slices
                 parsed.append(slice(item, item+1))
