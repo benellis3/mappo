@@ -37,6 +37,7 @@ class EpisodeBatch:
             dtype = field_info.get("dtype", th.float32)
 
             if group:
+                assert group in groups, "Group {} must have its number of members defined in _groups_".format(group)
                 shape = (groups[group], *vshape)
             else:
                 shape = vshape
@@ -46,22 +47,45 @@ class EpisodeBatch:
             else:
                 self.data.transition_data[field_key] = th.zeros((batch_size, max_seq_length, *shape), dtype=dtype)
 
-    #TODO: expose these with __setitem__, support more indexing options?
+    def extend(self, scheme, groups=None):
+        self._setup_data(scheme, self.groups if groups is None else groups, self.max_seq_length, self.batch_size)
+
+    def update(self, data, bs=slice(None), ts=slice(None), episode_const=False):
+        if not episode_const:
+            self.update_transition_data(data, bs, ts)
+        else:
+            self.update_episode_data(data, bs)
+
     def update_transition_data(self, data, bs=slice(None), ts=slice(None)):
-        slices = self._parse_slices([bs, ts])
+        slices = self._parse_slices((bs, ts))
 
         # This only applies when inserting environmental data.
         # Will be overwritten when adding EpisodeBatch data to the replay buffer
         self.data.transition_data["filled"][slices] = 1
 
-        for k, v in data.items():
+        if isinstance(data, dict):
+            data_items = data.items()
+        elif isinstance(data, EpisodeBatch):
+            data_items = data.data.transition_data.items()
+        else:
+            raise ValueError("Must update transition data with dict or EpisodeBatch, not {}".format(str(type(data))))
+
+        for k, v in data_items:
             if k in self.data.transition_data:
                 #TODO: guard to make sure we're only viewing to add singleton b/v dims if needed.
                 self.data.transition_data[k][slices] = v.view_as(self.data.transition_data[k][slices])
 
-    def update_episode_data(self, data, bs):
-        bs = self._parse_slices([bs, slice(None)])
-        for k, v in data.items():
+    def update_episode_data(self, data, bs=slice(None)):
+        bs = self._parse_slices((bs, slice(None)))
+
+        if isinstance(data, dict):
+            data_items = data.items()
+        elif isinstance(data, EpisodeBatch):
+            data_items = data.data.episode_data.items()
+        else:
+            raise ValueError("Must update episode data with dict or EpisodeBatch, not {}".format(str(type(data))))
+
+        for k, v in data_items:
             if k in self.data.episode_data:
                 self.data.episode_data[k][bs] = v.view_as(self.data.episode_data[k][bs])
 
@@ -73,7 +97,7 @@ class EpisodeBatch:
                 return self.data.transition_data[item]
             else:
                 raise ValueError
-        elif isinstance(item, list) and all([isinstance(it, str) for it in item]):
+        elif isinstance(item, tuple) and all([isinstance(it, str) for it in item]):
             new_data = self._new_data_sn()
             for key in item:
                 if key in self.data.transition_data:
@@ -85,36 +109,35 @@ class EpisodeBatch:
 
             # Update the scheme to only have the requested keys
             new_scheme = {key: self.scheme[key] for key in item}
-            ret = EpisodeBatch(new_scheme, self.groups, self.max_seq_length, self.batch_size, data=new_data)
-            # TODO: update scheme? do we need scheme after initialisation?
-            # TR: I think so, scheme contains useful information like groups and sizes
+            new_groups = {self.scheme[key]["group"]: self.groups[self.scheme[key]["group"]]
+                          for key in item if "group" in self.scheme[key]}
+            ret = EpisodeBatch(new_scheme, new_groups, self.max_seq_length, self.batch_size, data=new_data)
             return ret
         else:
             item = self._parse_slices(item)
-            assert len(item) == 2, "Must index by both Batch and Time"
             new_data = self._new_data_sn()
             for k, v in self.data.transition_data.items():
                 new_data.transition_data[k] = v[item]
             for k, v in self.data.episode_data.items():
                 new_data.episode_data[k] = v[item[0]]
 
-            ret_bs = self._get_num_items(item[0])
+            ret_bs = self._get_num_items(item[0], self.batch_size)
+            ret_max_t = self._get_num_items(item[1], self.max_seq_length)
 
-            # TODO: Adjust the max_seq_length to the max over the returned slice
-            ret = EpisodeBatch(self.scheme, self.groups, self.max_seq_length, ret_bs, data=new_data)
+            ret = EpisodeBatch(self.scheme, self.groups, ret_max_t, ret_bs, data=new_data)
             return ret
 
-    def _get_num_items(self, indexing_item):
+    def _get_num_items(self, indexing_item, max_size):
         if isinstance(indexing_item, list) or isinstance(indexing_item, np.ndarray):
             return len(indexing_item)
         elif isinstance(indexing_item, slice):
             # TODO: Is there a cleaner way to do this?
             if indexing_item.start is None and indexing_item.stop is None:
-                ret_bs = self.batch_size
+                ret_bs = max_size
             elif indexing_item.start is None:
                 ret_bs = indexing_item.stop
             elif indexing_item.stop is None:
-                ret_bs = self.batch_size - indexing_item.start
+                ret_bs = max_size - indexing_item.start
             else:
                 ret_bs = indexing_item.stop - indexing_item.start
             return ret_bs
@@ -127,10 +150,13 @@ class EpisodeBatch:
 
     def _parse_slices(self, items):
         parsed = []
-        # Only a single      slice [a:b]                 int [i]                 [ [a,b,c] ] was given
-        if isinstance(items, slice) or isinstance(items, int) or (isinstance(items, list) and len(items) != 2):
-            # TODO: Maybe we should assume we're just indexing by batch if both are not given?
-            raise IndexError("Must index EpisodeBatch by Batch and Time")
+        # Only batch slice given, add full time slice
+        if (isinstance(items, slice)  # slice a:b
+            or isinstance(items, int)  # int i
+            or (isinstance(items, (list, np.ndarray, th.LongTensor, th.cuda.LongTensor)))  # [a,b,c]
+            ):
+            items = (items, slice(None))
+
         # Need the time indexing to be contiguous
         if isinstance(items[1], list):
             raise IndexError("Indexing across Time must be contiguous")
@@ -175,10 +201,19 @@ class ReplayBuffer(EpisodeBatch):
         assert self.can_sample(batch_size)
         # Uniform sampling only atm
         ep_ids = np.random.choice(self.episodes_in_buffer, batch_size, replace=False)
-        return self[ep_ids, :]
+        return self[ep_ids]
 
-
-
+    # def _check_slice(self, slice, max_size):
+    #     if slice.step is not None:
+    #         return slice.step > 0  # pytorch doesn't support negative steps so neither do we
+    #     if slice.start is None and slice.stop is None:
+    #         return True
+    #     elif slice.start is None:
+    #         return 0 < slice.stop <= max_size
+    #     elif slice.stop is None:
+    #         return 0 <= slice.start < max_size
+    #     else:
+    #         return (0 < slice.stop <= max_size) and (0 <= slice.start < max_size)
 
 if __name__ == "__main__":
     bs = 4
@@ -205,21 +240,23 @@ if __name__ == "__main__":
 
     ep_batch.update_transition_data(env_data, 0, 0)
 
+    ep_batch.update({"epsilon": th.ones(bs)*.05}, episode_const=True)
+
     ep_batch[:, 1].update_transition_data(batch_data)
-    ep_batch.update_transition_data(batch_data, slice(None), 2)
+    ep_batch.update_transition_data(batch_data, ts=2)
 
     print(ep_batch["filled"])
 
-    ep_batch.update_transition_data(env_data, slice(0,1), slice(2,3))
+    ep_batch.update_transition_data(env_data, 0, 2)
 
     env_data = {
         "obs": th.ones(2, 3),
         "state": th.eye(3)*2
     }
-    ep_batch.update_transition_data(env_data, slice(3,4), slice(0,1))
+    ep_batch.update_transition_data(env_data, 3, 0)
 
-    b2 = ep_batch[slice(0,1),slice(1,2)]
-    b2.update_transition_data(env_data, slice(0,1), slice(0,1))
+    b2 = ep_batch[0, 1]
+    b2.update(env_data, 0, 0)
 
     replay_buffer = ReplayBuffer(scheme, groups, 3, 5)
 
@@ -229,4 +266,4 @@ if __name__ == "__main__":
 
     sampled = replay_buffer.sample(3)
 
-    print(sampled.batch_size)
+    print("sampled bs", sampled.batch_size)
