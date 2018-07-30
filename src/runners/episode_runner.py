@@ -48,7 +48,7 @@ class EpisodeRunner:
         }
 
         # TODO: Bs should take into account if an env has terminated
-        self.batch.update_transition_data(env_data, bs=slice(None), ts=self.envs_t)
+        self.batch.update(env_data, ts=self.t)
 
         # TODO: Pass batch to mac to get actions out
         # TODO: Update the rest of the data

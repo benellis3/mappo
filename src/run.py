@@ -16,6 +16,7 @@ from learners import REGISTRY as le_REGISTRY
 from runners import REGISTRY as r_REGISTRY
 from controllers import MultiAgentController
 from components.episode_buffer import ReplayBuffer
+from components.transforms import OneHot
 
 
 def run(_run, _config, _log, pymongo_client):
@@ -90,6 +91,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
 
     # Set up schemes and groups here
     env_info = runner_obj.get_env_info()
+    args.n_agents = env_info["n_agents"]
 
     # Default/Base scheme
     scheme = {
@@ -101,7 +103,11 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         "terminated": {"vshape": (1,)}
     }
     groups = {
-        "agents": env_info["n_agents"]
+        "agents": args.n_agents
+    }
+    preprocess = {
+        "actions": ("actions_onehot", [OneHot(out_dim=args.n_agents)]),
+        "avail_actions": ("avail_actions_onehot", [OneHot(out_dim=args.n_agents)])
     }
 
     # Setup multiagent controller here
