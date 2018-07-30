@@ -6,7 +6,7 @@ from torch.autograd import Variable
 import torch as th
 from types import SimpleNamespace as SN
 
-from .transforms import TRANSFORMS, _has_gradient
+from .transforms_old import TRANSFORMS, _has_gradient
 from .scheme import Scheme
 
 

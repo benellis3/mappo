@@ -3,7 +3,7 @@ import torch as th
 from torch.autograd import Variable
 from torch.distributions import Categorical
 from torch.nn.functional import softmax
-from .transforms import _to_batch, _from_batch, _adim, _vdim, _bsdim, _check_nan
+from .transforms_old import _to_batch, _from_batch, _adim, _vdim, _bsdim, _check_nan
 
 REGISTRY = {}
 

@@ -8,11 +8,18 @@ from types import SimpleNamespace as SN
 
 
 class EpisodeBatch:
-    def __init__(self, scheme, groups, max_seq_length, batch_size, data=None):
+    def __init__(self,
+                 scheme,
+                 groups,
+                 batch_size,
+                 max_seq_length,
+                 data=None,
+                 preprocess={}):
         self.scheme = scheme.copy()
         self.groups = groups
-        self.max_seq_length = max_seq_length
         self.batch_size = batch_size
+        self.max_seq_length = max_seq_length
+        self.preprocess = preprocess
 
         if data is not None:
             self.data = data
@@ -20,9 +27,29 @@ class EpisodeBatch:
             self.data = SN()
             self.data.transition_data = {}
             self.data.episode_data = {}
-            self._setup_data(self.scheme, self.groups, max_seq_length, batch_size)
+            self._setup_data(self.scheme, self.groups, batch_size, max_seq_length, self.preprocess)
 
-    def _setup_data(self, scheme, groups, max_seq_length, batch_size):
+    def _setup_data(self, scheme, groups, batch_size, max_seq_length, preprocess):
+        if preprocess is not None:
+            for k in preprocess:
+                assert k in scheme
+                new_k = preprocess[k][0]
+                transforms = preprocess[k][1]
+
+                vshape = self.scheme[k]["vshape"]
+                dtype = self.scheme[k]["dtype"]
+                for transform in transforms:
+                    vshape, dtype = transform.infer_output_info(vshape, dtype)
+
+                self.scheme[new_k] = {
+                    "vshape": vshape,
+                    "dtype": dtype
+                }
+                if "group" in self.scheme[k]:
+                    self.scheme[new_k]["group"] = self.scheme[k]["group"]
+                if "episode_const" in self.scheme[k]:
+                    self.scheme[new_k]["episode_const"] = self.scheme[k]["episode_const"]
+
         assert "filled" not in scheme, '"filled" is a reserved key for masking.'
         scheme.update({
             "filled": {"vshape": (1,)},
@@ -47,13 +74,36 @@ class EpisodeBatch:
                 self.data.transition_data[field_key] = th.zeros((batch_size, max_seq_length, *shape), dtype=dtype)
 
     def extend(self, scheme, groups=None):
-        self._setup_data(scheme, self.groups if groups is None else groups, self.max_seq_length, self.batch_size)
+        self._setup_data(scheme, self.groups if groups is None else groups, self.batch_size, self.max_seq_length)
 
     def update(self, data, bs=slice(None), ts=slice(None), episode_const=False):
         if not episode_const:
             self.update_transition_data(data, bs, ts)
         else:
             self.update_episode_data(data, bs)
+
+    def cuda(self):
+        for k, v in self.data.transition_data.items():
+            v = v.cuda()
+        for k, v in self.data.episode_data.items():
+            v = v.cuda()
+
+    def cpu(self):
+        for k, v in self.data.transition_data.items():
+            v = v.cpu()
+        for k, v in self.data.episode_data.items():
+            v = v.cpu()
+
+    def _to_tensor(self, data, key):
+        dtype = self.scheme[key].get("dtype", th.float32)
+        if isinstance(data, np.ndarray):
+            return th.from_numpy(data).type(dtype)
+        elif isinstance(data, list):
+            return th.from_numpy(np.asarray(data)).type(dtype)
+        elif data.dtype == dtype:
+            return data
+        else:
+            raise ValueError("Can only insert np.ndarray, list, or dtype={} for {}".format(dtype, key))
 
     def update_transition_data(self, data, bs=slice(None), ts=slice(None)):
         slices = self._parse_slices((bs, ts))
@@ -65,14 +115,28 @@ class EpisodeBatch:
         for k, v in data.items():
             if k in self.data.transition_data:
                 #TODO: guard to make sure we're only viewing to add singleton b/v dims if needed.
+                v = self._to_tensor(v, k)
                 self.data.transition_data[k][slices] = v.view_as(self.data.transition_data[k][slices])
 
+                if k in self.preprocess:
+                    new_k = self.preprocess[k][0]
+                    for transform in self.preprocess[k][1]:
+                        v = transform.transform(v)
+                    self.data.transition_data[new_k][slices] = v.view_as(self.data.transition_data[new_k][slices])
+
     def update_episode_data(self, data, bs=slice(None)):
-        bs = self._parse_slices((bs, slice(None)))
+        bs = self._parse_slices(bs)[0]
 
         for k, v in data.items():
             if k in self.data.episode_data:
+                v = self._to_tensor(v, k)
                 self.data.episode_data[k][bs] = v.view_as(self.data.episode_data[k][bs])
+
+            if k in self.preprocess:
+                new_k = self.preprocess[k][0]
+                for transform in self.preprocess[k][1]:
+                    v = transform.transform(v)
+                self.data.episode_data[new_k][bs] = v.view_as(self.data.episode_data[new_k][bs])
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -96,7 +160,7 @@ class EpisodeBatch:
             new_scheme = {key: self.scheme[key] for key in item}
             new_groups = {self.scheme[key]["group"]: self.groups[self.scheme[key]["group"]]
                           for key in item if "group" in self.scheme[key]}
-            ret = EpisodeBatch(new_scheme, new_groups, self.max_seq_length, self.batch_size, data=new_data)
+            ret = EpisodeBatch(new_scheme, new_groups, self.batch_size, self.max_seq_length, data=new_data)
             return ret
         else:
             item = self._parse_slices(item)
@@ -109,7 +173,7 @@ class EpisodeBatch:
             ret_bs = self._get_num_items(item[0], self.batch_size)
             ret_max_t = self._get_num_items(item[1], self.max_seq_length)
 
-            ret = EpisodeBatch(self.scheme, self.groups, ret_max_t, ret_bs, data=new_data)
+            ret = EpisodeBatch(self.scheme, self.groups, ret_bs, ret_max_t, data=new_data)
             return ret
 
     def _get_num_items(self, indexing_item, max_size):
@@ -157,8 +221,8 @@ class EpisodeBatch:
 
 
 class ReplayBuffer(EpisodeBatch):
-    def __init__(self, scheme, groups, max_seq_length, buffer_size):
-        super(ReplayBuffer, self).__init__(scheme, groups, max_seq_length, buffer_size)
+    def __init__(self, scheme, groups, buffer_size, max_seq_length, preprocess=None):
+        super(ReplayBuffer, self).__init__(scheme, groups, buffer_size, max_seq_length, preprocess=preprocess)
         self.buffer_size = buffer_size  # same as self.batch_size but more explicit
         self.buffer_index = 0
         self.episodes_in_buffer = 0
@@ -202,7 +266,8 @@ class ReplayBuffer(EpisodeBatch):
 
 if __name__ == "__main__":
     bs = 4
-    groups = {"agents": 2,}
+    n_agents = 2
+    groups = {"agents": n_agents}
     # "input": {"vshape": (shape), "episode_const": bool, "group": (name), "dtype": dtype}
     scheme = {
         "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},
@@ -210,14 +275,20 @@ if __name__ == "__main__":
         "state": {"vshape": (3,3)},
         "epsilon": {"vshape": (1,), "episode_const": True}
     }
+    from transforms import OneHot
+    preprocess = {
+        "actions": ("actions_onehot", [OneHot(out_dim=5)])
+    }
 
-    ep_batch = EpisodeBatch(scheme, groups, 3, bs)
+    ep_batch = EpisodeBatch(scheme, groups, bs, 3, preprocess=preprocess)
 
     env_data = {
+        "actions": th.ones(n_agents, 1).long(),
         "obs": th.ones(2, 3),
         "state": th.eye(3)
     }
     batch_data = {
+        "actions": th.ones(bs, n_agents, 1).long(),
         "obs": th.ones(2, 3).unsqueeze(0).repeat(bs,1,1),
         "state": th.eye(3).unsqueeze(0).repeat(bs,1,1),
     }
@@ -243,7 +314,7 @@ if __name__ == "__main__":
     b2 = ep_batch[0, 1]
     b2.update(env_data, 0, 0)
 
-    replay_buffer = ReplayBuffer(scheme, groups, 3, 5)
+    replay_buffer = ReplayBuffer(scheme, groups, 5, 3, preprocess=preprocess)
 
     replay_buffer.insert_episode_batch(ep_batch)
 
@@ -251,5 +322,4 @@ if __name__ == "__main__":
 
     sampled = replay_buffer.sample(3)
 
-    print(sampled.max_seq_length)
-    print(sampled[:,:1].max_seq_length)
+    print(sampled["actions_onehot"])
