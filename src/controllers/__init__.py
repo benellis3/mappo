@@ -35,10 +35,11 @@ REGISTRY["flounderl_mac"] = FLOUNDERLMultiagentController
 
 class MultiAgentController:
 
-    def __init__(self, n_agents, scheme, groups, args):
+    def __init__(self, n_agents, scheme, groups, preprocess, args):
         self.n_agents = n_agents
         self.scheme = scheme
         self.groups = groups
+        self.preprocess = preprocess
         self.args = args
 
     def select_actions(self, inputs, test_mode=False):

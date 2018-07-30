@@ -60,6 +60,9 @@ class EpisodeBatch:
             group = field_info.get("group", None)
             dtype = field_info.get("dtype", th.float32)
 
+            if isinstance(vshape, int):
+                vshape = (vshape,)
+
             if group:
                 assert group in groups, "Group {} must have its number of members defined in _groups_".format(group)
                 shape = (groups[group], *vshape)
@@ -83,6 +86,7 @@ class EpisodeBatch:
 
     def update(self, data, bs=slice(None), ts=slice(None)):
         slices = self._parse_slices((bs, ts))
+        # TODO: what does marked_filled do?
         marked_filled = False
         for k, v in data.items():
             if k in self.data.transition_data:
@@ -190,6 +194,11 @@ class EpisodeBatch:
                 parsed.append(item)
         return parsed
 
+    def __repr__(self):
+        return "EpisodeBatch. Batch Size:{} Max_seq_len:{} Keys:{} Groups:{}".format(self.batch_size,
+                                                                                     self.max_seq_length,
+                                                                                     self.scheme.keys(),
+                                                                                     self.groups.keys())
 
 class ReplayBuffer(EpisodeBatch):
     def __init__(self, scheme, groups, buffer_size, max_seq_length, preprocess=None, device="cpu"):
@@ -222,6 +231,12 @@ class ReplayBuffer(EpisodeBatch):
         # Uniform sampling only atm
         ep_ids = np.random.choice(self.episodes_in_buffer, batch_size, replace=False)
         return self[ep_ids]
+
+    def __repr__(self):
+        return "ReplayBuffer. {}/{} episodes. Keys:{} Groups:{}".format(self.episodes_in_buffer,
+                                                                        self.buffer_size,
+                                                                        self.scheme.keys(),
+                                                                        self.groups.keys())
 
     # def _check_slice(self, slice, max_size):
     #     if slice.step is not None:

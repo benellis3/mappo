@@ -18,5 +18,6 @@ class OneHot(Transform):
         return y_onehot.float()
 
     def infer_output_info(self, vshape_in, dtype_in):
-        assert vshape_in == (1,)
+        # TODO: Check this shouldn't be here
+        # assert vshape_in == (1,)
         return (self.out_dim,), th.float32

@@ -91,41 +91,40 @@ def run_sequential(args, _logging_struct, _run, unique_token):
 
     # Set up schemes and groups here
     env_info = runner_obj.get_env_info()
-    args.n_agents = env_info["n_agents"]
+    n_agents = env_info["n_agents"]
 
     # Default/Base scheme
     scheme = {
         "state": {"vshape": env_info["state_shape"]},
         "obs": {"vshape": env_info["obs_shape"], "group": "agents"},
-        "actions": {"vshape": env_info["n_actions"], "group": "agents", "dtype": th.long},  # One hot
-        "avail_actions": {"vshape": env_info["n_actions"], "group": "agents", "dtype": th.long},  # One hot
+        "actions": {"vshape": (1,), "group": "agents", "dtype": th.int},
+        "avail_actions": {"vshape": (env_info["n_actions"],), "group": "agents", "dtype": th.int},
         "reward": {"vshape": (1,)},
-        "terminated": {"vshape": (1,)}
+        "terminated": {"vshape": (1,), "dtype": th.uint8}
     }
     groups = {
-        "agents": args.n_agents
+        "agents": n_agents
     }
     preprocess = {
-        "actions": ("actions_onehot", [OneHot(out_dim=args.n_agents)]),
-        "avail_actions": ("avail_actions_onehot", [OneHot(out_dim=args.n_agents)])
+        "actions": ("actions_onehot", [OneHot(out_dim=n_agents)]),
+        "avail_actions": ("avail_actions_onehot", [OneHot(out_dim=n_agents)])
     }
 
     # Setup multiagent controller here
-    mac = MultiAgentController(env_info["n_agents"], scheme, groups, args)  # Dummy for testing
+    mac = MultiAgentController(env_info["n_agents"], scheme, groups, preprocess, args)  # Dummy for testing
 
     # Give runner the scheme
-    runner_obj.setup(scheme=scheme, groups=groups, mac=mac)
+    runner_obj.setup(scheme=scheme, groups=groups, preprocess=preprocess, mac=mac)
 
     # create the learner
-    learner_obj = le_REGISTRY[args.learner](multiagent_controller=runner_obj.multiagent_controller,
-                                            logging_struct=_logging_struct,
-                                            args=args)
+    learner_obj = None # Temp
 
     # create non-agent models required by learner
-    learner_obj.create_models(runner_obj.data_scheme)
+    # learner_obj.create_models(runner_obj.data_scheme)
 
     # replay buffer
-    buffer = ReplayBuffer(scheme, groups, env_info["episode_limit"], args.buffer_size)
+    # TODO: Add device
+    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"], preprocess=preprocess)
 
     # start training
     episode = 0
