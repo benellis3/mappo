@@ -1,6 +1,6 @@
 import numpy as np
 
-from components.transforms import _underscore_to_cap
+from components.transforms_old import _underscore_to_cap
 
 
 class BasicLearner():

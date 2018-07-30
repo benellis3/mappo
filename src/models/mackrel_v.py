@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _check_nan
+from components.transforms_old import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _check_nan
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 from utils.mackrel import _n_agent_pairings
 

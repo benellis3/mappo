@@ -1094,7 +1094,7 @@ def _deepcopy_unit(self, memo):
     return u
 
 
-from components.transforms import _seq_mean
+from components.transforms_old import _seq_mean
 
 
 class StatsAggregator():

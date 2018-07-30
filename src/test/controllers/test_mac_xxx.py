@@ -1,7 +1,7 @@
 from torch.autograd import Variable
 import torch as th
 
-from components.transforms import _vdim
+from components.transforms_old import _vdim
 
 def test1():
     """

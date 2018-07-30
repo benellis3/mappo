@@ -3,7 +3,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim
+from components.transforms_old import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
 class COMAQFunction(nn.Module):

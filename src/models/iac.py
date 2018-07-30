@@ -2,7 +2,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from components.transforms import _tdim, _vdim, _to_batch, _from_batch, _check_inputs_validity, _shift
+from components.transforms_old import _tdim, _vdim, _to_batch, _from_batch, _check_inputs_validity, _shift
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
 class IACVQFunction(nn.Module):

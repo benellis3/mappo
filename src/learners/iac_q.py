@@ -9,7 +9,7 @@ from debug.debug import IS_PYCHARM_DEBUG
 from models.iac import IACCritic
 from numpy.random import randint
 from components.scheme import Scheme
-from components.transforms import _adim, _bsdim, _tdim, _vdim, \
+from components.transforms_old import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap
 

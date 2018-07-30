@@ -1,7 +1,7 @@
 import torch as th
 from torch import nn
 
-from components.transforms import _to_batch, _from_batch
+from components.transforms_old import _to_batch, _from_batch
 
 class EntropyRegularisationLoss(nn.Module):
 

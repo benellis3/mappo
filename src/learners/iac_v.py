@@ -9,7 +9,7 @@ from torch.optim import RMSprop
 from debug.debug import IS_PYCHARM_DEBUG
 from models.iac import IACCritic
 from components.scheme import Scheme
-from components.transforms import _bsdim, _vdim, _tdim, _adim, _generate_scheme_shapes, \
+from components.transforms_old import _bsdim, _vdim, _tdim, _adim, _generate_scheme_shapes, \
     _generate_input_shapes, _join_dicts, _build_model_inputs
 
 from .basic import BasicLearner

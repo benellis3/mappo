@@ -5,8 +5,8 @@ import torch as th
 from components.action_selectors import REGISTRY as as_REGISTRY
 from components import REGISTRY as co_REGISTRY
 from components.scheme import Scheme
-from components.episode_buffer import BatchEpisodeBuffer
-from components.transforms import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
+from components.episode_buffer_old import BatchEpisodeBuffer
+from components.transforms_old import _build_model_inputs, _join_dicts, _generate_scheme_shapes, _generate_input_shapes
 from models import REGISTRY as m_REGISTRY
 
 

@@ -9,7 +9,7 @@ from sacred.utils import apply_backspaces_and_linefeeds
 import sys
 import torch as th
 
-from components.transforms import _merge_dicts
+from components.transforms_old import _merge_dicts
 from run import run
 from utils.logging import get_logger
 

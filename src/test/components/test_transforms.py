@@ -1,9 +1,9 @@
 import numpy as np
 import ujson as json
 
-from components.episode_buffer import BatchEpisodeBuffer
+from components.episode_buffer_old import BatchEpisodeBuffer
 from components.scheme import Scheme
-from components.transforms import _join_dicts, _build_model_inputs
+from components.transforms_old import _join_dicts, _build_model_inputs
 
 def test1():
     """
@@ -27,7 +27,7 @@ def test2():
     Test _to_batch and _from_batch
     """
     import torch as th
-    from components.transforms import _to_batch, _from_batch
+    from components.transforms_old import _to_batch, _from_batch
     tformat="a*bs*t*v"
     a = th.randn(4,32,20,10)
     x, params, tformat = _to_batch(a, tformat)

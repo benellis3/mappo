@@ -2,7 +2,7 @@ import torch as th
 
 from models import REGISTRY as mo_REGISTRY
 from components.scheme import Scheme
-from components.transforms import _generate_input_shapes, _generate_scheme_shapes
+from components.transforms_old import _generate_input_shapes, _generate_scheme_shapes
 
 class BasicAgentController():
 

@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch as th
 import numpy as np
 
-from components.transforms import _to_batch, _from_batch, _check_inputs_validity, _tdim, _vdim
+from components.transforms_old import _to_batch, _from_batch, _check_inputs_validity, _tdim, _vdim
 
 
 class COMAJointQFunction(nn.Module):

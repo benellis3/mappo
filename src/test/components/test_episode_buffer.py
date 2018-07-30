@@ -4,7 +4,7 @@ models.REGISTRY
 #from models import REGISTRY
 
 from components.scheme import Scheme
-from components.episode_buffer import BatchEpisodeBuffer
+from components.episode_buffer_old import BatchEpisodeBuffer
 
 
 import torch as th

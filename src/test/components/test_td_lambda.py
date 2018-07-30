@@ -1,7 +1,7 @@
 import numpy.testing as tst
 import numpy as np
 import torch as th
-from components.episode_buffer import BatchEpisodeBuffer
+from components.episode_buffer_old import BatchEpisodeBuffer
 from components.scheme import Scheme
 
 def G_t_n(R, V, t, n, gamma, truncated):

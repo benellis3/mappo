@@ -3,7 +3,7 @@
 # from utils.blitzz.scheme import Scheme
 # from utils.blitzz.sequence_buffer import BatchEpisodeBuffer
 # from utils.blitzz.learners.coma import COMALearner, COMAPolicyLoss, COMACriticLoss
-from components.episode_buffer import BatchEpisodeBuffer
+from components.episode_buffer_old import BatchEpisodeBuffer
 import numpy.testing as npt
 from torch import nn
 from utils.dict2namedtuple import convert

@@ -1,8 +1,8 @@
 import numpy.testing as tst
 import numpy as np
 import torch as th
-from components.transforms import _n_step_return
-from components.episode_buffer import BatchEpisodeBuffer
+from components.transforms_old import _n_step_return
+from components.episode_buffer_old import BatchEpisodeBuffer
 from components.scheme import Scheme
 
 def test1():

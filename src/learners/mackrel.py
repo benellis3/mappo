@@ -11,11 +11,11 @@ from torch.optim import RMSprop
 
 from debug.debug import IS_PYCHARM_DEBUG
 from components.scheme import Scheme
-from components.transforms import _adim, _bsdim, _tdim, _vdim, \
+from components.transforms_old import _adim, _bsdim, _tdim, _vdim, \
     _generate_input_shapes, _generate_scheme_shapes, _build_model_inputs, \
     _join_dicts, _seq_mean, _copy_remove_keys, _make_logging_str, _underscore_to_cap, _check_nan
 from components.losses import EntropyRegularisationLoss
-from components.transforms import _to_batch, \
+from components.transforms_old import _to_batch, \
     _from_batch, _naninfmean
 from utils.mackrel import _n_agent_pairings, _agent_ids_2_pairing_id, _pairing_id_2_agent_ids, _n_agent_pair_samples, _agent_ids_2_pairing_id
 

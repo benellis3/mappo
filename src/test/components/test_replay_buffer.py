@@ -1,6 +1,6 @@
 from components.replay_buffer import ContiguousReplayBuffer
 from components.scheme import Scheme
-from components.episode_buffer import BatchEpisodeBuffer
+from components.episode_buffer_old import BatchEpisodeBuffer
 
 import numpy as np
 

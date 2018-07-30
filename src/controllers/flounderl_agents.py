@@ -7,8 +7,8 @@ import torch as th
 from components.action_selectors import REGISTRY as as_REGISTRY
 from components import REGISTRY as co_REGISTRY
 from components.scheme import Scheme
-from components.episode_buffer import BatchEpisodeBuffer
-from components.transforms import _build_model_inputs, _join_dicts, \
+from components.episode_buffer_old import BatchEpisodeBuffer
+from components.transforms_old import _build_model_inputs, _join_dicts, \
     _generate_scheme_shapes, _generate_input_shapes, _adim, _bsdim, _tdim, _vdim, _agent_flatten, _check_nan, \
     _to_batch, _from_batch, _vdim, _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean, \
     _pad_nan

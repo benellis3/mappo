@@ -4,7 +4,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 
-from components.transforms import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _pick_keys
+from components.transforms_old import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim, _pick_keys
 from models import REGISTRY as m_REGISTRY
 from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
 
