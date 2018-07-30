@@ -2,10 +2,6 @@ import torch as th
 import numpy as np
 from types import SimpleNamespace as SN
 
-#env thread: dict of tensors (keys must match (some of) those in scheme)
-#runner: EpBatch(t,bs)
-#buffer: Buffer(EpBatch(t,many))
-
 
 class EpisodeBatch:
     def __init__(self,
@@ -14,12 +10,14 @@ class EpisodeBatch:
                  batch_size,
                  max_seq_length,
                  data=None,
-                 preprocess={}):
+                 preprocess=None,
+                 device="cpu"):
         self.scheme = scheme.copy()
         self.groups = groups
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
-        self.preprocess = preprocess
+        self.preprocess = {} if preprocess is None else preprocess
+        self.device = device
 
         if data is not None:
             self.data = data
@@ -69,74 +67,44 @@ class EpisodeBatch:
                 shape = vshape
 
             if episode_const:
-                self.data.episode_data[field_key] = th.zeros((batch_size, *shape), dtype=dtype)
+                self.data.episode_data[field_key] = th.zeros((batch_size, *shape), dtype=dtype, device=self.device)
             else:
-                self.data.transition_data[field_key] = th.zeros((batch_size, max_seq_length, *shape), dtype=dtype)
+                self.data.transition_data[field_key] = th.zeros((batch_size, max_seq_length, *shape), dtype=dtype, device=self.device)
 
     def extend(self, scheme, groups=None):
         self._setup_data(scheme, self.groups if groups is None else groups, self.batch_size, self.max_seq_length)
 
-    def update(self, data, bs=slice(None), ts=slice(None), episode_const=False):
-        if not episode_const:
-            self.update_transition_data(data, bs, ts)
-        else:
-            self.update_episode_data(data, bs)
-
-    def cuda(self):
+    def to(self, device):
         for k, v in self.data.transition_data.items():
-            v = v.cuda()
+            v = v.to(device)
         for k, v in self.data.episode_data.items():
-            v = v.cuda()
+            v = v.to(device)
+        self.device = device
 
-    def cpu(self):
-        for k, v in self.data.transition_data.items():
-            v = v.cpu()
-        for k, v in self.data.episode_data.items():
-            v = v.cpu()
-
-    def _to_tensor(self, data, key):
-        dtype = self.scheme[key].get("dtype", th.float32)
-        if isinstance(data, np.ndarray):
-            return th.from_numpy(data).type(dtype)
-        elif isinstance(data, list):
-            return th.from_numpy(np.asarray(data)).type(dtype)
-        elif data.dtype == dtype:
-            return data
-        else:
-            raise ValueError("Can only insert np.ndarray, list, or dtype={} for {}".format(dtype, key))
-
-    def update_transition_data(self, data, bs=slice(None), ts=slice(None)):
+    def update(self, data, bs=slice(None), ts=slice(None)):
         slices = self._parse_slices((bs, ts))
-
-        # This should be applied when inserting new data.
-        # When updating from a dict with a "filled" key, this will be overwritten in loop below (correct behaviour)
-        self.data.transition_data["filled"][slices] = 1
-
+        marked_filled = False
         for k, v in data.items():
             if k in self.data.transition_data:
-                #TODO: guard to make sure we're only viewing to add singleton b/v dims if needed.
-                v = self._to_tensor(v, k)
-                self.data.transition_data[k][slices] = v.view_as(self.data.transition_data[k][slices])
+                target = self.data.transition_data
+                if not marked_filled: target["filled"][slices] = 1
+                _slices = slices
+            elif k in self.data.episode_data:
+                target = self.data.episode_data
+                _slices = slices[0]
+            else:
+                raise KeyError("{} not found in transition or episode data".format(k))
 
-                if k in self.preprocess:
-                    new_k = self.preprocess[k][0]
-                    for transform in self.preprocess[k][1]:
-                        v = transform.transform(v)
-                    self.data.transition_data[new_k][slices] = v.view_as(self.data.transition_data[new_k][slices])
-
-    def update_episode_data(self, data, bs=slice(None)):
-        bs = self._parse_slices(bs)[0]
-
-        for k, v in data.items():
-            if k in self.data.episode_data:
-                v = self._to_tensor(v, k)
-                self.data.episode_data[k][bs] = v.view_as(self.data.episode_data[k][bs])
+            dtype = self.scheme[k].get("dtype", th.float32)
+            v = th.tensor(v, dtype=dtype, device=self.device)
+            # TODO: guard to make sure we're only viewing to add singleton b/v dims if needed.
+            target[k][_slices] = v.view_as(target[k][_slices])
 
             if k in self.preprocess:
                 new_k = self.preprocess[k][0]
                 for transform in self.preprocess[k][1]:
                     v = transform.transform(v)
-                self.data.episode_data[new_k][bs] = v.view_as(self.data.episode_data[new_k][bs])
+                target[new_k][_slices] = v.view_as(target[new_k][_slices])
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -160,7 +128,7 @@ class EpisodeBatch:
             new_scheme = {key: self.scheme[key] for key in item}
             new_groups = {self.scheme[key]["group"]: self.groups[self.scheme[key]["group"]]
                           for key in item if "group" in self.scheme[key]}
-            ret = EpisodeBatch(new_scheme, new_groups, self.batch_size, self.max_seq_length, data=new_data)
+            ret = EpisodeBatch(new_scheme, new_groups, self.batch_size, self.max_seq_length, data=new_data, device=self.device)
             return ret
         else:
             item = self._parse_slices(item)
@@ -173,7 +141,7 @@ class EpisodeBatch:
             ret_bs = self._get_num_items(item[0], self.batch_size)
             ret_max_t = self._get_num_items(item[1], self.max_seq_length)
 
-            ret = EpisodeBatch(self.scheme, self.groups, ret_bs, ret_max_t, data=new_data)
+            ret = EpisodeBatch(self.scheme, self.groups, ret_bs, ret_max_t, data=new_data, device=self.device)
             return ret
 
     def _get_num_items(self, indexing_item, max_size):
@@ -221,18 +189,18 @@ class EpisodeBatch:
 
 
 class ReplayBuffer(EpisodeBatch):
-    def __init__(self, scheme, groups, buffer_size, max_seq_length, preprocess=None):
-        super(ReplayBuffer, self).__init__(scheme, groups, buffer_size, max_seq_length, preprocess=preprocess)
+    def __init__(self, scheme, groups, buffer_size, max_seq_length, preprocess=None, device="cpu"):
+        super(ReplayBuffer, self).__init__(scheme, groups, buffer_size, max_seq_length, preprocess=preprocess, device=device)
         self.buffer_size = buffer_size  # same as self.batch_size but more explicit
         self.buffer_index = 0
         self.episodes_in_buffer = 0
 
     def insert_episode_batch(self, ep_batch):
         if self.buffer_index + ep_batch.batch_size <= self.buffer_size:
-            self.update_transition_data(ep_batch.data.transition_data,
+            self.update(ep_batch.data.transition_data,
                                         slice(self.buffer_index, self.buffer_index + ep_batch.batch_size),
                                         slice(0, ep_batch.max_seq_length))
-            self.update_episode_data(ep_batch.data.episode_data,
+            self.update(ep_batch.data.episode_data,
                                      slice(self.buffer_index, self.buffer_index + ep_batch.batch_size))
             self.buffer_index = (self.buffer_index + ep_batch.batch_size)
             self.episodes_in_buffer = max(self.episodes_in_buffer, self.buffer_index)
@@ -294,22 +262,20 @@ if __name__ == "__main__":
     }
     # bs=4 x t=3 x v=3*3
 
-    ep_batch.update_transition_data(env_data, 0, 0)
+    ep_batch.update(env_data, 0, 0)
 
-    ep_batch.update({"epsilon": th.ones(bs)*.05}, episode_const=True)
+    ep_batch.update({"epsilon": th.ones(bs)*.05})
 
-    ep_batch[:, 1].update_transition_data(batch_data)
-    ep_batch.update_transition_data(batch_data, ts=1)
+    ep_batch[:, 1].update(batch_data)
+    ep_batch.update(batch_data, ts=1)
 
-    # print(ep_batch["filled"])
-
-    ep_batch.update_transition_data(env_data, 0, 1)
+    ep_batch.update(env_data, 0, 1)
 
     env_data = {
         "obs": th.ones(2, 3),
         "state": th.eye(3)*2
     }
-    ep_batch.update_transition_data(env_data, 3, 0)
+    ep_batch.update(env_data, 3, 0)
 
     b2 = ep_batch[0, 1]
     b2.update(env_data, 0, 0)
