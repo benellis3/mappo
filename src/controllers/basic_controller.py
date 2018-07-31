@@ -1,4 +1,4 @@
-class BasicController:
+class BasicMAC:
 
     def __init__(self, agents, args):
         self.agents = agents
