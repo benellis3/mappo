@@ -50,3 +50,12 @@ class MultiAgentEnv(object):
 
     def seed(self):
         raise NotImplementedError
+
+    def get_env_info(self):
+        #TODO: move this to env
+        env_info = {"state_shape": self.get_state_size(),
+                    "obs_shape": self.get_obs_size(),
+                    "n_actions": self.get_total_actions(),
+                    "n_agents": self.n_agents,
+                    "episode_limit": self.episode_limit}
+        return env_info

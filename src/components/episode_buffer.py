@@ -254,6 +254,7 @@ if __name__ == "__main__":
     bs = 4
     n_agents = 2
     groups = {"agents": n_agents}
+
     # "input": {"vshape": (shape), "episode_const": bool, "group": (name), "dtype": dtype}
     scheme = {
         "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},

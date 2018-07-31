@@ -13,19 +13,10 @@ class EpisodeRunner:
         assert self.batch_size == 1
 
         self.env = env_REGISTRY[self.args.env](env_args=self.args.env_args)
+        self.episode_limit = self.env.episode_limit
         self.t = 0
 
         self.T_env = 0
-
-    def get_env_info(self):
-        #TODO: move this to env
-        env_info = {"state_shape": self.env.get_state_size(),
-                    "obs_shape": self.env.get_obs_size(),
-                    "n_actions": self.env.get_total_actions(),
-                    "n_agents": self.env.n_agents,
-                    "episode_limit": self.env.episode_limit}
-        self.episode_limit = self.env.episode_limit
-        return env_info
 
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit, preprocess=preprocess)

@@ -14,7 +14,7 @@ from utils.timehelper import time_left, time_str
 
 from learners import REGISTRY as le_REGISTRY
 from runners import REGISTRY as r_REGISTRY
-from controllers import MultiAgentController
+from controllers import REGISTRY as mac_REGISTRY
 from components.episode_buffer import ReplayBuffer
 from components.transforms import OneHot
 
@@ -25,7 +25,9 @@ def run(_run, _config, _log, pymongo_client):
     _config = args_sanity_check(_config, _log)
 
     # convert _config dict to GenericDict objects (which cannot be overwritten later)
-    args = convert(_config)
+    # args = convert(_config)
+    args = SN(**_config)
+
     _log.info("Experiment Parameters:")
     experiment_params = pprint.pformat(_config,
                                        indent=4,
@@ -90,8 +92,9 @@ def run_sequential(args, _logging_struct, _run, unique_token):
                                          logging_struct=_logging_struct)
 
     # Set up schemes and groups here
-    env_info = runner_obj.get_env_info()
-    n_agents = env_info["n_agents"]
+    env_info = runner_obj.env.get_env_info()
+    args.n_agents = env_info["n_agents"]
+    args.n_actions = env_info["n_actions"]
 
     # Default/Base scheme
     scheme = {
@@ -103,14 +106,16 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         "terminated": {"vshape": (1,), "dtype": th.uint8}
     }
     groups = {
-        "agents": n_agents
+        "agents": args.n_agents
     }
     preprocess = {
-        "actions": ("actions_onehot", [OneHot(out_dim=n_agents)])
+        "actions": ("actions_onehot", [OneHot(out_dim=args.n_actions)])
     }
 
+    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"], preprocess=preprocess)
+
     # Setup multiagent controller here
-    mac = MultiAgentController(env_info["n_agents"], scheme, groups, preprocess, args)  # Dummy for testing
+    mac = mac_REGISTRY[args.mac](buffer.scheme, groups, args)  # Dummy for testing
 
     # Give runner the scheme
     runner_obj.setup(scheme=scheme, groups=groups, preprocess=preprocess, mac=mac)
@@ -120,7 +125,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
 
     # replay buffer
     # TODO: Add device
-    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"], preprocess=preprocess)
+
 
     # start training
     episode = 0
