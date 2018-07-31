@@ -106,8 +106,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         "agents": n_agents
     }
     preprocess = {
-        "actions": ("actions_onehot", [OneHot(out_dim=n_agents)]),
-        "avail_actions": ("avail_actions_onehot", [OneHot(out_dim=n_agents)])
+        "actions": ("actions_onehot", [OneHot(out_dim=n_agents)])
     }
 
     # Setup multiagent controller here
@@ -116,11 +115,8 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     # Give runner the scheme
     runner_obj.setup(scheme=scheme, groups=groups, preprocess=preprocess, mac=mac)
 
-    # create the learner
+    # Learner
     learner_obj = None # Temp
-
-    # create non-agent models required by learner
-    # learner_obj.create_models(runner_obj.data_scheme)
 
     # replay buffer
     # TODO: Add device
@@ -143,9 +139,6 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         if buffer.can_sample(args.batch_size):
             episode_sample = buffer.sample(args.batch_size)
 
-            if args.save_episode_samples:
-                assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
-                _logging_struct.hdf_logger.log("", episode_sample, runner_obj.T_env)
             learner_obj.train(episode_sample, T_env=runner_obj.T_env)
 
         # Execute test runs once in a while
@@ -175,9 +168,16 @@ def run_sequential(args, _logging_struct, _run, unique_token):
             learner_obj.save_models(path=save_path, token=unique_token, T=runner_obj.T_env)
 
         episode += 1
+        # Actually
+        log()
 
     _logging_struct.py_logger.info("Finished Training")
 
+def log():
+    # TODO: Log stuff
+    # if args.save_episode_samples:
+    #     assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
+    #     _logging_struct.hdf_logger.log("", episode_sample, runner_obj.T_env)
 
 # TODO: Clean this up
 def args_sanity_check(config, _log):
