@@ -112,6 +112,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         "actions": ("actions_onehot", [OneHot(out_dim=args.n_actions)])
     }
 
+    # TODO: Add device
     buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"], preprocess=preprocess)
 
     # Setup multiagent controller here
@@ -122,10 +123,6 @@ def run_sequential(args, _logging_struct, _run, unique_token):
 
     # Learner
     learner_obj = None # Temp
-
-    # replay buffer
-    # TODO: Add device
-
 
     # start training
     episode = 0

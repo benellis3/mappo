@@ -11,5 +11,11 @@ class RNNAgent(nn.Module):
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
         self.fc2 = nn.Linear(args.rnn_hidden_dim, args.n_actions)
 
-    def forward(self, inputs):
-        pass
+    def init_hidden(self):
+        return th.zeros((1,self.args.rnn_hidden_dim))
+
+    def forward(self, inputs, hidden_state):
+        x = F.relu(self.fc1(inputs))
+        h = self.rnn(x, hidden_state)
+        q = self.fc1(h)
+        return q, h

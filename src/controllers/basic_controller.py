@@ -9,11 +9,24 @@ class BasicMAC:
         self.args = args
         self._build_agents(input_shape)
 
-    def select_actions(self, inputs, test_mode=False):
+        self.hidden_states = None
+
+    def select_actions(self, ep_batch, t, test_mode=False):
+        agent_outputs = self.forward(ep_batch, t)
+        avail_actions = ep_batch["avail_actions"][:, t]
+        # TODO: Use an action selector
         return {"actions": [0 for _ in range(self.n_agents)]}  # Dummy for quick testing
 
-    def forward(self, inputs):
-        pass
+    def forward(self, ep_batch, t):
+        # TODO: Is this too hacky?
+        if t == 0:
+            # Make initial hidden states
+            self.hidden_states = self.agent.init_hidden().expand(self.n_agents, -1).unsqueeze(0) # 1av
+            self.hidden_states.to(ep_batch.device)
+        agent_inputs = self._build_inputs(ep_batch, t)
+        agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
+        # TODO: Return a dictionary?
+        return agent_outs
 
     def _build_agents(self, input_shape):
         self.agent = agent_REGISTRY[self.args.agent](input_shape, self.args)
