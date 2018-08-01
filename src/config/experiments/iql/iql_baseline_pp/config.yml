@@ -32,7 +32,7 @@ agents_hidden_state_size: 32
 t_max: 100000
 mixing_network_dim: 16
 
-mac: "basic"
+mac: "basic_mac"
 obs_agent_id: True
 obs_last_action: True
 agent: "rnn"
@@ -40,3 +40,6 @@ rnn_hidden_dim: 8
 epsilon_start: 1.0
 epsilon_finish: 0.05
 epsilon_anneal_time: 1000
+learner: "q_learner"
+lr: 0.005
+runner: "episode"

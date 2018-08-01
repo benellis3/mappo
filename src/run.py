@@ -88,11 +88,11 @@ def run(_run, _config, _log, pymongo_client):
 def run_sequential(args, _logging_struct, _run, unique_token):
 
     # Init runner so we can get env info
-    runner_obj = r_REGISTRY[args.runner](args=args,
+    runner = r_REGISTRY[args.runner](args=args,
                                          logging_struct=_logging_struct)
 
     # Set up schemes and groups here
-    env_info = runner_obj.env.get_env_info()
+    env_info = runner.env.get_env_info()
     args.n_agents = env_info["n_agents"]
     args.n_actions = env_info["n_actions"]
 
@@ -100,7 +100,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     scheme = {
         "state": {"vshape": env_info["state_shape"]},
         "obs": {"vshape": env_info["obs_shape"], "group": "agents"},
-        "actions": {"vshape": (1,), "group": "agents", "dtype": th.int},
+        "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},
         "avail_actions": {"vshape": (env_info["n_actions"],), "group": "agents", "dtype": th.int},
         "reward": {"vshape": (1,)},
         "terminated": {"vshape": (1,), "dtype": th.uint8}
@@ -119,10 +119,10 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     mac = mac_REGISTRY[args.mac](buffer.scheme, groups, args)  # Dummy for testing
 
     # Give runner the scheme
-    runner_obj.setup(scheme=scheme, groups=groups, preprocess=preprocess, mac=mac)
+    runner.setup(scheme=scheme, groups=groups, preprocess=preprocess, mac=mac)
 
     # Learner
-    learner_obj = None # Temp
+    learner = le_REGISTRY[args.learner](mac, _logging_struct, args)
 
     # start training
     episode = 0
@@ -132,42 +132,42 @@ def run_sequential(args, _logging_struct, _run, unique_token):
 
     _logging_struct.py_logger.info("Beginning training for {} timesteps".format(args.t_max))
 
-    while runner_obj.T_env <= args.t_max:
+    while runner.T_env <= args.t_max:
 
         # Run for a whole episode at a time
-        episode_batch = runner_obj.run(test_mode=False)
+        episode_batch = runner.run(test_mode=False)
         buffer.insert_episode_batch(episode_batch)
 
         if buffer.can_sample(args.batch_size):
             episode_sample = buffer.sample(args.batch_size)
 
-            learner_obj.train(episode_sample, T_env=runner_obj.T_env)
+            learner.train(episode_sample, runner.t, episode)
 
         # Execute test runs once in a while
-        n_test_runs = max(1, args.test_nepisode // runner_obj.batch_size)
-        if ( runner_obj.T_env - last_test_T) / args.test_interval >= 1.0:
+        n_test_runs = max(1, args.test_nepisode // runner.batch_size)
+        if (runner.T_env - last_test_T) / args.test_interval >= 1.0:
 
-            _logging_struct.py_logger.info("T_env: {} / {}".format(runner_obj.T_env, args.t_max))
-            _logging_struct.py_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner_obj.T_env, args.t_max), time_str(time.time() - start_time)))
-            runner_obj.log() # log runner statistics derived from training runs
+            _logging_struct.py_logger.info("T_env: {} / {}".format(runner.T_env, args.t_max))
+            _logging_struct.py_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner.T_env, args.t_max), time_str(time.time() - start_time)))
+            runner.log() # log runner statistics derived from training runs
 
-            last_test_T = runner_obj.T_env
+            last_test_T = runner.T_env
             for _ in range(n_test_runs):
-                runner_obj.run(test_mode=True)
+                runner.run(test_mode=True)
 
-            runner_obj.log()  # log runner statistics derived from test runs
-            learner_obj.log()
+            runner.log()  # log runner statistics derived from test runs
+            learner.log()
 
         # save model once in a while
-        if args.save_model and (runner_obj.T_env - model_save_time >= args.save_model_interval or model_save_time == 0):
-            model_save_time = runner_obj.T_env
+        if args.save_model and (runner.T_env - model_save_time >= args.save_model_interval or model_save_time == 0):
+            model_save_time = runner.T_env
             _logging_struct.py_logger.info("Saving models")
 
             save_path = os.path.join(args.local_results_path, "models") #"results/models/{}".format(unique_token)
             os.makedirs(save_path, exist_ok=True)
 
             # learner obj will save all agent and further models used
-            learner_obj.save_models(path=save_path, token=unique_token, T=runner_obj.T_env)
+            learner.save_models(path=save_path, token=unique_token, T=runner.T_env)
 
         episode += 1
         # Actually
@@ -179,7 +179,7 @@ def log():
     # TODO: Log stuff
     # if args.save_episode_samples:
     #     assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
-    #     _logging_struct.hdf_logger.log("", episode_sample, runner_obj.T_env)
+    #     _logging_struct.hdf_logger.log("", episode_sample, runner.T_env)
     pass
 
 # TODO: Clean this up

@@ -24,12 +24,15 @@ class BasicMAC:
         # TODO: Is this too hacky?
         if t == 0:
             # Make initial hidden states
-            self.hidden_states = self.agent.init_hidden().expand(self.n_agents, -1).unsqueeze(0) # 1av
+            self.hidden_states = self.agent.init_hidden().unsqueeze(0).expand(ep_batch.batch_size, self.n_agents, -1) # bav
             self.hidden_states.to(ep_batch.device)
         agent_inputs = self._build_inputs(ep_batch, t)
         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
         # TODO: Return a dictionary?
         return agent_outs
+
+    def get_params(self):
+        return self.agent.parameters()
 
     def _build_agents(self, input_shape):
         self.agent = agent_REGISTRY[self.args.agent](input_shape, self.args)
