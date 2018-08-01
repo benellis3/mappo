@@ -1,6 +1,6 @@
 import numpy as np
 
-class FlatThenDecaySchedule():
+class DecayThenFlatSchedule():
 
     def __init__(self,
                  start,

@@ -1,5 +1,5 @@
 import logging
-from components.episode_buffer_old import BatchEpisodeBuffer
+# from components.episode_buffer_old import BatchEpisodeBuffer
 from sacred.observers import FileStorageObserver
 from sacred.commandline_options import CommandLineOption
 import os

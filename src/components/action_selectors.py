@@ -3,7 +3,8 @@ import torch as th
 from torch.autograd import Variable
 from torch.distributions import Categorical
 from torch.nn.functional import softmax
-from .transforms_old import _to_batch, _from_batch, _adim, _vdim, _bsdim, _check_nan
+# from .transforms_old import _to_batch, _from_batch, _adim, _vdim, _bsdim, _check_nan
+from .epsilon_schedules import DecayThenFlatSchedule
 
 REGISTRY = {}
 
@@ -71,48 +72,35 @@ class MultinomialActionSelector():
 
 REGISTRY["multinomial"] = MultinomialActionSelector
 
+
 class EpsilonGreedyActionSelector():
 
     def __init__(self, args):
         self.args = args
-        self.output_type = "qvalues"
 
-    def _get_epsilons(self):
-        assert False, "function _get_epsilon must be overwritten by user in runner!"
-        pass
+        # Was there so I used it
+        self.schedule = DecayThenFlatSchedule(args.epsilon_start, args.epsilon_finish, args.epsilon_anneal_time, decay="linear")
 
-    def select_action(self, inputs, avail_actions, tformat, test_mode=False):
-        assert tformat in ["a*bs*t*v"], "invalid format!"
+    def select_action(self, agent_inputs, avail_actions, t, test_mode=False):
 
-        if isinstance(inputs["qvalues"], Variable):
-            agent_qvalues = inputs["qvalues"].data.clone()
-        else:
-            agent_qvalues = inputs["qvalues"].clone() # might not be necessary
+        # Assuming agent_inputs is a batch of Q-Values for each agent bav
+        epsilon_to_use = self.schedule.eval(t)
 
-        # greedy action selection
-        assert avail_actions.sum(dim=_vdim(tformat)).prod() > 0.0, \
-            "at least one batch entry has no available action!"
+        if test_mode:
+            # Greedy action selection only
+            epsilon_to_use = -1
 
         # mask actions that are excluded from selection
-        agent_qvalues[avail_actions == 0.0] = -float("inf") # should never be selected!
+        masked_q_values = agent_inputs.clone()
+        masked_q_values[avail_actions == 0.0] = -float("inf") # should never be selected!
 
-        masked_qvalues_batch, params, tformat = _to_batch(agent_qvalues, tformat)
-        _, _argmaxes = masked_qvalues_batch.max(dim=1, keepdim=True)
-        #_argmaxes.unsqueeze_(1)
+        # TODO: Please test this, its probably wrong
+        random_numbers = th.rand_like(agent_inputs[:,:,0])
+        pick_random = (random_numbers < epsilon_to_use).long()
+        random_actions = Categorical(avail_actions.float()).sample().unsqueeze(1).long()
 
-        if not test_mode: # normal epsilon-greedy action selection
-            epsilons, epsilons_tformat = self._get_epsilons()
-            random_numbers = epsilons.clone().uniform_()
-            _avail_actions, params, tformat = _to_batch(avail_actions, tformat)
-            random_actions = Categorical(_avail_actions).sample().unsqueeze(1)
-            epsilon_pos = (random_numbers < epsilons).repeat(agent_qvalues.shape[_adim(tformat)], 1) # sampling uniformly from actions available
-            epsilon_pos = epsilon_pos[:random_actions.shape[0], :]
-            _argmaxes[epsilon_pos] = random_actions[epsilon_pos]
-            eps_argmaxes = _from_batch(_argmaxes, params, tformat)
-            return eps_argmaxes, agent_qvalues, tformat
-        else: # don't use epsilon!
-            # sanity check: there always has to be at least one action available.
-            argmaxes = _from_batch(_argmaxes, params, tformat)
-            return argmaxes, agent_qvalues, tformat
+        picked_actions = pick_random * random_actions + (1 - pick_random) * masked_q_values.max(dim=2)[1]
+        # Squeeze away the time dimension
+        return picked_actions.squeeze(1)
 
 REGISTRY["epsilon_greedy"] = EpsilonGreedyActionSelector

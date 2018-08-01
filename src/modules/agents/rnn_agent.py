@@ -16,6 +16,10 @@ class RNNAgent(nn.Module):
 
     def forward(self, inputs, hidden_state):
         x = F.relu(self.fc1(inputs))
-        h = self.rnn(x, hidden_state)
-        q = self.fc1(h)
+        # TODO: Is this right? It feels hacky reshaping here
+        x = x.reshape(-1, self.args.rnn_hidden_dim)
+        h_in = hidden_state.reshape(-1, self.args.rnn_hidden_dim)
+        h = self.rnn(x, h_in)
+        h = h.reshape(-1, self.args.n_agents, self.args.rnn_hidden_dim)
+        q = self.fc2(h)
         return q, h

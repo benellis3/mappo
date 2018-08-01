@@ -1,4 +1,4 @@
 REGISTRY = {}
 
-from .basic import RNN
-REGISTRY["rnn"] = RNN
+from .rnn_agent import RNNAgent
+REGISTRY["rnn"] = RNNAgent

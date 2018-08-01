@@ -2,10 +2,10 @@ import torch as th
 import numpy as np
 
 from controllers import REGISTRY as c_REGISTRY
-from components.scheme import Scheme
-from components.episode_buffer_old import BatchEpisodeBuffer
+# from components.scheme import Scheme
+# from components.episode_buffer_old import BatchEpisodeBuffer
 from components.env_stats_aggregators import REGISTRY as envstats_REGISTRY
-from components.transforms_old import _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean
+# from components.transforms_old import _join_dicts, _underscore_to_cap, _copy_remove_keys, _make_logging_str, _seq_mean
 from copy import deepcopy
 from envs import REGISTRY as env_REGISTRY
 from functools import partial

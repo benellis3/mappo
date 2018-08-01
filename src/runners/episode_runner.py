@@ -48,17 +48,16 @@ class EpisodeRunner:
             self.batch.update(env_data, ts=self.t)
 
             # Pass the entire batch of experiences up till now to the agents
-            agent_outputs = self.mac.select_actions(self.batch, t=self.t, test_mode=test_mode)
-            # TODO: Should we just return a list of actions directly?
-            actions = agent_outputs["actions"]
+            # Receive the actions for each agent at this timestep in a batch of size 1
+            actions = self.mac.select_actions(self.batch, t=self.t, test_mode=test_mode)
 
             # TODO: Return episode limit from the environment separately from env_info
-            reward, terminated, env_info = self.env.step(actions)
+            reward, terminated, env_info = self.env.step(actions[0])
             episode_reward += reward
 
             # TODO: Use a better name
             env_data_2 = {
-                "actions": [actions],
+                "actions": actions,
                 "reward": [(reward,)],
                 "terminated": [(terminated != env_info.get("episode_limit", False),)],
             }

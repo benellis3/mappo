@@ -1,6 +1,5 @@
 from functools import partial
 
-from components.transforms_old import _join_dicts
 from .predator_prey import PredatorPreyCapture
 from .box_pushing import CoopBoxPushing
 #from .predator_prey import PredatorPreyCaptureCython

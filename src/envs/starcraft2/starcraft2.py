@@ -1233,7 +1233,7 @@ class SC2(MultiAgentEnv):
         stats["restarts"] = self.force_restarts
         return stats
 
-from components.transforms_old import _seq_mean
+# from components.transforms_old import _seq_mean
 
 class StatsAggregator():
 

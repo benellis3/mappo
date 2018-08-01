@@ -9,7 +9,6 @@ from sacred.utils import apply_backspaces_and_linefeeds
 import sys
 import torch as th
 
-from components.transforms_old import _merge_dicts
 from run import run
 from utils.logging import get_logger
 
@@ -117,11 +116,13 @@ if __name__ == '__main__':
     for _d in defaults:
         from config.defaults import REGISTRY as def_REGISTRY
         def_dic = def_REGISTRY[_d](config_dic, logger)
-        config_dic = _merge_dicts(config_dic, def_dic)
+        # config_dic = _merge_dicts(config_dic, def_dic)
+        config_dic = {**config_dic, **def_dic}
 
     #  finally merge with experiment config
     if exp_name is not None:
-        config_dic = _merge_dicts(config_dic, exp_dic)
+        # config_dic = _merge_dicts(config_dic, exp_dic)
+        config_dic = {**config_dic, **exp_dic}
 
     # add results path to config
     config_dic["local_results_path"] = results_path

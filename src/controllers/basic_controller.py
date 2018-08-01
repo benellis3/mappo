@@ -1,21 +1,24 @@
 from modules.agents import REGISTRY as agent_REGISTRY
-
+from components.action_selectors import REGISTRY as action_REGISTRY
 import torch as th
+
 
 class BasicMAC:
     def __init__(self, scheme, groups, args):
         self.n_agents = args.n_agents
-        input_shape = self._get_input_shape(scheme)
         self.args = args
+        input_shape = self._get_input_shape(scheme)
         self._build_agents(input_shape)
+
+        self.action_selector = action_REGISTRY[args.action_selector](args)
 
         self.hidden_states = None
 
     def select_actions(self, ep_batch, t, test_mode=False):
         agent_outputs = self.forward(ep_batch, t)
         avail_actions = ep_batch["avail_actions"][:, t]
-        # TODO: Use an action selector
-        return {"actions": [0 for _ in range(self.n_agents)]}  # Dummy for quick testing
+        chosen_actions = self.action_selector.select_action(agent_outputs, avail_actions, t, test_mode=test_mode)
+        return chosen_actions
 
     def forward(self, ep_batch, t):
         # TODO: Is this too hacky?
@@ -39,11 +42,11 @@ class BasicMAC:
         inputs.append(batch["obs"][:, t])  # b1av
         if self.args.obs_last_action:
             if t == 0:
-                inputs(th.zeros_like(batch["actions_onehot"][:, t]))
+                inputs.append(th.zeros_like(batch["actions_onehot"][:, t]))
             else:
-                inputs(batch["actions_onehot"][:, t-1])
+                inputs.append(batch["actions_onehot"][:, t-1])
         if self.args.obs_agent_id:
-            inputs.append(th.eye(device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, 1, -1, -1))
+            inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, 1, -1, -1))
 
         inputs = th.cat([x.squeeze(1) for x in inputs], dim=2)
         return inputs
@@ -51,7 +54,7 @@ class BasicMAC:
     def _get_input_shape(self, scheme):
         input_shape = scheme["obs"]["vshape"]
         if self.args.obs_last_action:
-            input_shape += scheme["actions_onehot"]["vshape"]
+            input_shape += scheme["actions_onehot"]["vshape"][0]
         if self.args.obs_agent_id:
             input_shape += self.n_agents
 

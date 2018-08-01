@@ -180,6 +180,7 @@ def log():
     # if args.save_episode_samples:
     #     assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
     #     _logging_struct.hdf_logger.log("", episode_sample, runner_obj.T_env)
+    pass
 
 # TODO: Clean this up
 def args_sanity_check(config, _log):

@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch as th
 
-from components.transforms_old import _to_batch, _from_batch, _check_inputs_validity, _tdim, _vdim
+# from components.transforms_old import _to_batch, _from_batch, _check_inputs_validity, _tdim, _vdim
 
 class DQN(nn.Module):
     def __init__(self, input_shapes, n_actions, output_type=None, output_shapes=None, layer_args=None, args=None):
