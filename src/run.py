@@ -8,9 +8,9 @@ import time
 import threading
 import torch as th
 from types import SimpleNamespace as SN
-from utils.dict2namedtuple import convert
-from utils.logging import get_logger, append_scalar, log_stats, HDFLogger
+from utils.logging import Logger
 from utils.timehelper import time_left, time_str
+from os.path import dirname, abspath
 
 from learners import REGISTRY as le_REGISTRY
 from runners import REGISTRY as r_REGISTRY
@@ -24,9 +24,10 @@ def run(_run, _config, _log, pymongo_client):
     # check args sanity
     _config = args_sanity_check(_config, _log)
 
-    # convert _config dict to GenericDict objects (which cannot be overwritten later)
-    # args = convert(_config)
     args = SN(**_config)
+
+    # setup loggers
+    logger = Logger(_log)
 
     _log.info("Experiment Parameters:")
     experiment_params = pprint.pformat(_config,
@@ -34,35 +35,21 @@ def run(_run, _config, _log, pymongo_client):
                                        width=1)
     _log.info("\n\n" + experiment_params + "\n")
 
-    import os
+    # TODO: Do we need to print this?
     _log.info("OS ENVIRON KEYS: {}\n\n".format(os.environ))
 
-    if _config.get("debug_mode", None) is not None:
-        _log.warning("ATTENTION DEBUG MODE: {}".format(_config["debug_mode"]))
-
-    # configure logging
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     if args.use_tensorboard:
-        import tensorboard
-        if tensorboard:
-            from tensorboard_logger import configure, log_value
-        import os
-        from os.path import dirname, abspath
-        file_tb_path = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
-        configure(os.path.join(file_tb_path, "{}").format(unique_token))
+        tb_logs_direc = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
+        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
+        logger.setup_tb(tb_exp_direc)
 
-    # set up logging objects to be passed on from now on
-    logging_struct = SN(py_logger=_log,
-                        sacred_log_scalar_fn=partial(append_scalar, run=_run))
-    if args.use_tensorboard:
-        logging_struct.tensorboard_log_scalar_fn=log_value
-
-    if args.use_hdf_logger:
-        logging_struct.hdf_logger = HDFLogger(path=args.local_results_path, name=args.name)
+    # sacred is on by default
+    logger.setup_sacred(_run)
 
     # Run and train
-    run_sequential(args=args, _run=_run, _logging_struct=logging_struct, unique_token=unique_token)
+    run_sequential(args=args, logger=logger)
 
     # Clean up after finishing
     print("Exiting Main")
@@ -85,11 +72,10 @@ def run(_run, _config, _log, pymongo_client):
     os._exit(os.EX_OK)
 
 
-def run_sequential(args, _logging_struct, _run, unique_token):
+def run_sequential(args, logger):
 
     # Init runner so we can get env info
-    runner = r_REGISTRY[args.runner](args=args,
-                                         logging_struct=_logging_struct)
+    runner = r_REGISTRY[args.runner](args=args, logger=logger)
 
     # Set up schemes and groups here
     env_info = runner.env.get_env_info()
@@ -122,7 +108,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     runner.setup(scheme=scheme, groups=groups, preprocess=preprocess, mac=mac)
 
     # Learner
-    learner = le_REGISTRY[args.learner](mac, _logging_struct, args)
+    learner = le_REGISTRY[args.learner](mac, logger, args)
 
     # start training
     episode = 0
@@ -130,7 +116,7 @@ def run_sequential(args, _logging_struct, _run, unique_token):
     model_save_time = 0
     start_time = time.time()
 
-    _logging_struct.py_logger.info("Beginning training for {} timesteps".format(args.t_max))
+    logger.console_logger.info("Beginning training for {} timesteps".format(args.t_max))
 
     while runner.T_env <= args.t_max:
 
@@ -147,8 +133,8 @@ def run_sequential(args, _logging_struct, _run, unique_token):
         n_test_runs = max(1, args.test_nepisode // runner.batch_size)
         if (runner.T_env - last_test_T) / args.test_interval >= 1.0:
 
-            _logging_struct.py_logger.info("T_env: {} / {}".format(runner.T_env, args.t_max))
-            _logging_struct.py_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner.T_env, args.t_max), time_str(time.time() - start_time)))
+            logger.console_logger.info("T_env: {} / {}".format(runner.T_env, args.t_max))
+            logger.console_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner.T_env, args.t_max), time_str(time.time() - start_time)))
             runner.log() # log runner statistics derived from training runs
 
             last_test_T = runner.T_env
@@ -158,22 +144,23 @@ def run_sequential(args, _logging_struct, _run, unique_token):
             runner.log()  # log runner statistics derived from test runs
             learner.log()
 
+        # TODO: Sort out model saving
         # save model once in a while
         if args.save_model and (runner.T_env - model_save_time >= args.save_model_interval or model_save_time == 0):
             model_save_time = runner.T_env
-            _logging_struct.py_logger.info("Saving models")
+            logger.console_logger.info("Saving models")
 
             save_path = os.path.join(args.local_results_path, "models") #"results/models/{}".format(unique_token)
             os.makedirs(save_path, exist_ok=True)
 
             # learner obj will save all agent and further models used
-            learner.save_models(path=save_path, token=unique_token, T=runner.T_env)
+            # learner.save_models(path=save_path, token=unique_token, T=runner.T_env)
 
         episode += 1
         # Actually
         log()
 
-    _logging_struct.py_logger.info("Finished Training")
+    logger.console_logger.info("Finished Training")
 
 def log():
     # TODO: Log stuff

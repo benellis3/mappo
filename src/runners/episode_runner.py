@@ -6,9 +6,9 @@ import torch as th
 
 class EpisodeRunner:
 
-    def __init__(self, args, logging_struct):
+    def __init__(self, args, logger):
         self.args = args
-        self.logging = logging_struct
+        self.logger = logger
         self.batch_size = self.args.batch_size_run
         assert self.batch_size == 1
 

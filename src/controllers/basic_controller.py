@@ -2,7 +2,6 @@ from modules.agents import REGISTRY as agent_REGISTRY
 from components.action_selectors import REGISTRY as action_REGISTRY
 import torch as th
 
-
 class BasicMAC:
     def __init__(self, scheme, groups, args):
         self.n_agents = args.n_agents
