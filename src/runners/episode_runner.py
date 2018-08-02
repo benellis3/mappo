@@ -36,16 +36,17 @@ class EpisodeRunner:
 
         terminated = False
         episode_reward = 0
+        self.mac.init_hidden(batch_size=self.batch_size)
 
         while not terminated:
 
-            env_data = {
+            pre_transition_data = {
                 "state": [self.env.get_state()],
                 "avail_actions": [self.env.get_avail_actions()],
                 "obs": [self.env.get_obs()]
             }
 
-            self.batch.update(env_data, ts=self.t)
+            self.batch.update(pre_transition_data, ts=self.t)
 
             # Pass the entire batch of experiences up till now to the agents
             # Receive the actions for each agent at this timestep in a batch of size 1
@@ -56,13 +57,13 @@ class EpisodeRunner:
             episode_reward += reward
 
             # TODO: Use a better name
-            env_data_2 = {
+            post_transition_data = {
                 "actions": actions,
                 "reward": [(reward,)],
                 "terminated": [(terminated != env_info.get("episode_limit", False),)],
             }
 
-            self.batch.update(env_data_2, ts=self.t)
+            self.batch.update(post_transition_data, ts=self.t)
 
             self.t += 1
 

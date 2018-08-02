@@ -12,14 +12,15 @@ class RNNAgent(nn.Module):
         self.fc2 = nn.Linear(args.rnn_hidden_dim, args.n_actions)
 
     def init_hidden(self):
-        return th.zeros((1,self.args.rnn_hidden_dim))
+        # make hidden states on same device as model
+        return self.fc1.weight.new(1, self.args.rnn_hidden_dim).zero_()
 
     def forward(self, inputs, hidden_state):
         x = F.relu(self.fc1(inputs))
         # TODO: Is this right? It feels hacky reshaping here
-        x = x.reshape(-1, self.args.rnn_hidden_dim)
+        # x = x.reshape(-1, self.args.rnn_hidden_dim)
         h_in = hidden_state.reshape(-1, self.args.rnn_hidden_dim)
         h = self.rnn(x, h_in)
-        h = h.reshape(-1, self.args.n_agents, self.args.rnn_hidden_dim)
+        # h = h.reshape(-1, self.args.n_agents, self.args.rnn_hidden_dim)
         q = self.fc2(h)
         return q, h

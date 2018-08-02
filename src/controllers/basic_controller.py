@@ -2,6 +2,7 @@ from modules.agents import REGISTRY as agent_REGISTRY
 from components.action_selectors import REGISTRY as action_REGISTRY
 import torch as th
 
+# This multi-agent controller shares parameters between agents
 class BasicMAC:
     def __init__(self, scheme, groups, args):
         self.n_agents = args.n_agents
@@ -20,18 +21,19 @@ class BasicMAC:
         return chosen_actions
 
     def forward(self, ep_batch, t):
-        # TODO: Is this too hacky?
-        if t == 0:
-            # Make initial hidden states
-            self.hidden_states = self.agent.init_hidden().unsqueeze(0).expand(ep_batch.batch_size, self.n_agents, -1) # bav
-            self.hidden_states.to(ep_batch.device)
         agent_inputs = self._build_inputs(ep_batch, t)
         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
         # TODO: Return a dictionary?
-        return agent_outs
+        return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
+
+    def init_hidden(self, batch_size):
+        self.hidden_states = self.agent.init_hidden().unsqueeze(0).expand(batch_size, self.n_agents, -1)  # bav
 
     def get_params(self):
         return self.agent.parameters()
+
+    def load_state(self, other_mac):
+        self.agent.load_state_dict(other_mac.agent.state_dict())
 
     def _build_agents(self, input_shape):
         self.agent = agent_REGISTRY[self.args.agent](input_shape, self.args)
@@ -48,9 +50,9 @@ class BasicMAC:
             else:
                 inputs.append(batch["actions_onehot"][:, t-1])
         if self.args.obs_agent_id:
-            inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, 1, -1, -1))
+            inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, -1, -1))
 
-        inputs = th.cat([x.squeeze(1) for x in inputs], dim=2)
+        inputs = th.cat([x.reshape(bs*self.n_agents, -1) for x in inputs], dim=1)
         return inputs
 
     def _get_input_shape(self, scheme):

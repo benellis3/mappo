@@ -156,7 +156,7 @@ def run_sequential(args, logger):
             # learner obj will save all agent and further models used
             # learner.save_models(path=save_path, token=unique_token, T=runner.T_env)
 
-        episode += 1
+        episode += args.batch_size_run
         # Actually
         log()
 
