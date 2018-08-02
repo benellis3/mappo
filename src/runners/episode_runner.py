@@ -1,8 +1,7 @@
 from envs import REGISTRY as env_REGISTRY
 from functools import partial
 from components.episode_buffer import EpisodeBatch
-import torch as th
-
+import numpy as np
 
 class EpisodeRunner:
 
@@ -17,6 +16,8 @@ class EpisodeRunner:
         self.t = 0
 
         self.t_env = 0
+
+        self.test_rewards = []
 
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit, preprocess=preprocess)
@@ -72,6 +73,12 @@ class EpisodeRunner:
 
         # TODO: Log stuff
         if test_mode:
+            self.test_rewards.append(episode_return)
+            if len(self.test_rewards) == self.args.test_nepisode:
+                # Finished testing for test_nepisodes, log stats about it for convenience
+                self.logger.log_stat("mean_test_return", np.mean(self.test_rewards), self.t_env)
+                self.logger.log_stat("std_test_return", np.std(self.test_rewards), self.t_env)
+                self.test_rewards = []
             self.logger.log_stat("test_return", episode_return, self.t_env)
         else:
             self.logger.log_stat("train_return", episode_return, self.t_env)

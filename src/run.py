@@ -130,7 +130,7 @@ def run_sequential(args, logger):
         if buffer.can_sample(args.batch_size):
             episode_sample = buffer.sample(args.batch_size)
 
-            learner.train(episode_sample, runner.t, episode)
+            learner.train(episode_sample, runner.t_env, episode)
 
         # Execute test runs once in a while
         n_test_runs = max(1, args.test_nepisode // runner.batch_size)
@@ -161,9 +161,11 @@ def run_sequential(args, logger):
 
         if (runner.t_env - last_log_T) >= args.log_interval:
             logger.print_recent_stats()
+            logger.log_stat("episode", episode, runner.t_env)
             last_log_T = runner.t_env
 
     logger.console_logger.info("Finished Training")
+
 
 # TODO: Clean this up
 def args_sanity_check(config, _log):

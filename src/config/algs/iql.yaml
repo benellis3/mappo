@@ -1,0 +1,15 @@
+# --- IQL specific parameters ---
+
+# use epsilon greedy action selector
+action_selector: "epsilon_greedy"
+epsilon_start: 1.0
+epsilon_finish: 0.05
+epsilon_anneal_time: 20000
+
+# update the target network every {} episodes
+target_update_interval: 200
+
+# use the Q_Learner to train
+learner: "q_learner"
+
+name: "iql"

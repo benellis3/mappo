@@ -72,7 +72,7 @@ class QLearner:
         masked_td_error = td_error * mask
 
         # Normal L2 loss, take mean over actual data
-        loss = (masked_td_error ** 2).sum() / mask.sum()
+        loss = (masked_td_error ** 2).sum() / mask.sum() # Not dividing by number of agents, only # valid timesteps
 
         # Optimise
         self.optimiser.zero_grad()
@@ -86,7 +86,10 @@ class QLearner:
 
         self.logger.log_stat("loss", loss.item(), t_env)
         self.logger.log_stat("grad_norm", grad_norm, t_env)
+        self.logger.log_stat("td_error", (masked_td_error.sum().item()/mask.sum()), t_env)
+        self.logger.log_stat("mean_q_value", (chosen_action_qvals * mask).sum().item()/(mask.sum() * self.args.n_agents), t_env)
+        self.logger.log_stat("mean_target", (targets * mask).sum().item()/(mask.sum() * self.args.n_agents), t_env)
 
     def _update_targets(self):
-        print("Updated target net.")
         self.target_mac.load_state(self.mac)
+        self.logger.console_logger.info("Updated target network")

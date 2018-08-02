@@ -1,0 +1,20 @@
+# --- Defaults for 4x4 predator prey, 4 agent capture, walls ---
+
+env: "pred_prey"
+
+env_args:
+  predator_prey_toroidal: False # Walls at the edge of the grid
+  predator_prey_shape: # 4x4 grid
+    - 4
+    - 4
+  n_prey: 1
+  agent_obs: # Agent's see 1 square around themselves
+    - 1
+    - 1
+  episode_limit: 50
+  n_agents: 4
+  reward_capture: 1 # Reward of 1 for capturing the prey
+  reward_almost_capture: 0
+  truncate_episodes: True # If we reach the episode_limit then don't treat the final transition as terminal
+
+t_max: 100000
