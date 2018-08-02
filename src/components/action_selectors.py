@@ -88,19 +88,17 @@ class EpsilonGreedyActionSelector():
 
         if test_mode:
             # Greedy action selection only
-            epsilon_to_use = -1
+            epsilon_to_use = 0.0
 
         # mask actions that are excluded from selection
         masked_q_values = agent_inputs.clone()
-        masked_q_values[avail_actions == 0.0] = -float("inf") # should never be selected!
+        masked_q_values[avail_actions == 0.0] = -float("inf")  # should never be selected!
 
-        # TODO: Please test this, its probably wrong
         random_numbers = th.rand_like(agent_inputs[:,:,0])
         pick_random = (random_numbers < epsilon_to_use).long()
-        random_actions = Categorical(avail_actions.float()).sample().unsqueeze(1).long()
+        random_actions = Categorical(avail_actions.float()).sample().long()
 
         picked_actions = pick_random * random_actions + (1 - pick_random) * masked_q_values.max(dim=2)[1]
-        # Squeeze away the time dimension
-        return picked_actions.squeeze(1)
+        return picked_actions
 
 REGISTRY["epsilon_greedy"] = EpsilonGreedyActionSelector

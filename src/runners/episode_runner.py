@@ -35,7 +35,7 @@ class EpisodeRunner:
         self.reset()
 
         terminated = False
-        episode_reward = 0
+        episode_return = 0
         self.mac.init_hidden(batch_size=self.batch_size)
 
         while not terminated:
@@ -54,7 +54,7 @@ class EpisodeRunner:
 
             # TODO: Return episode limit from the environment separately from env_info
             reward, terminated, env_info = self.env.step(actions[0])
-            episode_reward += reward
+            episode_return += reward
 
             # TODO: Use a better name
             post_transition_data = {
@@ -67,11 +67,13 @@ class EpisodeRunner:
 
             self.t += 1
 
-        self.T_env += self.t
+        if not test_mode:
+            self.T_env += self.t
 
         # TODO: Log stuff
+        if test_mode:
+            self.logger.log_stat("test_return", episode_return, self.T_env)
+        else:
+            self.logger.log_stat("train_return", episode_return, self.T_env)
 
         return self.batch
-
-    def log(self):
-        pass

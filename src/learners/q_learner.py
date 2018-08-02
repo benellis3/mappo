@@ -13,6 +13,8 @@ class QLearner:
         self.params = mac.get_params()
         self.optimiser = RMSprop(params=self.params, lr=args.lr)
 
+        self.last_target_update_episode = 0
+
         # a little wasteful to deepcopy (e.g. duplicates action selector), but should work for any MAC
         self.target_mac = copy.deepcopy(mac)
 
@@ -79,8 +81,9 @@ class QLearner:
         self.optimiser.step()
 
         # TODO: fix in case target_udpate_interval % batch_size_run != 0
-        if episode_num % self.args.target_update_interval:
+        if (episode_num - self.last_target_update_episode) / self.args.target_update_interval >= 1.0:
             self._update_targets()
+            self.last_target_update_episode = episode_num
 
         # TODO: Log stuff!
 

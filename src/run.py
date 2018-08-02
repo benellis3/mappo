@@ -113,6 +113,7 @@ def run_sequential(args, logger):
     # start training
     episode = 0
     last_test_T = 0
+    last_log_T = 0
     model_save_time = 0
     start_time = time.time()
 
@@ -135,13 +136,11 @@ def run_sequential(args, logger):
 
             logger.console_logger.info("T_env: {} / {}".format(runner.T_env, args.t_max))
             logger.console_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner.T_env, args.t_max), time_str(time.time() - start_time)))
-            runner.log() # log runner statistics derived from training runs
 
             last_test_T = runner.T_env
             for _ in range(n_test_runs):
                 runner.run(test_mode=True)
 
-            runner.log()  # log runner statistics derived from test runs
             learner.log()
 
         # TODO: Sort out model saving
@@ -157,17 +156,16 @@ def run_sequential(args, logger):
             # learner.save_models(path=save_path, token=unique_token, T=runner.T_env)
 
         episode += args.batch_size_run
-        # Actually
-        log()
+
+        if (runner.T_env - last_log_T) >= args.log_interval:
+            logger.console_logger.info(
+                "train r: {:.2f}\t test r: {:.2f}".format(
+                    np.mean([x[1] for x in logger.stats["train_return"][-100:]]),
+                    np.mean([x[1] for x in logger.stats["test_return"][-100:]]),
+            ))
+            last_log_T = runner.T_env
 
     logger.console_logger.info("Finished Training")
-
-def log():
-    # TODO: Log stuff
-    # if args.save_episode_samples:
-    #     assert args.use_hdf_logger, "use_hdf_logger needs to be enabled if episode samples are to be stored!"
-    #     _logging_struct.hdf_logger.log("", episode_sample, runner.T_env)
-    pass
 
 # TODO: Clean this up
 def args_sanity_check(config, _log):

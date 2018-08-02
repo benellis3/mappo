@@ -25,14 +25,13 @@ class Logger:
 
     # TODO: Setup hdf logger
 
-    def log_stat(self, key, value, t):
+    def log_stat(self, key, value, t, to_sacred=True):
         self.stats[key].append((t, value))
 
-        # TODO: Limit how much is being logged if it is too much
         if self.use_tb:
             self.tb_logger(key, value, t)
 
-        if self.use_sacred:
+        if self.use_sacred and to_sacred:
             if key in self.sacred_info:
                 self.sacred_info[key].append((t, value))
             else:
