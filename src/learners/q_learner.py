@@ -5,12 +5,12 @@ from torch.optim import RMSprop
 
 
 class QLearner:
-    def __init__(self, mac, logging_struct, args):
+    def __init__(self, mac, logger, args):
         self.args = args
         self.mac = mac
-        self.logging = logging_struct
+        self.logger = logger
 
-        self.params = mac.get_params()
+        self.params = list(mac.parameters())
         self.optimiser = RMSprop(params=self.params, lr=args.lr)
 
         self.last_target_update_episode = 0
@@ -80,17 +80,13 @@ class QLearner:
         grad_norm = th.nn.utils.clip_grad_norm_(self.params, self.args.grad_norm_clip)
         self.optimiser.step()
 
-        # TODO: fix in case target_udpate_interval % batch_size_run != 0
         if (episode_num - self.last_target_update_episode) / self.args.target_update_interval >= 1.0:
             self._update_targets()
             self.last_target_update_episode = episode_num
 
-        # TODO: Log stuff!
+        self.logger.log_stat("loss", loss.item(), t_env)
+        self.logger.log_stat("grad_norm", grad_norm, t_env)
 
     def _update_targets(self):
         print("Updated target net.")
         self.target_mac.load_state(self.mac)
-
-    # TODO: Get rid of this, log directly using the logging_struct
-    def log(self):
-        pass # Who needs to log anyway

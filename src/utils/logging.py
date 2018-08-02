@@ -1,6 +1,6 @@
 from collections import defaultdict
 import logging
-
+import numpy as np
 
 class Logger:
     def __init__(self, console_logger):
@@ -37,6 +37,11 @@ class Logger:
             else:
                 self.sacred_info[key] = [(t, value)]
 
+    def print_recent_stats(self):
+        log_str = ""
+        for k, v in self.stats.items():
+            log_str += k + ": {:.4f}".format(np.mean([x[1] for x in self.stats[k][-100:]])) + "\t"
+        self.console_logger.info(log_str)
 
 # set up a custom logger
 def get_logger():

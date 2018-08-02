@@ -115,11 +115,13 @@ def run_sequential(args, logger):
     last_test_T = 0
     last_log_T = 0
     model_save_time = 0
+
     start_time = time.time()
+    last_time = start_time
 
     logger.console_logger.info("Beginning training for {} timesteps".format(args.t_max))
 
-    while runner.T_env <= args.t_max:
+    while runner.t_env <= args.t_max:
 
         # Run for a whole episode at a time
         episode_batch = runner.run(test_mode=False)
@@ -132,38 +134,34 @@ def run_sequential(args, logger):
 
         # Execute test runs once in a while
         n_test_runs = max(1, args.test_nepisode // runner.batch_size)
-        if (runner.T_env - last_test_T) / args.test_interval >= 1.0:
+        if (runner.t_env - last_test_T) / args.test_interval >= 1.0:
 
-            logger.console_logger.info("T_env: {} / {}".format(runner.T_env, args.t_max))
-            logger.console_logger.info("Estimated time left: {}. Time passed: {}".format(time_left(start_time, runner.T_env, args.t_max), time_str(time.time() - start_time)))
+            logger.console_logger.info("t_env: {} / {}".format(runner.t_env, args.t_max))
+            logger.console_logger.info("Estimated time left: {}. Time passed: {}".format(
+                time_left(last_time, last_test_T, runner.t_env, args.t_max), time_str(time.time() - start_time)))
+            last_time = time.time()
 
-            last_test_T = runner.T_env
+            last_test_T = runner.t_env
             for _ in range(n_test_runs):
                 runner.run(test_mode=True)
 
-            learner.log()
-
         # TODO: Sort out model saving
         # save model once in a while
-        if args.save_model and (runner.T_env - model_save_time >= args.save_model_interval or model_save_time == 0):
-            model_save_time = runner.T_env
+        if args.save_model and (runner.t_env - model_save_time >= args.save_model_interval or model_save_time == 0):
+            model_save_time = runner.t_env
             logger.console_logger.info("Saving models")
 
             save_path = os.path.join(args.local_results_path, "models") #"results/models/{}".format(unique_token)
             os.makedirs(save_path, exist_ok=True)
 
             # learner obj will save all agent and further models used
-            # learner.save_models(path=save_path, token=unique_token, T=runner.T_env)
+            # learner.save_models(path=save_path, token=unique_token, T=runner.t_env)
 
         episode += args.batch_size_run
 
-        if (runner.T_env - last_log_T) >= args.log_interval:
-            logger.console_logger.info(
-                "train r: {:.2f}\t test r: {:.2f}".format(
-                    np.mean([x[1] for x in logger.stats["train_return"][-100:]]),
-                    np.mean([x[1] for x in logger.stats["test_return"][-100:]]),
-            ))
-            last_log_T = runner.T_env
+        if (runner.t_env - last_log_T) >= args.log_interval:
+            logger.print_recent_stats()
+            last_log_T = runner.t_env
 
     logger.console_logger.info("Finished Training")
 
@@ -176,14 +174,14 @@ def args_sanity_check(config, _log):
         config["use_cuda"] = False
         _log.warning("CUDA flag use_cuda was switched OFF automatically because no CUDA devices are available!")
 
-    assert (config["run_mode"] in ["parallel_subproc"] and config["use_replay_buffer"]) or (not config["run_mode"] in ["parallel_subproc"]),  \
-        "need to use replay buffer if running in parallel mode!"
+    # assert (config["run_mode"] in ["parallel_subproc"] and config["use_replay_buffer"]) or (not config["run_mode"] in ["parallel_subproc"]),  \
+    #     "need to use replay buffer if running in parallel mode!"
 
-    assert not (not config["use_replay_buffer"] and (config["batch_size_run"]!=config["batch_size"]) ) , "if not using replay buffer, require batch_size and batch_size_run to be the same."
+    # assert not (not config["use_replay_buffer"] and (config["batch_size_run"]!=config["batch_size"]) ) , "if not using replay buffer, require batch_size and batch_size_run to be the same."
 
-    if config["learner"] == "coma":
-       assert (config["run_mode"] in ["parallel_subproc"]  and config["batch_size_run"]==config["batch_size"]) or \
-       (not config["run_mode"] in ["parallel_subproc"]  and not config["use_replay_buffer"]), \
-           "cannot use replay buffer for coma, unless in parallel mode, when it needs to have exactly have size batch_size."
+    # if config["learner"] == "coma":
+    #    assert (config["run_mode"] in ["parallel_subproc"]  and config["batch_size_run"]==config["batch_size"]) or \
+    #    (not config["run_mode"] in ["parallel_subproc"]  and not config["use_replay_buffer"]), \
+    #        "cannot use replay buffer for coma, unless in parallel mode, when it needs to have exactly have size batch_size."
 
     return config

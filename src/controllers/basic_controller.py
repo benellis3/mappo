@@ -14,10 +14,10 @@ class BasicMAC:
 
         self.hidden_states = None
 
-    def select_actions(self, ep_batch, t, test_mode=False):
-        agent_outputs = self.forward(ep_batch, t)
-        avail_actions = ep_batch["avail_actions"][:, t]
-        chosen_actions = self.action_selector.select_action(agent_outputs, avail_actions, t, test_mode=test_mode)
+    def select_actions(self, ep_batch, t_ep, t_env, test_mode=False):
+        agent_outputs = self.forward(ep_batch, t_ep)
+        avail_actions = ep_batch["avail_actions"][:, t_ep]
+        chosen_actions = self.action_selector.select_action(agent_outputs, avail_actions, t_env, test_mode=test_mode)
         return chosen_actions
 
     def forward(self, ep_batch, t):
@@ -28,7 +28,7 @@ class BasicMAC:
     def init_hidden(self, batch_size):
         self.hidden_states = self.agent.init_hidden().unsqueeze(0).expand(batch_size, self.n_agents, -1)  # bav
 
-    def get_params(self):
+    def parameters(self):
         return self.agent.parameters()
 
     def load_state(self, other_mac):

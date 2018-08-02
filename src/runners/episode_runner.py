@@ -16,7 +16,7 @@ class EpisodeRunner:
         self.episode_limit = self.env.episode_limit
         self.t = 0
 
-        self.T_env = 0
+        self.t_env = 0
 
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit, preprocess=preprocess)
@@ -50,7 +50,7 @@ class EpisodeRunner:
 
             # Pass the entire batch of experiences up till now to the agents
             # Receive the actions for each agent at this timestep in a batch of size 1
-            actions = self.mac.select_actions(self.batch, t=self.t, test_mode=test_mode)
+            actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, test_mode=test_mode)
 
             # TODO: Return episode limit from the environment separately from env_info
             reward, terminated, env_info = self.env.step(actions[0])
@@ -68,12 +68,14 @@ class EpisodeRunner:
             self.t += 1
 
         if not test_mode:
-            self.T_env += self.t
+            self.t_env += self.t
 
         # TODO: Log stuff
         if test_mode:
-            self.logger.log_stat("test_return", episode_return, self.T_env)
+            self.logger.log_stat("test_return", episode_return, self.t_env)
         else:
-            self.logger.log_stat("train_return", episode_return, self.T_env)
+            self.logger.log_stat("train_return", episode_return, self.t_env)
+            self.logger.log_stat("ep_length", self.t, self.t_env)
+            self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
 
         return self.batch
