@@ -86,12 +86,14 @@ class EpisodeBatch:
 
     def update(self, data, bs=slice(None), ts=slice(None)):
         slices = self._parse_slices((bs, ts))
-        # TODO: what does marked_filled do?
-        marked_filled = False
+        marked_filled = False  # only do filled for the first key we update
         for k, v in data.items():
             if k in self.data.transition_data:
                 target = self.data.transition_data
-                if not marked_filled: target["filled"][slices] = 1
+                if not marked_filled:
+                    target["filled"][slices] = 1
+                else:
+                    marked_filled = True
                 _slices = slices
             elif k in self.data.episode_data:
                 target = self.data.episode_data

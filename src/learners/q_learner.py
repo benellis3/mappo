@@ -20,10 +20,12 @@ class QLearner:
 
         # Get the relevant quantities
         # can't bootstrap from last step UNLESS TERMINAL: TODO: handle this case!
-        rewards = batch["reward"][:, :-1]
-        actions = batch["actions"][:, :-1]
-        terminated = batch["terminated"][:, :-1]
-        mask = batch["filled"][:, :-1]
+        rewards = batch["reward"]
+        actions = batch["actions"]
+        terminated = batch["terminated"]
+        mask = batch["filled"]
+        # can't train using last step unless terminal
+        mask[:, -1] = terminated[:, -1]
 
         # Calculate the Q-Values necessary for the target
         target_mac_out = []
@@ -31,6 +33,7 @@ class QLearner:
         for t in range(batch.max_seq_length):
             target_agent_outs = self.target_mac.forward(batch, t=t)
             target_mac_out.append(target_agent_outs)
+
         target_mac_out = th.stack(target_mac_out, dim=1)  # Concat across time
 
         # We don't need the first timesteps Q-Value estimate for calculating targets
@@ -43,13 +46,16 @@ class QLearner:
         # Max over target Q-Values
         target_max_qvals = target_mac_out.max(dim=3)[0]
 
+        # Add dummy target to allow training when last state is terminal
+        target_max_qvals = th.cat([target_max_qvals, th.zeros_like(target_max_qvals[:, -1:])], dim=1)
+
         # Calculate 1-step Q-Learning targets
         targets = rewards + self.args.gamma * (1 - terminated).float() * target_max_qvals
 
         # Calculate estimated Q-Values
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
-        for t in range(batch.max_seq_length - 1):  # Don't need to calculate it for the last possible timestep
+        for t in range(batch.max_seq_length):
             agent_outs = self.mac.forward(batch, t=t)
             mac_out.append(agent_outs)
         mac_out = th.stack(mac_out, dim=1)  # Concat over time again
