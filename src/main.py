@@ -9,6 +9,7 @@ from sacred.utils import apply_backspaces_and_linefeeds
 import sys
 import torch as th
 from utils.logging import get_logger
+import yaml
 
 from run import run
 
@@ -23,18 +24,9 @@ results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
 mongo_client = None
 
-def setup_mongodb(conf_str):
-    # The central mongodb for our deepmarl experiments
-    # You need to set up local port forwarding to ensure this local port maps to the server
-    # if conf_str == "":
-    # db_host = "localhost"
-    # db_port = 27027 # Use a different port from the default mongodb port to avoid a potential clash
 
-    from config.mongodb import REGISTRY as mongo_REGISTRY
-    mongo_conf = mongo_REGISTRY[conf_str](None, None)
-    db_url = mongo_conf["db_url"]
-    db_name = mongo_conf["db_name"]
-
+# Function to connect to a mongodb and add a Sacred MongoObserver
+def setup_mongodb(db_url, db_name):
     client = None
     mongodb_fail = True
 
@@ -61,6 +53,7 @@ def setup_mongodb(conf_str):
 
     return client
 
+
 @ex.main
 def my_main(_run, _config, _log, env_args):
     global mongo_client
@@ -74,7 +67,8 @@ def my_main(_run, _config, _log, env_args):
     run(_run, _config, _log, mongo_client)
 
     # force exit
-    os._exit()
+    os._exit(0)
+
 
 if __name__ == '__main__':
     import os
@@ -82,69 +76,69 @@ if __name__ == '__main__':
     from copy import deepcopy
     params = deepcopy(sys.argv)
 
-    defaults = []
-    config_dic = {}
+    # Run stuff using python main.py --config=iql.yaml --env-config=sc2.yaml with ...
 
-    # manually parse for experiment tags
-    del_indices = []
-    exp_name = None
+    # Get the defaults from default.yaml
+    with open(os.path.join(os.path.dirname(__file__), "config", "default.yaml"), "r") as f:
+        try:
+            config_dict = yaml.load(f)
+        except yaml.YAMLError as exc:
+            assert False, "default.yaml error: {}".format(exc)
+
+    # Load algorithm default config
+    algo_config_name = None
     for _i, _v in enumerate(params):
-        if _v.split("=")[0] == "--exp_name":
-            del_indices.append(_i)
-            exp_name = _v.split("=")[1]
+        if _v.split("=")[0] == "--config":
+            algo_config_name = _v.split("=")[1]
+            del params[_i]
             break
 
-    # load experiment config (if there is such as thing)
-    exp_dic = None
-    if exp_name is not None:
-        from config.experiments import REGISTRY as exp_REGISTRY
-        assert exp_name in exp_REGISTRY, "Unknown experiment name: {}".format(exp_name)
-        exp_dic = exp_REGISTRY[exp_name](None, logger)
-        if "defaults" in exp_dic:
-            defaults.extend(exp_dic["defaults"].split(" "))
-            del exp_dic["defaults"]
-        config_dic = deepcopy(exp_dic)
+    if algo_config_name is not None:
+        with open(os.path.join(os.path.dirname(__file__), "config", "algs", "{}.yaml".format(algo_config_name)), "r") as f:
+            try:
+                config_algo_dict = yaml.load(f)
+            except yaml.YAMLError as exc:
+                assert False, "{}.yaml error: {}".format(algo_config_name, exc)
+        config_dict = {**config_dict, **config_algo_dict}
 
-    # check for defaults in command line parameters
+    # Load env default config
+    # Code duplication =)
+    env_config_name = None
     for _i, _v in enumerate(params):
-        if _v.split("=")[0] == "--default_cfgs":
-            del_indices.append(_i)
-            defaults.extend(_v.split("=")[1].split(" "))
+        if _v.split("=")[0] == "--env-config":
+            env_config_name = _v.split("=")[1]
+            del params[_i]
             break
 
-    # load default configs in order
-    for _d in defaults:
-        from config.defaults import REGISTRY as def_REGISTRY
-        def_dic = def_REGISTRY[_d](config_dic, logger)
-        # config_dic = _merge_dicts(config_dic, def_dic)
-        config_dic = {**config_dic, **def_dic}
-
-    #  finally merge with experiment config
-    if exp_name is not None:
-        # config_dic = _merge_dicts(config_dic, exp_dic)
-        config_dic = {**config_dic, **exp_dic}
-
-    # add results path to config
-    config_dic["local_results_path"] = results_path
+    if env_config_name is not None:
+        with open(os.path.join(os.path.dirname(__file__), "config", "envs", "{}.yaml".format(env_config_name)), "r") as f:
+            try:
+                config_env_dict = yaml.load(f)
+            except yaml.YAMLError as exc:
+                assert False, "{}.yaml error: {}".format(env_config_name, exc)
+        config_dict = {**config_dict, **config_env_dict}
 
     # now add all the config to sacred
-    ex.add_config(config_dic)
+    ex.add_config(config_dict)
 
     # Check if we don't want to save to sacred mongodb
     no_mongodb = False
 
     for _i, _v in enumerate(params):
         if "--no-mongo" == _v:
-            del_indices.append(_i)
+            del params[_i]
             no_mongodb = True
             break
 
-    # delete indices that contain custom experiment tags
-    for _i in sorted(del_indices, reverse=True):
-        del params[_i]
+    # If there is no url set for the mongodb, we cannot use it
+    if not no_mongodb and "db_url" not in config_dict:
+        no_mongodb = True
+        logger.error("No 'db_url' to use for Sacred MongoDB")
 
     if not no_mongodb:
-        mongo_client = setup_mongodb(config_dic["mongodb_profile"])
+        db_url = config_dict["db_url"]
+        db_name = config_dict["db_name"]
+        mongo_client = setup_mongodb(db_url, db_name)
 
     # Save to disk by default for sacred, even if we are using the mongodb
     logger.info("Saving to FileStorageObserver in results/sacred.")
