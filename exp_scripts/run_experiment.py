@@ -59,9 +59,8 @@ def main(config_name, run=False):
     server_list = config.server_list
     param_dicts = config.param_dicts
     n_repeat = config.n_repeat
-    exp_name = "--exp_name='{}'".format(config.exp_name)
-    # branch = config.branch
-    # print(len(param_dicts))
+    config_name = "--config='{}'".format(config.config)
+    config_env = "--env-config='{}'".format(config.env_config)
 
     all_experiments = [exp for param_dict in param_dicts for exp in gen_params_prod(param_dict)]
     n_experiments = len(all_experiments)
@@ -105,7 +104,7 @@ def main(config_name, run=False):
                         break
                     params = all_experiments[exp_idx]
                     # params += "server=" + server +" gpu=" + str(gpu)
-                    params = "{} {} LABEL={}".format(exp_name, params, config.LABEL)
+                    params = "{} {} {} label={}".format(config_name, config_env, params, config.label)
                     log.append(params)
                     # print(params)
                     if not run:

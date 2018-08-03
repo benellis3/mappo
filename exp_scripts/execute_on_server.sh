@@ -20,7 +20,7 @@ echo "Updating git repo"
 cd $EXP_DIR/pymarl
 # echo "REMEMBER TO ALLOW UPDATING OF THE REPO IN execute_on_server.sh AFTER TESTING!"
 git fetch -q origin
-git reset --hard origin/tabz -q
+git reset --hard origin/refactor -q
 
 # Run the experiment $N_REPEAT times on GPU $GPU
 bash ./run.sh $GPU_ID "bash exp_scripts/repeat_exp.sh $N_REPEAT $PARAMS"
