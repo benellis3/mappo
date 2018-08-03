@@ -13,6 +13,6 @@ target_update_interval: 200
 
 # use the Q_Learner to train
 learner: "q_learner"
-mixer: None
+mixer: "vdn"
 
 name: "iql"

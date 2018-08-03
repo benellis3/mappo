@@ -81,6 +81,7 @@ def run_sequential(args, logger):
     env_info = runner.env.get_env_info()
     args.n_agents = env_info["n_agents"]
     args.n_actions = env_info["n_actions"]
+    args.state_shape = env_info["state_shape"]
 
     # Default/Base scheme
     scheme = {
@@ -130,6 +131,10 @@ def run_sequential(args, logger):
         if buffer.can_sample(args.batch_size):
             episode_sample = buffer.sample(args.batch_size)
 
+            # Truncate batch to only filled timesteps
+            max_ep_t = episode_sample.max_t_filled()
+            episode_sample = episode_sample[:, :max_ep_t]
+
             learner.train(episode_sample, runner.t_env, episode)
 
         # Execute test runs once in a while
@@ -160,8 +165,8 @@ def run_sequential(args, logger):
         episode += args.batch_size_run
 
         if (runner.t_env - last_log_T) >= args.log_interval:
-            logger.print_recent_stats()
             logger.log_stat("episode", episode, runner.t_env)
+            logger.print_recent_stats()
             last_log_T = runner.t_env
 
     logger.console_logger.info("Finished Training")

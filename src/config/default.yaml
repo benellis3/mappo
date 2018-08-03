@@ -23,7 +23,7 @@ buffer_size: 32 # Size of the replay buffer
 lr: 0.0005
 grad_norm_clip: 10 # Reduce magnitude of gradients above this L2 norm
 
-# --- Agent parmeters ---
+# --- Agent parameters ---
 agent: "rnn" # Default rnn agent
 rnn_hidden_dim: 64 # Size of hidden state for default rnn agent
 obs_agent_id: True # Include the agent's one_hot id in the observation

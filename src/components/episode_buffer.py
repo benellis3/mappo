@@ -50,7 +50,7 @@ class EpisodeBatch:
 
         assert "filled" not in scheme, '"filled" is a reserved key for masking.'
         scheme.update({
-            "filled": {"vshape": (1,)},
+            "filled": {"vshape": (1,), "dtype": th.long},
         })
 
         for field_key, field_info in scheme.items():
@@ -195,6 +195,9 @@ class EpisodeBatch:
                 # Leave slices and lists as is
                 parsed.append(item)
         return parsed
+
+    def max_t_filled(self):
+        return th.sum(self.data.transition_data["filled"], 1).max(0)[0]
 
     def __repr__(self):
         return "EpisodeBatch. Batch Size:{} Max_seq_len:{} Keys:{} Groups:{}".format(self.batch_size,

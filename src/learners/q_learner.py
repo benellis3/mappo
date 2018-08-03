@@ -1,5 +1,7 @@
 import copy
 from components.episode_buffer import EpisodeBatch
+from modules.mixers.vdn import VDNMixer
+from modules.mixers.qmix import QMixer
 import torch as th
 from torch.optim import RMSprop
 
@@ -15,17 +17,26 @@ class QLearner:
 
         self.last_target_update_episode = 0
 
+        self.mixer = None
+        if args.mixer is not None:
+            if args.mixer == "vdn":
+                self.mixer = VDNMixer()
+            elif args.mixer == "qmix":
+                self.mixer = QMixer(args)
+            else:
+                raise ValueError("Mixer {} not recognised.".format(args.mixer))
+            self.params += list(self.mixer.parameters())
+            self.target_mixer = copy.deepcopy(self.mixer)
+
         # a little wasteful to deepcopy (e.g. duplicates action selector), but should work for any MAC
         self.target_mac = copy.deepcopy(mac)
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
-
         # Get the relevant quantities
-        # can't bootstrap from last step UNLESS TERMINAL: TODO: handle this case!
         rewards = batch["reward"]
         actions = batch["actions"]
         terminated = batch["terminated"]
-        mask = batch["filled"]
+        mask = batch["filled"].float()
         # can't train using last step unless terminal
         mask[:, -1] = terminated[:, -1]
 
@@ -65,6 +76,11 @@ class QLearner:
         # Pick the Q-Values for the actions taken by each agent
         chosen_action_qvals = th.gather(mac_out, dim=3, index=actions).squeeze(3)  # Remove the last dim
 
+        # Mix
+        if self.mixer is not None:
+            chosen_action_qvals = self.mixer(chosen_action_qvals, batch)
+            targets = self.target_mixer(targets, batch)
+
         # Td-error
         td_error = (chosen_action_qvals - targets.detach())
 
@@ -92,4 +108,6 @@ class QLearner:
 
     def _update_targets(self):
         self.target_mac.load_state(self.mac)
+        if self.mixer is not None:
+            self.target_mixer.load_state_dict(self.mixer.state_dict())
         self.logger.console_logger.info("Updated target network")
