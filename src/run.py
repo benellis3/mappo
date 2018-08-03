@@ -25,7 +25,7 @@ def run(_run, _config, _log, pymongo_client):
     _config = args_sanity_check(_config, _log)
 
     args = SN(**_config)
-    args.device = "gpu" if args.use_cuda else "cpu"
+    args.device = "cuda" if args.use_cuda else "cpu"
 
     # setup loggers
     logger = Logger(_log)

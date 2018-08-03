@@ -84,16 +84,14 @@ class EpisodeBatch:
             v = v.to(device)
         self.device = device
 
-    def update(self, data, bs=slice(None), ts=slice(None)):
+    def update(self, data, bs=slice(None), ts=slice(None), mark_filled=True):
         slices = self._parse_slices((bs, ts))
-        marked_filled = False  # only do filled for the first key we update
         for k, v in data.items():
             if k in self.data.transition_data:
                 target = self.data.transition_data
-                if not marked_filled:
+                if mark_filled:
                     target["filled"][slices] = 1
-                else:
-                    marked_filled = True
+                    mark_filled = False
                 _slices = slices
             elif k in self.data.episode_data:
                 target = self.data.episode_data
@@ -215,10 +213,11 @@ class ReplayBuffer(EpisodeBatch):
     def insert_episode_batch(self, ep_batch):
         if self.buffer_index + ep_batch.batch_size <= self.buffer_size:
             self.update(ep_batch.data.transition_data,
-                                        slice(self.buffer_index, self.buffer_index + ep_batch.batch_size),
-                                        slice(0, ep_batch.max_seq_length))
+                        slice(self.buffer_index, self.buffer_index + ep_batch.batch_size),
+                        slice(0, ep_batch.max_seq_length),
+                        mark_filled=False)
             self.update(ep_batch.data.episode_data,
-                                     slice(self.buffer_index, self.buffer_index + ep_batch.batch_size))
+                        slice(self.buffer_index, self.buffer_index + ep_batch.batch_size))
             self.buffer_index = (self.buffer_index + ep_batch.batch_size)
             self.episodes_in_buffer = max(self.episodes_in_buffer, self.buffer_index)
             self.buffer_index = self.buffer_index % self.buffer_size
