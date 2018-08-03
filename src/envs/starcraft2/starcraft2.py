@@ -150,6 +150,8 @@ class SC2(MultiAgentEnv):
         self.timeouts = 0
         self.force_restarts = 0
 
+        self.last_stats = None
+
     def map_settings(self):
 
         if self.map_name in stalker_zaelot_maps:
@@ -314,9 +316,13 @@ class SC2(MultiAgentEnv):
 
     def step(self, actions):
 
+        # TODO: Check this, maybe we want to be able to handle tensors here
+        # Make actions a list of ints
+        actions = [int(a) for a in actions]
+
         self.last_action = self.one_hot(actions, self.n_actions)
 
-      # Collect individual actions
+        # Collect individual actions
         sc_actions = []
         for a_id, action in enumerate(actions):
             if not self.heuristic:
@@ -1232,6 +1238,33 @@ class SC2(MultiAgentEnv):
         stats["timeouts"] = self.timeouts
         stats["restarts"] = self.force_restarts
         return stats
+
+    def get_agg_stats(self, stats):
+
+        current_stats = {}
+        for stat in stats:
+            for _k, _v in stat.items():
+                if not (_k in current_stats):
+                    current_stats[_k] = []
+                if _k in ["win_rate"]:
+                    continue
+                current_stats[_k].append(_v)
+
+        # average over stats
+        aggregate_stats = {}
+        for _k, _v in current_stats.items():
+            if _k in ["win_rate"]:
+                aggregate_stats[_k] = np.mean([ (_a - _b)/(_c - _d) for _a, _b, _c, _d in zip(current_stats["battles_won"],
+                                                                                              [0]*len(current_stats["battles_won"]) if self.last_stats is None else self.last_stats["battles_won"],
+                                                                                              current_stats["battles_game"],
+                                                                                              [0]*len(current_stats["battles_game"]) if self.last_stats is None else
+                                                                                              self.last_stats["battles_game"])
+                                                if (_c - _d) != 0.0])
+            else:
+                aggregate_stats[_k] = np.mean([_a-_b for _a, _b in zip(_v, [0]*len(_v) if self.last_stats is None else self.last_stats[_k])])
+
+        self.last_stats = current_stats
+        return aggregate_stats
 
 # from components.transforms_old import _seq_mean
 

@@ -18,6 +18,7 @@ class EpisodeRunner:
         self.t_env = 0
 
         self.test_rewards = []
+        self.test_env_stats = []
 
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit, preprocess=preprocess)
@@ -72,17 +73,29 @@ class EpisodeRunner:
             self.t_env += self.t
 
         # TODO: Log stuff
+
+        # TODO: Sort out sc2/env stats logging
+        env_stats = self.env.get_stats()
+
         if test_mode:
             self.test_rewards.append(episode_return)
+            self.test_env_stats.append(env_stats)
             if len(self.test_rewards) == self.args.test_nepisode:
                 # Finished testing for test_nepisodes, log stats about it for convenience
                 self.logger.log_stat("mean_test_return", np.mean(self.test_rewards), self.t_env)
                 self.logger.log_stat("std_test_return", np.std(self.test_rewards), self.t_env)
                 self.test_rewards = []
+
+                for k, v in self.env.get_agg_stats([env_stats]).items():
+                    self.logger.log_stat("test_mean_" + k, v, self.t_env)
+                self.test_env_stats = []
             self.logger.log_stat("test_return", episode_return, self.t_env)
         else:
             self.logger.log_stat("train_return", episode_return, self.t_env)
             self.logger.log_stat("ep_length", self.t, self.t_env)
             self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
+            # Log the env stats
+            for k, v in self.env.get_agg_stats([env_stats]).items():
+                self.logger.log_stat(k, v, self.t_env)
 
         return self.batch

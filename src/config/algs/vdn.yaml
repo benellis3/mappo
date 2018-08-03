@@ -1,4 +1,4 @@
-# --- IQL specific parameters ---
+# --- VDN specific parameters ---
 
 # use epsilon greedy action selector
 action_selector: "epsilon_greedy"
@@ -15,4 +15,4 @@ target_update_interval: 200
 learner: "q_learner"
 mixer: "vdn"
 
-name: "iql"
+name: "vdn"

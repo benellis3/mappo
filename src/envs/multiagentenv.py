@@ -38,6 +38,10 @@ class MultiAgentEnv(object):
     def get_stats(self):
         raise NotImplementedError
 
+    # TODO: Temp hack
+    def get_agg_stats(self, stats):
+        return {}
+
     def reset(self):
         """ Returns initial observations and states"""
         raise NotImplementedError

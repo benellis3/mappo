@@ -42,8 +42,8 @@ class Logger:
         for i, (k, v) in enumerate(self.stats.items()):
             if k == "episode":
                 continue
-            item = "{:.4f}".format(np.mean([x[1] for x in self.stats[k][-100:]]))
-            log_str += "{:<18}{:>8}".format(k + ":", item)
+            item = "{:.4f}".format(np.mean([x[1] for x in self.stats[k][-10:]]))
+            log_str += "{:<25}{:>8}".format(k + ":", item)
             log_str += "\n" if (i + 1) % 4 == 0 else "\t"
         self.console_logger.info(log_str)
 
