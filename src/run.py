@@ -111,6 +111,9 @@ def run_sequential(args, logger):
     # Learner
     learner = le_REGISTRY[args.learner](mac, logger, args)
 
+    if args.use_cuda:
+        learner.cuda()
+
     # start training
     episode = 0
     last_test_T = 0

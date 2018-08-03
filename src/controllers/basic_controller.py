@@ -34,6 +34,9 @@ class BasicMAC:
     def load_state(self, other_mac):
         self.agent.load_state_dict(other_mac.agent.state_dict())
 
+    def cuda(self):
+        self.agent.cuda()
+
     def _build_agents(self, input_shape):
         self.agent = agent_REGISTRY[self.args.agent](input_shape, self.args)
 

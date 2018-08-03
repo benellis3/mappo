@@ -3,6 +3,7 @@ from functools import partial
 from components.episode_buffer import EpisodeBatch
 import numpy as np
 
+
 class EpisodeRunner:
 
     def __init__(self, args, logger):
@@ -58,7 +59,6 @@ class EpisodeRunner:
             reward, terminated, env_info = self.env.step(actions[0])
             episode_return += reward
 
-            # TODO: Use a better name
             post_transition_data = {
                 "actions": actions,
                 "reward": [(reward,)],
@@ -71,8 +71,6 @@ class EpisodeRunner:
 
         if not test_mode:
             self.t_env += self.t
-
-        # TODO: Log stuff
 
         # TODO: Sort out sc2/env stats logging
         env_stats = self.env.get_stats()
