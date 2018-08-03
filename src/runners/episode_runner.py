@@ -22,7 +22,8 @@ class EpisodeRunner:
         self.test_env_stats = []
 
     def setup(self, scheme, groups, preprocess, mac):
-        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit, preprocess=preprocess)
+        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit,
+                                 preprocess=preprocess, device=self.args.device)
         self.mac = mac
         # TODO: Remove these if the runner doesn't need them
         self.scheme = scheme

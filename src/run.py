@@ -25,6 +25,7 @@ def run(_run, _config, _log, pymongo_client):
     _config = args_sanity_check(_config, _log)
 
     args = SN(**_config)
+    args.device = "gpu" if args.use_cuda else "cpu"
 
     # setup loggers
     logger = Logger(_log)
@@ -34,9 +35,6 @@ def run(_run, _config, _log, pymongo_client):
                                        indent=4,
                                        width=1)
     _log.info("\n\n" + experiment_params + "\n")
-
-    # TODO: Do we need to print this?
-    _log.info("OS ENVIRON KEYS: {}\n\n".format(os.environ))
 
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -100,7 +98,8 @@ def run_sequential(args, logger):
     }
 
     # TODO: Add device
-    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"], preprocess=preprocess)
+    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"],
+                          preprocess=preprocess, device=args.device)
 
     # Setup multiagent controller here
     mac = mac_REGISTRY[args.mac](buffer.scheme, groups, args)  # Dummy for testing
