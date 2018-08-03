@@ -2,8 +2,6 @@
 
 env: sc2
 
-env_stats_aggregator: "sc2"
-
 env_args:
   map_name: "3m_3m" # 3 marines by default
   difficulty: "3"
@@ -22,3 +20,8 @@ env_args:
   obs_instead_of_state: False
   continuing_episode: False
   game_version: "3.16.1"
+
+test_nepisode: 20
+test_interval: 10000
+log_interval: 5000
+t_max: 2000000
