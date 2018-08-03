@@ -2,6 +2,10 @@ from run_experiment import extend_param_dicts
 
 server_list = [
     ("brown", [0,1,2,3,4,5,6,7], 2),
+    ("gollum", [0,1,2,3,4,5,6,7], 2),
+    ("gandalf", [1,2,3,4,5,6,7], 2),
+    ("gimli", [0,3,5,7], 2)
+    ("woma", [1,2,3,4,5,6,7], 1)
 ]
 
 label = "QMIX_Refactor_Test"
