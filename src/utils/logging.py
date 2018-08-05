@@ -33,9 +33,11 @@ class Logger:
 
         if self.use_sacred and to_sacred:
             if key in self.sacred_info:
-                self.sacred_info[key].append((t, value))
+                self.sacred_info["{}_T".format(key)].append(t)
+                self.sacred_info[key].append(value)
             else:
-                self.sacred_info[key] = [(t, value)]
+                self.sacred_info["{}_T".format(key)] = [t]
+                self.sacred_info[key] = [value]
 
     def print_recent_stats(self):
         log_str = "Recent Stats | t_env: {:>10} | Episode: {:>8}\n".format(*self.stats["episode"][-1])

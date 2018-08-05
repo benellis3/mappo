@@ -102,9 +102,10 @@ class QLearner:
 
         self.logger.log_stat("loss", loss.item(), t_env)
         self.logger.log_stat("grad_norm", grad_norm, t_env)
-        self.logger.log_stat("td_error", (masked_td_error.sum().item()/mask.sum()), t_env)
-        self.logger.log_stat("mean_q_value", (chosen_action_qvals * mask).sum().item()/(mask.sum() * self.args.n_agents), t_env)
-        self.logger.log_stat("mean_target", (targets * mask).sum().item()/(mask.sum() * self.args.n_agents), t_env)
+        mask_elems = mask.sum().item()
+        self.logger.log_stat("td_error", (masked_td_error.sum().item()/mask_elems), t_env)
+        self.logger.log_stat("mean_q_value", (chosen_action_qvals * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
+        self.logger.log_stat("mean_target", (targets * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
 
     def _update_targets(self):
         self.target_mac.load_state(self.mac)
