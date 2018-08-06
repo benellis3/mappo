@@ -168,8 +168,22 @@ class ParallelRunner:
 
         # TODO: Sort out sc2/env stats logging
         if test_mode:
-            # TODO: Implement this!
-            pass
+            self.test_rewards.extend(episode_returns)
+            self.test_env_stats.extend(env_stats)
+            n_test_runs = max(1, self.args.test_nepisode // self.batch_size)
+            if len(self.test_rewards) == n_test_runs:
+                self.logger.log_stat("mean_test_return", np.mean(self.test_rewards), self.t_env)
+                self.logger.log_stat("std_test_return", np.std(self.test_rewards), self.t_env)
+                for test_return in self.test_rewards:
+                    self.logger.log_stat("test_return", test_return, self.t_env)
+
+                # TODO: Move env stat aggregator out of environment
+                self.parent_conns[0].send(("agg_stats", self.test_env_stats))
+                aggregated_stats = self.parent_conns[0].recv()
+                for k, v in aggregated_stats.items():
+                    self.logger.log_stat("mean_test_{}".format(k), v, self.t_env)
+                self.test_rewards = []
+                self.test_env_stats = []
         elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
             self.logger.log_stat("mean_train_return", np.mean(episode_returns), self.t_env)
             self.logger.log_stat("std_train_return", np.std(episode_returns), self.t_env)
@@ -181,7 +195,7 @@ class ParallelRunner:
             # TODO: Move env stat aggregator out of environment
             self.parent_conns[0].send(("agg_stats", env_stats))
             aggregated_stats = self.parent_conns[0].recv()
-            for k, v in aggregated_stats:
+            for k, v in aggregated_stats.items():
                 self.logger.log_stat("mean_{}".format(k), v, self.t_env)
 
             self.log_train_stats_t = self.t_env
