@@ -1,0 +1,17 @@
+# --- IQL specific parameters ---
+
+# use epsilon greedy action selector
+action_selector: "multinomial"
+
+buffer_size: 32
+batch_size_run: 1
+
+# update the target network every {} episodes
+target_update_interval: 200
+
+# use COMA
+agent_output_type: "pi_logits"
+learner: "coma_learner"
+mixer: # mixer becomes None
+
+name: "iql"

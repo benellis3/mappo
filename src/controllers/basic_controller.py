@@ -9,6 +9,7 @@ class BasicMAC:
         self.args = args
         input_shape = self._get_input_shape(scheme)
         self._build_agents(input_shape)
+        self.agent_output_type = args.agent_output_type
 
         self.action_selector = action_REGISTRY[args.action_selector](args)
 
@@ -16,6 +17,8 @@ class BasicMAC:
 
     def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
         agent_outputs = self.forward(ep_batch, t_ep)
+        if self.agent_output_type == "pi_logits":
+            agent_outputs = agent_outputs.softmax(dim=-1)
         # Only select actions for the selected batch elements in bs
         avail_actions = ep_batch["avail_actions"][bs, t_ep]
         chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions, t_env, test_mode=test_mode)

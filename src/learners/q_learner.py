@@ -7,13 +7,12 @@ from torch.optim import RMSprop
 
 
 class QLearner:
-    def __init__(self, mac, logger, args):
+    def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.mac = mac
         self.logger = logger
 
         self.params = list(mac.parameters())
-        self.optimiser = RMSprop(params=self.params, lr=args.lr)
 
         self.last_target_update_episode = 0
 
@@ -27,6 +26,8 @@ class QLearner:
                 raise ValueError("Mixer {} not recognised.".format(args.mixer))
             self.params += list(self.mixer.parameters())
             self.target_mixer = copy.deepcopy(self.mixer)
+
+        self.optimiser = RMSprop(params=self.params, lr=args.lr)
 
         # a little wasteful to deepcopy (e.g. duplicates action selector), but should work for any MAC
         self.target_mac = copy.deepcopy(mac)

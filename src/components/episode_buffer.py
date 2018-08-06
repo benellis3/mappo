@@ -232,9 +232,12 @@ class ReplayBuffer(EpisodeBatch):
 
     def sample(self, batch_size):
         assert self.can_sample(batch_size)
-        # Uniform sampling only atm
-        ep_ids = np.random.choice(self.episodes_in_buffer, batch_size, replace=False)
-        return self[ep_ids]
+        if self.episodes_in_buffer == batch_size:
+            return self
+        else:
+            # Uniform sampling only atm
+            ep_ids = np.random.choice(self.episodes_in_buffer, batch_size, replace=False)
+            return self[ep_ids]
 
     def __repr__(self):
         return "ReplayBuffer. {}/{} episodes. Keys:{} Groups:{}".format(self.episodes_in_buffer,

@@ -1,279 +1,57 @@
-import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from components.transforms_old import _check_inputs_validity, _to_batch, _from_batch, _adim, _bsdim, _tdim, _vdim
-from models.basic import RNN as RecurrentAgent, DQN as NonRecurrentAgent
-
-class COMAQFunction(nn.Module):
-    # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
-
-    def __init__(self, input_shapes, output_shapes={}, layer_args={}, n_actions=None, args=None):
-
-        super(COMAQFunction, self).__init__()
-
-        self.args = args
-        self.n_actions = n_actions
-
-        # Set up input regions automatically if required (if sensible)
-        self.input_shapes = {}
-        assert set(input_shapes.keys()) == {"main"}, \
-            "set of input_shapes does not coincide with model structure!"
-        self.input_shapes.update(input_shapes)
-
-        # Set up output_shapes automatically if required
-        self.output_shapes = {}
-        self.output_shapes["qvalues"] = self.n_actions # qvals
-        self.output_shapes.update(output_shapes)
-
-        # Set up layer_args automatically if required
-        self.layer_args = {}
-        self.layer_args["fc1"] = {"in":self.input_shapes["main"], "out":64}
-        self.layer_args["fc2"] = {"in":self.layer_args["fc1"]["out"], "out":self.output_shapes["qvalues"]}
-        self.layer_args.update(layer_args)
-
-        # Set up network layers
-        self.fc1 = nn.Linear(self.layer_args["fc1"]["in"], self.layer_args["fc1"]["out"])
-        self.fc2 = nn.Linear(self.layer_args["fc2"]["in"], self.layer_args["fc2"]["out"])
-
-        # DEBUG
-        # self.fc2.weight.data.zero_()
-        # self.fc2.bias.data.zero_()
-
-    def init_hidden(self):
-        """
-        There's no hidden state required for this model.
-        """
-        pass
-
-
-    def forward(self, inputs, tformat):
-        # _check_inputs_validity(inputs, self.input_shapes, tformat, allow_nonseq=True)
-
-        main, params, tformat = _to_batch(inputs.get("main"), tformat)
-        x = F.relu(self.fc1(main))
-        qvalues = self.fc2(x)
-        return _from_batch(qvalues, params, tformat)
-
-class COMAAdvantage(nn.Module):
-    # modelled after https://github.com/oxwhirl/hardercomns/blob/master/code/model/StarCraftMicro.lua 5e00920
-
-    def __init__(self, n_actions, input_shapes, output_shapes={}, layer_args={}, args=None):
-        """
-        This model contains no network layers
-        """
-        super(COMAAdvantage, self).__init__()
-        self.args = args
-        self.n_actions = n_actions
-
-        # Set up input regions automatically if required (if sensible)
-        self.input_shapes = {}
-        assert set(input_shapes.keys()) == {"qvalues", "agent_action", "agent_policy", "avail_actions"},\
-            "set of input_shapes does not coincide with model structure!"
-        self.input_shapes.update(input_shapes)
-
-        pass
-
-    def init_hidden(self):
-        """
-        There's no hidden state required for this model.
-        """
-        pass
-
-
-    def forward(self, inputs, tformat, baseline = True): # DEBUG!!
-        # _check_inputs_validity(inputs, self.input_shapes, tformat)
-
-        qvalues, params_qv, tformat_qv = _to_batch(inputs.get("qvalues").clone(), tformat)
-        agent_action, params_aa, tformat_aa = _to_batch(inputs.get("agent_action"), tformat)
-        agent_policy, params_ap, tformat_ap = _to_batch(inputs.get("agent_policy"), tformat)
-
-        if baseline:
-        # Fuse to COMA advantage
-            baseline = th.bmm(
-                agent_policy.unsqueeze(1),
-                qvalues.unsqueeze(2)).squeeze(2)
-        else:
-            baseline = 0
-
-        _aa = agent_action.clone()
-        _aa = _aa.masked_fill(_aa!=_aa, 0.0)
-        Q = th.gather(qvalues, 1, _aa.long())
-        Q = Q.masked_fill(agent_action!=agent_action, float("nan"))
-
-        A = Q - baseline
-
-        return _from_batch(A, params_qv, tformat_qv), _from_batch(Q, params_qv, tformat_qv), tformat
-
 
 class COMACritic(nn.Module):
-
-    """
-    Concats COMAQFunction and COMAAdvantage together to an advantage and qvalue function
-    """
-
-    def __init__(self, input_shapes, n_actions, output_shapes={}, layer_args={}, args=None):
-        """
-        This model contains no network layers but only sub-models
-        """
-
+    def __init__(self, scheme, args):
         super(COMACritic, self).__init__()
+
         self.args = args
-        self.n_actions = n_actions
+        self.n_actions = args.n_actions
+        self.n_agents = args.n_agents
 
-        # Set up input regions automatically if required (if sensible)
-        self.input_shapes = {}
-        self.input_shapes.update(input_shapes)
+        input_shape = self._get_input_shape(scheme)
 
-        # Set up output_shapes automatically if required
-        self.output_shapes = {}
-        self.output_shapes["advantage"] = 1
-        self.output_shapes["qvalue"] = 1
-        self.output_shapes.update(output_shapes)
-
-        # Set up layer_args automatically if required
-        self.layer_args = {}
-        self.layer_args["qfunction"] = {}
-        self.layer_args.update(layer_args)
-
-        self.COMAQFunction = COMAQFunction(input_shapes={"main":self.input_shapes["qfunction"]},
-                                           output_shapes={},
-                                           layer_args={"main":self.layer_args["qfunction"]},
-                                           n_actions = self.n_actions,
-                                           args=self.args)
-
-        self.COMAAdvantage = COMAAdvantage(input_shapes={"avail_actions":self.input_shapes["avail_actions"],
-                                                         "qvalues":self.COMAQFunction.output_shapes["qvalues"],
-                                                         "agent_action":self.input_shapes["agent_action"],
-                                                         "agent_policy":self.input_shapes["agent_policy"]},
-                                         output_shapes={},
-                                         n_actions=self.n_actions,
-                                         args=self.args)
-
-        pass
-
-    def init_hidden(self):
-        """
-        There's no hidden state required for this model.
-        """
-        pass
+        # Set up network layers
+        self.fc1 = nn.Linear(input_shape, 128)
+        self.fc2 = nn.Linear(128, self.n_actions)
 
 
-    def forward(self, inputs, tformat, baseline=True):
-        #_check_inputs_validity(inputs, self.input_shapes, tformat)
+    def forward(self, batch):
+        inputs = self._build_inputs(batch)
+        x = F.relu(self.fc1(inputs))
+        q = self.fc2(x)
+        return q
 
-        qvalues = self.COMAQFunction(inputs={"main":inputs["qfunction"]},
-                                     tformat=tformat)
+    def _build_inputs(self, batch):
+        bs = batch.batch_size
+        max_t = batch.max_seq_length
+        inputs = []
+        # state
+        inputs.append(batch["state"].unsqueeze(2).repeat(1, 1, self.n_agents, 1))
 
-        advantage, qvalue, _ = self.COMAAdvantage(inputs={"avail_actions":inputs["avail_actions"],
-                                                          "qvalues":qvalues,
-                                                          "agent_action":inputs["agent_action"],
-                                                          "agent_policy":inputs["agent_policy"]},
-                                                  tformat=tformat,
-                                                  baseline=baseline)
-        return {"advantage": advantage, "qvalue": qvalue}, tformat
+        # actions (masked out by agent)
+        actions = batch["actions_onehot"].view(bs, max_t, 1, -1).repeat(1, 1, self.n_agents, 1)
+        agent_mask = (1 - th.eye(self.n_agents, device=batch.device))
+        agent_mask = agent_mask.view(-1, 1).repeat(1, self.n_actions).view(self.n_agents, -1)
+        inputs.append(actions * agent_mask.unsqueeze(0).unsqueeze(0))
 
+        # last actions
+        last_actions = th.cat([th.zeros_like(batch["actions_onehot"][:,0:1]), batch["actions_onehot"][:, 1:]], dim=1)
+        last_actions = last_actions.view(bs, max_t, 1, -1).repeat(1, 1, self.n_agents, 1)
+        inputs.append(last_actions)
 
+        inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, max_t, -1, -1))
 
-class COMANonRecurrentAgent(NonRecurrentAgent):
+        inputs = th.cat([x.reshape(bs * max_t * self.n_agents, -1) for x in inputs], dim=1)
+        return inputs
 
-    def forward(self, inputs, tformat, loss_fn=None, hidden_states=None, **kwargs):
-        test_mode = kwargs["test_mode"]
-
-        losses = None
-
-        avail_actions, params_aa, tformat_aa = _to_batch(inputs["avail_actions"], tformat)
-        x, params, tformat = _to_batch(inputs["main"], tformat)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-
-        # mask policy elements corresponding to unavailable actions
-        #n_available_actions = avail_actions.detach().sum(dim=1, keepdim=True)
-        #x = th.exp(x)
-        #x = x.masked_fill(avail_actions == 0, float(np.finfo(np.float32).tiny))
-        #x = th.div(x, x.sum(dim=1, keepdim=True))
-
-        n_available_actions = avail_actions.sum(dim=1, keepdim=True)
-        x = th.exp(x)
-        x = x.masked_fill(avail_actions == 0, np.sqrt(float(np.finfo(np.float32).tiny)))
-        x_sum = x.sum(dim=1, keepdim=True)
-        second_mask = (x_sum <= np.sqrt(float(np.finfo(np.float32).tiny)) * avail_actions.shape[1])
-        x_sum = x_sum.masked_fill(second_mask, 1.0)
-        x = th.div(x, x_sum)
-
-        # throw debug warning if second masking was necessary
-        if th.sum(second_mask.data) > 0:
-            if self.args.debug_verbose:
-                print('Warning in COMANonRecurrentAgent.forward(): some sum during the softmax has been 0!')
-
-        # add softmax exploration (if switched on)
-        if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-            epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-            epsilons, _, _ = _to_batch(epsilons, tformat)
-            x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
-
-        x = _from_batch(x, params, tformat)
-
-        if loss_fn is not None:
-            losses, _ = loss_fn(x, tformat=tformat)
-
-        return x, hidden_states, losses, tformat
-
-class COMARecurrentAgent(RecurrentAgent):
-
-    def forward(self, inputs, hidden_states, tformat, loss_fn=None, **kwargs):
-        _check_inputs_validity(inputs, self.input_shapes, tformat)
-
-        test_mode = kwargs["test_mode"]
-
-        _inputs = inputs["main"]
-        _inputs_aa = inputs["avail_actions"]
-
-        loss = None
-        t_dim = _tdim(tformat)
-        assert t_dim == 2, "t_dim along unsupported axis"
-        t_len = _inputs.shape[t_dim]
-
-        x_list = []
-        h_list = [hidden_states]
-
-        for t in range(t_len):
-
-            x = _inputs[:, :, slice(t, t + 1), :].contiguous()
-            avail_actions = _inputs_aa[:, :, slice(t, t + 1), :].contiguous()
-            x, tformat = self.encoder({"main":x}, tformat)
-
-            x, params_x, tformat_x = _to_batch(x, tformat)
-            avail_actions, params_aa, tformat_aa = _to_batch(avail_actions, tformat)
-            h, params_h, tformat_h = _to_batch(h_list[-1], tformat)
-
-            h = self.gru(x, h)
-            x = self.output(h)
-
-            n_available_actions = avail_actions.sum(dim=1, keepdim=True)
-
-            x = x - (1 - avail_actions) * 1e30
-            x = F.softmax(x, 1)
-
-            # add softmax exploration (if switched on)
-            if self.args.coma_exploration_mode in ["softmax"] and not test_mode:
-               epsilons = inputs["epsilons"].unsqueeze(_tdim(tformat))
-               epsilons, _, _ = _to_batch(epsilons, tformat)
-               x = avail_actions * epsilons / n_available_actions + x * (1 - epsilons)
-
-            h = _from_batch(h, params_h, tformat_h)
-            x = _from_batch(x, params_x, tformat_x)
-
-            h_list.append(h)
-            x_list.append(x)
-
-        if loss_fn is not None:
-            _x = th.cat(x_list, dim=_tdim(tformat))
-            loss = loss_fn(_x, tformat=tformat)[0]
-
-        return th.cat(x_list, t_dim), \
-               th.cat(h_list[1:], t_dim), \
-               loss, \
-               tformat
-
+    def _get_input_shape(self, scheme):
+        # state
+        input_shape = scheme["state"]["vshape"]
+        # actions and last actions
+        input_shape += scheme["actions_onehot"]["vshape"][0] * self.n_agents * 2
+        # agent id
+        input_shape += self.n_agents
+        return input_shape

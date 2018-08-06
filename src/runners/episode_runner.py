@@ -95,7 +95,8 @@ class EpisodeRunner:
         else:
             self.logger.log_stat("train_return", episode_return, self.t_env)
             self.logger.log_stat("ep_length", self.t, self.t_env)
-            self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
+            if hasattr(self.mac.action_selector, "epsilon"):
+                self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
             # Log the env stats
             for k, v in self.env.get_agg_stats([env_stats]).items():
                 self.logger.log_stat(k, v, self.t_env)
