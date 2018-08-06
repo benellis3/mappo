@@ -41,6 +41,8 @@ class ParallelRunner:
         self.test_rewards = []
         self.test_env_stats = []
 
+        self.log_train_stats_t = 0
+
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit,
                                  preprocess=preprocess, device=self.args.device)
@@ -80,6 +82,7 @@ class ParallelRunner:
 
         all_terminated = False
         episode_returns = [0 for _ in range(self.batch_size)]
+        episode_lengths = [0 for _ in range(self.batch_size)]
         self.mac.init_hidden(batch_size=self.batch_size)
         terminated = [False for _ in range(self.batch_size)]
         envs_not_terminated = [b_idx for b_idx, termed in enumerate(terminated) if not termed]
@@ -119,6 +122,7 @@ class ParallelRunner:
                     post_transition_data["reward"].append((data["reward"],))
 
                     episode_returns[idx] += data["reward"]
+                    episode_lengths[idx] += 1
                     if not test_mode:
                         self.t_env += 1
 
@@ -162,40 +166,25 @@ class ParallelRunner:
             env_stat = parent_conn.recv()
             env_stats.append(env_stat)
 
+        # TODO: Sort out sc2/env stats logging
         if test_mode:
+            # TODO: Implement this!
             pass
-        else:
+        elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
             self.logger.log_stat("mean_train_return", np.mean(episode_returns), self.t_env)
             self.logger.log_stat("std_train_return", np.std(episode_returns), self.t_env)
+            self.logger.log_stat("mean_ep_length", np.mean(episode_lengths), self.t_env)
 
             # TODO: Move logging into the action selector for this stuff
             self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
 
-        # TODO: Abide by logging intervals
+            # TODO: Move env stat aggregator out of environment
+            self.parent_conns[0].send(("agg_stats", env_stats))
+            aggregated_stats = self.parent_conns[0].recv()
+            for k, v in aggregated_stats:
+                self.logger.log_stat("mean_{}".format(k), v, self.t_env)
 
-        # TODO: Sort out sc2/env stats logging
-        # env_stats = self.env.get_stats()
-
-        # if test_mode:
-        #     self.test_rewards.append(episode_return)
-        #     self.test_env_stats.append(env_stats)
-        #     if len(self.test_rewards) == self.args.test_nepisode:
-        #         # Finished testing for test_nepisodes, log stats about it for convenience
-        #         self.logger.log_stat("mean_test_return", np.mean(self.test_rewards), self.t_env)
-        #         self.logger.log_stat("std_test_return", np.std(self.test_rewards), self.t_env)
-        #         self.test_rewards = []
-        #
-        #         for k, v in self.env.get_agg_stats([env_stats]).items():
-        #             self.logger.log_stat("test_mean_" + k, v, self.t_env)
-        #         self.test_env_stats = []
-        #     self.logger.log_stat("test_return", episode_return, self.t_env)
-        # else:
-        #     self.logger.log_stat("train_return", episode_return, self.t_env)
-        #     self.logger.log_stat("ep_length", self.t, self.t_env)
-        #     self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
-        #     # Log the env stats
-        #     for k, v in self.env.get_agg_stats([env_stats]).items():
-        #         self.logger.log_stat(k, v, self.t_env)
+            self.log_train_stats_t = self.t_env
 
         return self.batch
 
@@ -239,6 +228,9 @@ def env_worker(remote, env_fn):
             remote.send(env.get_env_info())
         elif cmd == "get_stats":
             remote.send(env.get_stats())
+        elif cmd == "agg_stats":
+            agg_stats = env.get_agg_stats(data)
+            remote.send(agg_stats)
         else:
             raise NotImplementedError
 
