@@ -14,10 +14,11 @@ class BasicMAC:
 
         self.hidden_states = None
 
-    def select_actions(self, ep_batch, t_ep, t_env, test_mode=False):
+    def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
         agent_outputs = self.forward(ep_batch, t_ep)
-        avail_actions = ep_batch["avail_actions"][:, t_ep]
-        chosen_actions = self.action_selector.select_action(agent_outputs, avail_actions, t_env, test_mode=test_mode)
+        # Only select actions for the selected batch elements in bs
+        avail_actions = ep_batch["avail_actions"][bs, t_ep]
+        chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions, t_env, test_mode=test_mode)
         return chosen_actions
 
     def forward(self, ep_batch, t):

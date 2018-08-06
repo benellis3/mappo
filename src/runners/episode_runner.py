@@ -30,6 +30,9 @@ class EpisodeRunner:
         self.groups = groups
         self.preprocess = preprocess
 
+    def get_env_info(self):
+        return self.env.get_env_info()
+
     def reset(self):
         self.batch = self.new_batch()
         self.env.reset()
