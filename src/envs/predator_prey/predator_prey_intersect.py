@@ -443,7 +443,8 @@ class PredatorPreyCapture(MultiAgentEnv):
         if self.batch_mode:
             return self.grid.copy().reshape(self.state_size)
         else:
-            return self.grid[0, :, :, :].reshape(self.state_size)
+            # return self.grid[0, :, :, :].reshape(self.state_size)
+            return np.concatenate([self.grid[0, :, :, :].reshape(self.state_size), np.asarray([self.steps/self.episode_limit])])
 
     def get_obs_intersect_pair_size(self):
         return 2 * self.get_obs_size()
@@ -625,7 +626,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         return self.obs_size
 
     def get_state_size(self):
-        return self.state_size
+        return self.state_size + 1
 
     def get_stats(self):
         pass

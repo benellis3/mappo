@@ -33,10 +33,14 @@ class COMALearner:
         max_t = batch.max_seq_length
         rewards = batch["reward"]
         actions = batch["actions"]
-        terminated = batch["terminated"]
+        terminated = batch["terminated"].float()
         mask = batch["filled"].float()
-        # can't train critic using last step unless terminal
+        avail_actions = batch["avail_actions"]
         critic_mask = mask.clone()
+
+        mask = mask.repeat(1, 1, self.n_agents).view(-1)
+
+        q_vals = self._train_critic(batch, rewards, terminated, actions, avail_actions, critic_mask, bs, max_t, t_env)
 
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
@@ -45,35 +49,29 @@ class COMALearner:
             mac_out.append(agent_outs)
         mac_out = th.stack(mac_out, dim=1)  # Concat over time
 
-        # Mask out unavailable actions
-        avail_actions = batch["avail_actions"]
-        mac_out[avail_actions == 0] = -9999999  # From OG deepmarl
-
-        q_vals = self.critic(batch)
+        # Mask out unavailable actions, renormalise (as in action selection)
+        mac_out[avail_actions == 0] = 0
+        mac_out = mac_out/mac_out.sum(dim=-1, keepdim=True)
+        mac_out[avail_actions == 0] = 0
 
         # Calculated advantage
-        pi = mac_out.softmax(dim=-1).view(-1, self.n_actions)
+        pi = mac_out.view(-1, self.n_actions)
         baseline = (pi * q_vals).sum(-1).detach()
 
         # Calculate policy grad with mask
         q_taken = th.gather(q_vals, dim=1, index=actions.view(-1, 1)).squeeze(1)
-        log_pi = mac_out.log_softmax(dim=-1).view(-1, self.n_actions)
-        log_pi_taken = th.gather(log_pi, dim=1, index=actions.view(-1, 1)).squeeze(1)
+        # log_pi = mac_out.log_softmax(dim=-1).view(-1, self.n_actions)
+        pi_taken = th.gather(pi, dim=1, index=actions.view(-1, 1)).squeeze(1)
+        pi_taken[mask == 0] = 1.0
+        log_pi_taken = th.log(pi_taken)
 
-        mask = mask.repeat(1, 1, self.n_agents).view(-1)
         coma_loss = - ((q_taken.detach() * log_pi_taken - baseline) * mask).sum() / mask.sum()
 
-        # TODO: is this faster if losses are summed and pytorch can parallelise(??) agent and critic backwards?
         # Optimise agents
         self.agent_optimiser.zero_grad()
         coma_loss.backward()
         grad_norm = th.nn.utils.clip_grad_norm_(self.agent_params, self.args.grad_norm_clip)
         self.agent_optimiser.step()
-
-        # Optimise critic
-        target_q_vals = self.target_critic(batch)
-        target_q_vals[avail_actions.view(-1, self.n_actions) == 0] = -9999999
-        self._train_critic(rewards, terminated, q_taken, target_q_vals, critic_mask, bs, max_t, t_env)
 
         if (episode_num - self.last_target_update_episode) / self.args.target_update_interval >= 1.0:
             self._update_targets()
@@ -82,41 +80,54 @@ class COMALearner:
         self.logger.log_stat("coma_loss", coma_loss.item(), t_env)
         self.logger.log_stat("agent_grad_norm", grad_norm, t_env)
 
-    def _train_critic(self, rewards, terminated, q_taken, target_q_vals, mask, bs, max_t, t_env):
-        q_taken = q_taken.view(bs, max_t, self.n_agents)
+    def _train_critic(self, batch, rewards, terminated, actions, avail_actions, mask, bs, max_t, t_env):
+        # Optimise critic
+        target_q_vals = self.target_critic(batch)
         target_q_vals = target_q_vals.view(bs, max_t, self.n_agents, self.n_actions)
-        # Max over target Q-Values
-        target_max_qvals = target_q_vals.max(dim=3)[0]
+        targets_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
 
         # Add dummy target to allow training when last state is terminal
-        target_max_qvals = th.cat([target_max_qvals[:, 1:], th.zeros_like(target_max_qvals[:, -1:])], dim=1)
+        targets_taken = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, -1:])], dim=1)
 
-        # Calculate 1-step Q-Learning targets TODO: td-lambda
-        targets = rewards + self.args.gamma * (1 - terminated).float() * target_max_qvals
-        # targets = build_targets(rewards, terminated, mask, target_max_qvals, self.n_agents, self.args.gamma, 0.8)
+        # Calculate td-lambda targets
+        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, 0.0)
 
         # Only train last step if terminal
         mask[:, -1] = terminated[:, -1]
-        # Td-error
-        td_error = (q_taken - targets.detach())
 
-        # 0-out the targets that came from padded data
-        masked_td_error = td_error * mask
+        q_vals = th.zeros_like(target_q_vals)
 
-        # Normal L2 loss, take mean over actual data
-        loss = (masked_td_error ** 2).sum() / mask.sum()  # Not dividing by number of agents, only # valid timesteps
-        self.critic_optimiser.zero_grad()
-        loss.backward()
-        grad_norm = th.nn.utils.clip_grad_norm_(self.agent_params, self.args.grad_norm_clip)
-        self.critic_optimiser.step()
+        for t in reversed(range(rewards.size(1))):
+            mask_t = mask[:, t].expand(-1, self.n_agents).reshape(-1)
+            if mask_t.sum() == 0:
+                continue
 
-        self.logger.log_stat("critic_loss", loss.item(), t_env)
-        self.logger.log_stat("critic_grad_norm", grad_norm, t_env)
-        self.logger.log_stat("td_error", (masked_td_error.sum().item() / mask.sum()), t_env)
-        self.logger.log_stat("mean_q_value",
-                             (q_taken * mask).sum().item() / (mask.sum() * self.args.n_agents), t_env)
-        self.logger.log_stat("mean_target", (targets * mask).sum().item() / (mask.sum() * self.args.n_agents), t_env)
-        pass
+            q_t = self.critic(batch, t)
+            q_vals[:, t] = q_t.view(bs, self.n_agents, self.n_actions)
+            q_taken = th.gather(q_t, dim=1, index=actions[:, t].reshape(-1, 1)).squeeze(1)
+            q_taken = q_taken.view(-1)
+            targets_t = targets[:, t].reshape(-1)
+
+            td_error = (q_taken - targets_t.detach())
+
+            # 0-out the targets that came from padded data
+            masked_td_error = td_error * mask_t
+
+            # Normal L2 loss, take mean over actual data
+            loss = (masked_td_error ** 2).sum() / mask_t.sum()  # Not dividing by number of agents, only # valid timesteps
+            self.critic_optimiser.zero_grad()
+            loss.backward()
+            grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, self.args.grad_norm_clip)
+            self.critic_optimiser.step()
+
+            self.logger.log_stat("critic_loss", loss.item(), t_env)
+            self.logger.log_stat("critic_grad_norm", grad_norm, t_env)
+            self.logger.log_stat("abs_td_error", (masked_td_error.abs().sum().item() / mask_t.sum()), t_env)
+            self.logger.log_stat("mean_q_value",
+                                 (q_taken * mask_t).sum().item() / (mask_t.sum() * self.args.n_agents), t_env)
+            self.logger.log_stat("mean_target", (targets_t * mask_t).sum().item() / (mask_t.sum() * self.args.n_agents), t_env)
+
+        return q_vals.view(-1, self.n_actions)
 
 
     def _update_targets(self):

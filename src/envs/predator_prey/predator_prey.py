@@ -56,7 +56,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.toroidal = args.predator_prey_toroidal
         shape = args.predator_prey_shape
         self.x_max, self.y_max = shape
-        self.state_size = self.x_max * self.y_max * 2
+        self.state_size = self.x_max * self.y_max * 2 + 1
         self.env_max = lTensor(shape)
         self.grid_shape = np.asarray(shape)
         self.grid = Tensor(self.batch_size, self.x_max, self.y_max, 2).zero_()  # channels are 0: agents, 1: prey
@@ -237,7 +237,7 @@ class PredatorPreyCapture(MultiAgentEnv):
 
     def get_state(self):
         if self.batch_mode:
-            return self.grid.clone().view(self.state_size)
+            return torch.cat([self.grid.clone().view(self.state_size - 1), self.grid.new(1).fill_(self.steps)], dim=0)
         else:
             return self.grid[0, :, :, :].cpu().view(self.state_size).numpy()
 

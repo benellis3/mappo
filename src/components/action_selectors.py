@@ -11,12 +11,16 @@ class MultinomialActionSelector():
 
     def __init__(self, args):
         self.args = args
-        self.output_type = "policies"
-        pass
+
+        self.schedule = DecayThenFlatSchedule(args.epsilon_start, args.epsilon_finish, args.epsilon_anneal_time,
+                                              decay="linear")
+        self.epsilon = self.schedule.eval(0)
 
     def select_action(self, agent_inputs, avail_actions, t_env, test_mode=False):
         masked_policies = agent_inputs.clone()
         masked_policies[avail_actions == 0.0] = 0.0
+
+        self.epsilon = self.schedule.eval(t_env)
 
         if test_mode:
             picked_actions = masked_policies.max(dim=2)[1]
@@ -35,6 +39,7 @@ class EpsilonGreedyActionSelector():
 
         # Was there so I used it
         self.schedule = DecayThenFlatSchedule(args.epsilon_start, args.epsilon_finish, args.epsilon_anneal_time, decay="linear")
+        self.epsilon = self.schedule.eval(0)
 
     def select_action(self, agent_inputs, avail_actions, t_env, test_mode=False):
 

@@ -101,9 +101,9 @@ if __name__ == '__main__':
             assert False, "default.yaml error: {}".format(exc)
 
     # Load algorithm and env base configs
-    alg_config = _get_config(params, "--config", "algs")
     env_config = _get_config(params, "--env-config", "envs")
-    config_dict = {**config_dict, **alg_config, **env_config}
+    alg_config = _get_config(params, "--config", "algs")
+    config_dict = {**config_dict, **env_config, **alg_config}
 
     # now add all the config to sacred
     ex.add_config(config_dict)
