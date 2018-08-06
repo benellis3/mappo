@@ -21,6 +21,8 @@ class EpisodeRunner:
         self.test_rewards = []
         self.test_env_stats = []
 
+        self.log_train_stats_t = 0
+
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit,
                                  preprocess=preprocess, device=self.args.device)
@@ -80,6 +82,7 @@ class EpisodeRunner:
         env_stats = self.env.get_stats()
 
         if test_mode:
+            # Always log testing stats
             self.test_rewards.append(episode_return)
             self.test_env_stats.append(env_stats)
             if len(self.test_rewards) == self.args.test_nepisode:
@@ -92,7 +95,8 @@ class EpisodeRunner:
                     self.logger.log_stat("test_mean_" + k, v, self.t_env)
                 self.test_env_stats = []
             self.logger.log_stat("test_return", episode_return, self.t_env)
-        else:
+        elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
+            # Only log training stats if enough time has passed
             self.logger.log_stat("train_return", episode_return, self.t_env)
             self.logger.log_stat("ep_length", self.t, self.t_env)
             if hasattr(self.mac.action_selector, "epsilon"):
@@ -100,5 +104,6 @@ class EpisodeRunner:
             # Log the env stats
             for k, v in self.env.get_agg_stats([env_stats]).items():
                 self.logger.log_stat(k, v, self.t_env)
+            self.log_train_stats_t = self.t_env
 
         return self.batch
