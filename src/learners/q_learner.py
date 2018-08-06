@@ -31,6 +31,8 @@ class QLearner:
         # a little wasteful to deepcopy (e.g. duplicates action selector), but should work for any MAC
         self.target_mac = copy.deepcopy(mac)
 
+        self.log_stats_t = 0
+
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         # Get the relevant quantities
         rewards = batch["reward"]
@@ -100,12 +102,14 @@ class QLearner:
             self._update_targets()
             self.last_target_update_episode = episode_num
 
-        self.logger.log_stat("loss", loss.item(), t_env)
-        self.logger.log_stat("grad_norm", grad_norm, t_env)
-        mask_elems = mask.sum().item()
-        self.logger.log_stat("td_error", (masked_td_error.sum().item()/mask_elems), t_env)
-        self.logger.log_stat("mean_q_value", (chosen_action_qvals * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
-        self.logger.log_stat("mean_target", (targets * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
+        if t_env - self.log_stats_t >= self.args.trainer_log_interval:
+            self.logger.log_stat("loss", loss.item(), t_env)
+            self.logger.log_stat("grad_norm", grad_norm, t_env)
+            mask_elems = mask.sum().item()
+            self.logger.log_stat("td_error", (masked_td_error.sum().item()/mask_elems), t_env)
+            self.logger.log_stat("mean_q_value", (chosen_action_qvals * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
+            self.logger.log_stat("mean_target", (targets * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
+            self.log_stats_t = t_env
 
     def _update_targets(self):
         self.target_mac.load_state(self.mac)
