@@ -54,7 +54,7 @@ class ParallelRunner:
         return self.env_info
 
     def reset(self):
-        self.batch: EpisodeBatch = self.new_batch()
+        self.batch = self.new_batch()
         # Reset the envs
         for parent_conn in self.parent_conns:
             parent_conn.send(("reset", None))
@@ -153,6 +153,25 @@ class ParallelRunner:
             if not all_terminated:
                 self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
 
+        # Get stats back for each env
+        for parent_conn in self.parent_conns:
+            parent_conn.send(("get_stats",None))
+
+        env_stats = []
+        for parent_conn in self.parent_conns:
+            env_stat = parent_conn.recv()
+            env_stats.append(env_stat)
+
+        if test_mode:
+            pass
+        else:
+            self.logger.log_stat("mean_train_return", np.mean(episode_returns), self.t_env)
+            self.logger.log_stat("std_train_return", np.std(episode_returns), self.t_env)
+
+            # TODO: Move logging into the action selector for this stuff
+            self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
+
+        # TODO: Abide by logging intervals
 
         # TODO: Sort out sc2/env stats logging
         # env_stats = self.env.get_stats()
@@ -218,6 +237,8 @@ def env_worker(remote, env_fn):
             break
         elif cmd == "get_env_info":
             remote.send(env.get_env_info())
+        elif cmd == "get_stats":
+            remote.send(env.get_stats())
         else:
             raise NotImplementedError
 
