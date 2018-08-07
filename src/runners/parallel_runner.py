@@ -166,7 +166,7 @@ class ParallelRunner:
             env_stat = parent_conn.recv()
             env_stats.append(env_stat)
 
-        # TODO: Sort out sc2/env stats logging
+        # TODO: Sort out sc2/env stats logging! Episode runner hacks stuff more accurately (I think...)
         if test_mode:
             self.test_rewards.extend(episode_returns)
             self.test_env_stats.extend(env_stats)

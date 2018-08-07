@@ -44,6 +44,16 @@ class EpisodeRunner:
     def run(self, test_mode=False):
         self.reset()
 
+        # TODO: This is hacky and should be changed!
+        if test_mode and self.test_rewards == []:
+            # This is the first testing episode
+            # We need to give the current env stats to get_agg_stats to properly calculate test stats later
+            current_env_stats = self.env.get_stats()
+            train_stats_till_now = self.env.get_agg_stats([current_env_stats])
+            # Log these stats for the trainining episodes since the last logging time till now so we don't lose them
+            for k, v in train_stats_till_now.items():
+                self.logger.log_stat(k, v, self.t_env)
+
         terminated = False
         episode_return = 0
         self.mac.init_hidden(batch_size=self.batch_size)
