@@ -32,7 +32,7 @@ class QLearner:
         # a little wasteful to deepcopy (e.g. duplicates action selector), but should work for any MAC
         self.target_mac = copy.deepcopy(mac)
 
-        self.log_stats_t = 0
+        self.log_stats_t = -100000
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         # Get the relevant quantities

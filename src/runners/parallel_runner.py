@@ -41,7 +41,7 @@ class ParallelRunner:
         self.test_rewards = []
         self.test_env_stats = []
 
-        self.log_train_stats_t = 0
+        self.log_train_stats_t = -100000
 
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit,

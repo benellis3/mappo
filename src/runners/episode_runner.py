@@ -21,7 +21,8 @@ class EpisodeRunner:
         self.test_rewards = []
         self.test_env_stats = []
 
-        self.log_train_stats_t = 0
+        # Log the first run
+        self.log_train_stats_t = -1000000
 
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit,
