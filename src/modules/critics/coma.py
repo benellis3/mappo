@@ -34,6 +34,9 @@ class COMACritic(nn.Module):
         # state
         inputs.append(batch["state"][:, ts].unsqueeze(2).repeat(1, 1, self.n_agents, 1))
 
+        # observation
+        inputs.append(batch["obs"][:, ts])
+
         # actions (masked out by agent)
         actions = batch["actions_onehot"][:, ts].view(bs, max_t, 1, -1).repeat(1, 1, self.n_agents, 1)
         agent_mask = (1 - th.eye(self.n_agents, device=batch.device))
@@ -58,6 +61,8 @@ class COMACritic(nn.Module):
     def _get_input_shape(self, scheme):
         # state
         input_shape = scheme["state"]["vshape"]
+        # observation
+        input_shape += scheme["obs"]["vshape"]
         # actions and last actions
         input_shape += scheme["actions_onehot"]["vshape"][0] * self.n_agents * 2
         # agent id

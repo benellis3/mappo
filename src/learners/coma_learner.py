@@ -58,6 +58,8 @@ class COMALearner:
         pi = mac_out.view(-1, self.n_actions)
         baseline = (pi * q_vals).sum(-1).detach()
 
+        self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum(), t_env)
+
         # Calculate policy grad with mask
         q_taken = th.gather(q_vals, dim=1, index=actions.view(-1, 1)).squeeze(1)
         # log_pi = mac_out.log_softmax(dim=-1).view(-1, self.n_actions)
@@ -90,7 +92,7 @@ class COMALearner:
         targets_taken = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, -1:])], dim=1)
 
         # Calculate td-lambda targets
-        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, 0.0)
+        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, 0.8)
 
         # Only train last step if terminal
         mask[:, -1] = terminated[:, -1]
@@ -124,8 +126,8 @@ class COMALearner:
             self.logger.log_stat("critic_grad_norm", grad_norm, t_env)
             self.logger.log_stat("abs_td_error", (masked_td_error.abs().sum().item() / mask_t.sum()), t_env)
             self.logger.log_stat("mean_q_value",
-                                 (q_taken * mask_t).sum().item() / (mask_t.sum() * self.args.n_agents), t_env)
-            self.logger.log_stat("mean_target", (targets_t * mask_t).sum().item() / (mask_t.sum() * self.args.n_agents), t_env)
+                                 (q_taken * mask_t).sum().item() / (mask_t.sum()), t_env)
+            self.logger.log_stat("mean_target", (targets_t * mask_t).sum().item() / mask_t.sum(), t_env)
 
         return q_vals.view(-1, self.n_actions)
 
