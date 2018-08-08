@@ -92,12 +92,20 @@ class COMALearner:
         targets_taken = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, -1:])], dim=1)
 
         # Calculate td-lambda targets
-        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, 0.8)
+        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, 1.0)
 
         # Only train last step if terminal
         mask[:, -1] = terminated[:, -1]
 
         q_vals = th.zeros_like(target_q_vals)
+
+        running_log = {
+            "critic_loss" : [],
+            "critic_grad_norm" : [],
+            "abs_td_error" : [],
+            "mean_q_value" : [],
+            "mean_target" : []
+        }
 
         for t in reversed(range(rewards.size(1))):
             mask_t = mask[:, t].expand(-1, self.n_agents).reshape(-1)
@@ -122,12 +130,15 @@ class COMALearner:
             grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, self.args.grad_norm_clip)
             self.critic_optimiser.step()
 
-            self.logger.log_stat("critic_loss", loss.item(), t_env)
-            self.logger.log_stat("critic_grad_norm", grad_norm, t_env)
-            self.logger.log_stat("abs_td_error", (masked_td_error.abs().sum().item() / mask_t.sum()), t_env)
-            self.logger.log_stat("mean_q_value",
-                                 (q_taken * mask_t).sum().item() / (mask_t.sum()), t_env)
-            self.logger.log_stat("mean_target", (targets_t * mask_t).sum().item() / mask_t.sum(), t_env)
+            running_log["critic_loss"].append(loss.item())
+            running_log["critic_grad_norm"].append(grad_norm)
+            running_log["abs_td_error"].append((masked_td_error.abs().sum().item() / mask_t.sum()))
+            running_log["mean_q_value"].append((q_taken * mask_t).sum().item() / (mask_t.sum()))
+            running_log["mean_target"].append((targets_t * mask_t).sum().item() / mask_t.sum())
+
+        ts_logged = len(running_log["critic_loss"])
+        for key in ["critic_loss", "critic_grad_norm", "abs_td_error", "mean_q_value", "mean_target"]:
+            self.logger.log_stat(key, sum(running_log[key])/ts_logged, t_env)
 
         return q_vals.view(-1, self.n_actions)
 
