@@ -8,14 +8,15 @@ epsilon_anneal_time: 50000
 runner: "parallel"
 t_max: 500000
 
-buffer_size: 32
-batch_size_run: 32
-batch_size: 32
+buffer_size: 64
+batch_size_run: 64
+batch_size: 64
 
 # update the target network every {} episodes
 target_update_interval: 1000
 
-lr: 0.0005
+lr: 0.001
+critic_lr: 0.001
 td_lambda: 0.8
 
 # use COMA

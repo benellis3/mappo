@@ -25,7 +25,7 @@ class COMALearner:
 
         # TODO: separate lrs
         self.agent_optimiser = RMSprop(params=self.agent_params, lr=args.lr)
-        self.critic_optimiser = RMSprop(params=self.critic_params, lr=args.lr)
+        self.critic_optimiser = RMSprop(params=self.critic_params, lr=args.critic_lr)
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         # Get the relevant quantities
@@ -61,9 +61,9 @@ class COMALearner:
         self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum(), t_env)
 
         # Calculate policy grad with mask
-        q_taken = th.gather(q_vals, dim=1, index=actions.view(-1, 1)).squeeze(1)
+        q_taken = th.gather(q_vals, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
         # log_pi = mac_out.log_softmax(dim=-1).view(-1, self.n_actions)
-        pi_taken = th.gather(pi, dim=1, index=actions.view(-1, 1)).squeeze(1)
+        pi_taken = th.gather(pi, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
         pi_taken[mask == 0] = 1.0
         log_pi_taken = th.log(pi_taken)
 
