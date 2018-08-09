@@ -5,16 +5,18 @@ epsilon_start: 1.0
 epsilon_finish: .05
 epsilon_anneal_time: 20000
 
-runner: "episode"
+runner: "parallel"
 t_max: 500000
 
-buffer_size: 32
-batch_size_run: 1
-batch_size: 32
+buffer_size: 16
+batch_size_run: 16
+batch_size: 16
 
 # update the target network every {} episodes
-target_update_interval: 100
+target_update_interval: 200
+
 lr: 0.0005
+td_lambda: 0.8
 
 # use COMA
 agent_output_type: "pi_logits"

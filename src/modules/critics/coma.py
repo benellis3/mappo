@@ -17,12 +17,12 @@ class COMACritic(nn.Module):
         self.fc1 = nn.Linear(input_shape, 64)
         self.fc2 = nn.Linear(64, 64)
         self.fc3 = nn.Linear(64, self.n_actions)
-
+        nn.init.constant_(self.fc3.bias, 0)
 
     def forward(self, batch, t=None):
         inputs = self._build_inputs(batch, t=t)
         x = F.relu(self.fc1(inputs))
-        x = F.relu(self.fc2(x)) + x
+        x = F.relu(self.fc2(x))
         q = self.fc3(x)
         return q
 

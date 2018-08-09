@@ -92,7 +92,7 @@ class COMALearner:
         targets_taken = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, -1:])], dim=1)
 
         # Calculate td-lambda targets
-        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, 1.0)
+        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
 
         # Only train last step if terminal
         mask[:, -1] = terminated[:, -1]
@@ -115,7 +115,6 @@ class COMALearner:
             q_t = self.critic(batch, t)
             q_vals[:, t] = q_t.view(bs, self.n_agents, self.n_actions)
             q_taken = th.gather(q_t, dim=1, index=actions[:, t].reshape(-1, 1)).squeeze(1)
-            q_taken = q_taken.view(-1)
             targets_t = targets[:, t].reshape(-1)
 
             td_error = (q_taken - targets_t.detach())
@@ -127,7 +126,7 @@ class COMALearner:
             loss = (masked_td_error ** 2).sum() / mask_t.sum()  # Not dividing by number of agents, only # valid timesteps
             self.critic_optimiser.zero_grad()
             loss.backward()
-            grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, self.args.grad_norm_clip)
+            grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, 0.5)
             self.critic_optimiser.step()
 
             running_log["critic_loss"].append(loss.item())
