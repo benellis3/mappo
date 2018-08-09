@@ -1,8 +1,8 @@
 # --- COMA specific parameters ---
 
 action_selector: "multinomial"
-epsilon_start: .5
-epsilon_finish: .01
+epsilon_start: .0
+epsilon_finish: .0
 epsilon_anneal_time: 50000
 
 runner: "parallel"
