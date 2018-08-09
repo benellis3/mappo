@@ -170,7 +170,7 @@ class ParallelRunner:
         if test_mode:
             self.test_rewards.extend(episode_returns)
             self.test_env_stats.extend(env_stats)
-            n_test_runs = max(1, self.args.test_nepisode // self.batch_size)
+            n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
             if len(self.test_rewards) == n_test_runs:
                 self.logger.log_stat("mean_test_return", np.mean(self.test_rewards), self.t_env)
                 self.logger.log_stat("std_test_return", np.std(self.test_rewards), self.t_env)

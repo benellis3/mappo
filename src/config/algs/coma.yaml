@@ -8,9 +8,9 @@ epsilon_anneal_time: 50000
 runner: "parallel"
 t_max: 500000
 
-buffer_size: 64
-batch_size_run: 64
-batch_size: 64
+buffer_size: 32
+batch_size_run: 32
+batch_size: 32
 
 # update the target network every {} episodes
 target_update_interval: 1000

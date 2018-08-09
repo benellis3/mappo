@@ -12,15 +12,11 @@ env_args:
     - 1
     - 1
   episode_limit: 50
-  n_agents: 3
-  reward_capture: 50 # Reward of 1 for capturing the prey
+  n_agents: 4
+  reward_capture: 1 # Reward of 1 for capturing the prey
   reward_almost_capture: 0
   truncate_episodes: True # If we reach the episode_limit then don't treat the final transition as terminal
-  fully_observable: False
-  intersection_global_view: True
-  intersection_id_coded: True
-  reward_collision: 0.0
-  reward_scare: 0.0
   reward_time: -0.1
+  fully_observable: False
 
 t_max: 100000
