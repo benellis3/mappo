@@ -1,19 +1,19 @@
 # --- COMA specific parameters ---
 
 action_selector: "multinomial"
-epsilon_start: 1.0
-epsilon_finish: .05
-epsilon_anneal_time: 20000
+epsilon_start: .5
+epsilon_finish: .01
+epsilon_anneal_time: 50000
 
 runner: "parallel"
 t_max: 500000
 
-buffer_size: 16
-batch_size_run: 16
-batch_size: 16
+buffer_size: 32
+batch_size_run: 32
+batch_size: 32
 
 # update the target network every {} episodes
-target_update_interval: 200
+target_update_interval: 1000
 
 lr: 0.0005
 td_lambda: 0.8

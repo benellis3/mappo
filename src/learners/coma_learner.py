@@ -54,7 +54,7 @@ class COMALearner:
         mac_out = mac_out/mac_out.sum(dim=-1, keepdim=True)
         mac_out[avail_actions == 0] = 0
 
-        # Calculated advantage
+        # Calculated baseline
         pi = mac_out.view(-1, self.n_actions)
         baseline = (pi * q_vals).sum(-1).detach()
 
@@ -67,7 +67,11 @@ class COMALearner:
         pi_taken[mask == 0] = 1.0
         log_pi_taken = th.log(pi_taken)
 
-        coma_loss = - ((q_taken.detach() * log_pi_taken - baseline) * mask).sum() / mask.sum()
+        advantages = (q_taken - baseline).detach()
+
+        coma_loss = - ((advantages * log_pi_taken) * mask).sum() / mask.sum()
+
+        self.logger.log_stat("advantage_mean", (advantages * mask).sum().item() / mask.sum(), t_env)
 
         # Optimise agents
         self.agent_optimiser.zero_grad()
@@ -126,7 +130,7 @@ class COMALearner:
             loss = (masked_td_error ** 2).sum() / mask_t.sum()  # Not dividing by number of agents, only # valid timesteps
             self.critic_optimiser.zero_grad()
             loss.backward()
-            grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, 0.5)
+            grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, 5)
             self.critic_optimiser.step()
 
             running_log["critic_loss"].append(loss.item())
