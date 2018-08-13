@@ -88,7 +88,7 @@ def run_sequential(args, logger):
         "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},
         "avail_actions": {"vshape": (env_info["n_actions"],), "group": "agents", "dtype": th.int},
         "reward": {"vshape": (1,)},
-        "terminated": {"vshape": (1,), "dtype": th.uint8}
+        "terminated": {"vshape": (1,), "dtype": th.uint8},
     }
     groups = {
         "agents": args.n_agents
@@ -97,7 +97,6 @@ def run_sequential(args, logger):
         "actions": ("actions_onehot", [OneHot(out_dim=args.n_actions)])
     }
 
-    # TODO: Add device
     buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"],
                           preprocess=preprocess, device=args.device)
 

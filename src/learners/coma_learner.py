@@ -14,7 +14,8 @@ class COMALearner:
         self.mac = mac
         self.logger = logger
 
-        self.last_target_update_episode = 0
+        self.last_target_update_step = 0
+        self.critic_training_steps = 0
 
         self.critic = COMACritic(scheme, args)
         self.target_critic = copy.deepcopy(self.critic)
@@ -79,9 +80,9 @@ class COMALearner:
         grad_norm = th.nn.utils.clip_grad_norm_(self.agent_params, self.args.grad_norm_clip)
         self.agent_optimiser.step()
 
-        if (episode_num - self.last_target_update_episode) / self.args.target_update_interval >= 1.0:
+        if (self.critic_training_steps - self.last_target_update_step) / self.args.target_update_interval >= 1.0:
             self._update_targets()
-            self.last_target_update_episode = episode_num
+            self.last_target_update_step = self.critic_training_steps
 
         self.logger.log_stat("coma_loss", coma_loss.item(), t_env)
         self.logger.log_stat("agent_grad_norm", grad_norm, t_env)
@@ -132,6 +133,7 @@ class COMALearner:
             loss.backward()
             grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, 5)
             self.critic_optimiser.step()
+            self.critic_training_steps += 1
 
             running_log["critic_loss"].append(loss.item())
             running_log["critic_grad_norm"].append(grad_norm)
