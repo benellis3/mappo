@@ -158,7 +158,8 @@ class ParallelRunner:
             if not all_terminated:
                 self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
 
-        self.t_env += self.env_steps_this_run
+        if not test_mode:
+            self.t_env += self.env_steps_this_run
 
         # Get stats back for each env
         for parent_conn in self.parent_conns:
