@@ -37,14 +37,15 @@ class ParallelRunner:
 
         self.t_env = 0
 
-        # TODO: Fix env testing and stats
-        self.test_rewards = []
-        self.test_env_stats = []
+        self.train_returns = []
+        self.test_returns = []
+        self.train_stats = {}
+        self.test_stats = {}
 
         self.log_train_stats_t = -100000
 
     def setup(self, scheme, groups, preprocess, mac):
-        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit,
+        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit + 1,
                                  preprocess=preprocess, device=self.args.device)
         self.mac = mac
         # TODO: Remove these if the runner doesn't need them
@@ -57,6 +58,7 @@ class ParallelRunner:
 
     def reset(self):
         self.batch = self.new_batch()
+
         # Reset the envs
         for parent_conn in self.parent_conns:
             parent_conn.send(("reset", None))
@@ -87,6 +89,7 @@ class ParallelRunner:
         self.mac.init_hidden(batch_size=self.batch_size)
         terminated = [False for _ in range(self.batch_size)]
         envs_not_terminated = [b_idx for b_idx, termed in enumerate(terminated) if not termed]
+        final_env_infos = []  # may store extra stats like battle won. this is filled in ORDER OF TERMINATION
 
         while not all_terminated:
 
@@ -128,16 +131,17 @@ class ParallelRunner:
                         self.env_steps_this_run += 1
 
                     env_terminated = False
-                    if data["terminated"] and not data["ep_limit"]:
+                    if data["terminated"]:
+                        final_env_infos.append(data["info"])
+                    if data["terminated"] and not data["info"].get("episode_limit", False):
                         env_terminated = True
                     terminated[idx] = data["terminated"]
                     post_transition_data["terminated"].append((env_terminated,))
 
                     # Data for the next timestep needed to select an action
-                    if not data["terminated"]:
-                        pre_transition_data["state"].append(data["state"])
-                        pre_transition_data["avail_actions"].append(data["avail_actions"])
-                        pre_transition_data["obs"].append(data["obs"])
+                    pre_transition_data["state"].append(data["state"])
+                    pre_transition_data["avail_actions"].append(data["avail_actions"])
+                    pre_transition_data["obs"].append(data["obs"])
 
             # Actions are a tensor, need to stack them
             # TODO: Make a bit cleaner
@@ -146,17 +150,16 @@ class ParallelRunner:
             # Add post_transiton data into the batch
             self.batch.update(post_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=False)
 
-            # Update terminated envs after adding post_transition_data
-            envs_not_terminated = [b_idx for b_idx, termed in enumerate(terminated) if not termed]
-
             # Move onto the next timestep
             self.t += 1
 
             # Add the pre-transition data
-            all_terminated = all(terminated)
 
-            if not all_terminated:
-                self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
+            self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
+
+            # Update terminated envs after adding post_transition_data
+            envs_not_terminated = [b_idx for b_idx, termed in enumerate(terminated) if not termed]
+            all_terminated = all(terminated)
 
         if not test_mode:
             self.t_env += self.env_steps_this_run
@@ -170,41 +173,36 @@ class ParallelRunner:
             env_stat = parent_conn.recv()
             env_stats.append(env_stat)
 
-        # TODO: Sort out sc2/env stats logging! Episode runner hacks stuff more accurately (I think...)
-        if test_mode:
-            self.test_rewards.extend(episode_returns)
-            self.test_env_stats.extend(env_stats)
-            n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
-            if len(self.test_rewards) == n_test_runs:
-                self.logger.log_stat("mean_test_return", np.mean(self.test_rewards), self.t_env)
-                self.logger.log_stat("std_test_return", np.std(self.test_rewards), self.t_env)
-                for test_return in self.test_rewards:
-                    self.logger.log_stat("test_return", test_return, self.t_env)
+        cur_stats = self.test_stats if test_mode else self.train_stats
+        cur_returns = self.test_returns if test_mode else self.train_returns
+        log_prefix = "test_" if test_mode else ""
+        infos = [cur_stats] + final_env_infos
+        cur_stats.update({k: sum(d.get(k, 0) for d in infos) for k in set.union(*[set(d) for d in infos])})
+        cur_stats["n_episodes"] = self.batch_size + cur_stats.get("n_episodes", 0)
+        cur_stats["ep_length"] = sum(episode_lengths) + cur_stats.get("ep_length", 0)
 
-                # TODO: Move env stat aggregator out of environment
-                self.parent_conns[0].send(("agg_stats", self.test_env_stats))
-                aggregated_stats = self.parent_conns[0].recv()
-                for k, v in aggregated_stats.items():
-                    self.logger.log_stat("mean_test_{}".format(k), v, self.t_env)
-                self.test_rewards = []
-                self.test_env_stats = []
+        cur_returns.extend(episode_returns)
+
+        n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
+        if test_mode and (len(self.test_returns) == n_test_runs):
+            self._log(cur_returns, cur_stats, log_prefix)
         elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
-            self.logger.log_stat("mean_train_return", np.mean(episode_returns), self.t_env)
-            self.logger.log_stat("std_train_return", np.std(episode_returns), self.t_env)
-            self.logger.log_stat("mean_ep_length", np.mean(episode_lengths), self.t_env)
-
-            # TODO: Move logging into the action selector for this stuff
-            self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
-
-            # TODO: Move env stat aggregator out of environment
-            self.parent_conns[0].send(("agg_stats", env_stats))
-            aggregated_stats = self.parent_conns[0].recv()
-            for k, v in aggregated_stats.items():
-                self.logger.log_stat("mean_{}".format(k), v, self.t_env)
-
+            self._log(cur_returns, cur_stats, log_prefix)
+            if hasattr(self.mac.action_selector, "epsilon"):
+                self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
             self.log_train_stats_t = self.t_env
 
         return self.batch
+
+    def _log(self, returns, stats, prefix):
+        self.logger.log_stat(prefix + "mean_return", np.mean(returns), self.t_env)
+        self.logger.log_stat(prefix + "std_return", np.std(returns), self.t_env)
+        returns.clear()
+
+        for k, v in stats.items():
+            if k != "n_episodes":
+                self.logger.log_stat(prefix + "mean_" + k, v/stats["n_episodes"], self.t_env)
+        stats.clear()
 
 
 def env_worker(remote, env_fn):
@@ -216,7 +214,6 @@ def env_worker(remote, env_fn):
             actions = data
             # Take a step in the environment
             reward, terminated, env_info = env.step(actions)
-            reached_ep_limit = env_info.get("episode_limit", False)
             # Return the observations, avail_actions and state to make the next action
             state = env.get_state()
             avail_actions = env.get_avail_actions()
@@ -230,7 +227,7 @@ def env_worker(remote, env_fn):
                 "actions": actions,
                 "reward": reward,
                 "terminated": terminated,
-                "ep_limit": reached_ep_limit
+                "info": env_info
             })
         elif cmd == "reset":
             env.reset()

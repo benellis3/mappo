@@ -20,7 +20,6 @@ class EpisodeRunner:
 
         self.train_returns = []
         self.test_returns = []
-
         self.train_stats = {}
         self.test_stats = {}
 
@@ -31,10 +30,6 @@ class EpisodeRunner:
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit + 1,
                                  preprocess=preprocess, device=self.args.device)
         self.mac = mac
-        # TODO: Remove these if the runner doesn't need them
-        self.scheme = scheme
-        self.groups = groups
-        self.preprocess = preprocess
 
     def get_env_info(self):
         return self.env.get_env_info()
@@ -88,14 +83,13 @@ class EpisodeRunner:
         cur_stats = self.test_stats if test_mode else self.train_stats
         cur_returns = self.test_returns if test_mode else self.train_returns
         log_prefix = "test_" if test_mode else ""
-        cur_stats = {k: cur_stats.get(k, 0) + env_info.get(k, 0) for k in set(cur_stats) | set(env_info)}
+        cur_stats.update({k: cur_stats.get(k, 0) + env_info.get(k, 0) for k in set(cur_stats) | set(env_info)})
         cur_stats["n_episodes"] = 1 + cur_stats.get("n_episodes", 0)
         cur_stats["ep_length"] = self.t + cur_stats.get("ep_length", 0)
 
         if not test_mode:
             self.t_env += self.t
 
-        # TODO: Sort out sc2/env stats logging
         cur_returns.append(episode_return)
 
         if test_mode and (len(self.test_returns) == self.args.test_nepisode):

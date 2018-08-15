@@ -184,6 +184,8 @@ def args_sanity_check(config, _log):
 
     if config["test_nepisode"] < config["batch_size_run"]:
         config["test_nepisode"] = config["batch_size_run"]
+    else:
+        config["test_nepisode"] = (config["test_nepisode"]//config["batch_size_run"]) * config["batch_size_run"]
 
     # assert (config["run_mode"] in ["parallel_subproc"] and config["use_replay_buffer"]) or (not config["run_mode"] in ["parallel_subproc"]),  \
     #     "need to use replay buffer if running in parallel mode!"

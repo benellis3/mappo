@@ -24,7 +24,6 @@ class COMALearner:
         self.critic_params = list(self.critic.parameters())
         self.params = self.agent_params + self.critic_params
 
-        # TODO: separate lrs
         self.agent_optimiser = RMSprop(params=self.agent_params, lr=args.lr)
         self.critic_optimiser = RMSprop(params=self.critic_params, lr=args.critic_lr)
 
@@ -32,11 +31,13 @@ class COMALearner:
         # Get the relevant quantities
         bs = batch.batch_size
         max_t = batch.max_seq_length
-        rewards = batch["reward"]
-        actions = batch["actions"]
-        terminated = batch["terminated"].float()
-        mask = batch["filled"].float()
-        avail_actions = batch["avail_actions"]
+        rewards = batch["reward"][:, :-1]
+        actions = batch["actions"][:, :-1]
+        terminated = batch["terminated"][:, :-1].float()
+        mask = batch["filled"][:, :-1].float()
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
+        avail_actions = batch["avail_actions"][:, :-1]
+
         critic_mask = mask.clone()
 
         mask = mask.repeat(1, 1, self.n_agents).view(-1)
@@ -45,7 +46,7 @@ class COMALearner:
 
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
-        for t in range(batch.max_seq_length):
+        for t in range(batch.max_seq_length - 1):
             agent_outs = self.mac.forward(batch, t=t)
             mac_out.append(agent_outs)
         mac_out = th.stack(mac_out, dim=1)  # Concat over time
@@ -90,17 +91,11 @@ class COMALearner:
     def _train_critic(self, batch, rewards, terminated, actions, avail_actions, mask, bs, max_t, t_env):
         # Optimise critic
         target_q_vals = self.target_critic(batch)
-        target_q_vals = target_q_vals.view(bs, max_t, self.n_agents, self.n_actions)
+        target_q_vals = target_q_vals.view(bs, max_t, self.n_agents, self.n_actions)[:, 1:]
         targets_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
-
-        # Add dummy target to allow training when last state is terminal
-        targets_taken = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, -1:])], dim=1)
 
         # Calculate td-lambda targets
         targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
-
-        # Only train last step if terminal
-        mask[:, -1] = terminated[:, -1]
 
         q_vals = th.zeros_like(target_q_vals)
 
