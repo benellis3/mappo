@@ -8,13 +8,13 @@ def build_targets(rewards, terminated, mask, target_qs, n_agents, gamma, td_lamb
     terminated = terminated.float()
     for t in reversed(range(max_t)):
         if t == max_t - 1:
-            running_target = terminated[:, t] * rewards[:, t]
+            running_target = rewards[:, t] + gamma * (1 - terminated[:, t]) * target_qs[:, t]
         else:
             running_target = mask[:, t] * (
                 terminated[:, t] * rewards[:, t]
                 + (1 - terminated[:, t]) * (
                                td_lambda * (rewards[:, t] + gamma * running_target)
-                               + (1 - td_lambda) * (rewards[:, t] + gamma * target_qs[:, t, :])
+                               + (1 - td_lambda) * (rewards[:, t] + gamma * target_qs[:, t])
                                            ))
         targets[:, t, :] = running_target
     return targets
