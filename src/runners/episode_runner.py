@@ -18,14 +18,17 @@ class EpisodeRunner:
 
         self.t_env = 0
 
-        self.test_rewards = []
-        self.test_env_stats = []
+        self.train_returns = []
+        self.test_returns = []
+
+        self.train_stats = {}
+        self.test_stats = {}
 
         # Log the first run
         self.log_train_stats_t = -1000000
 
     def setup(self, scheme, groups, preprocess, mac):
-        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit,
+        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit + 1,
                                  preprocess=preprocess, device=self.args.device)
         self.mac = mac
         # TODO: Remove these if the runner doesn't need them
@@ -43,16 +46,6 @@ class EpisodeRunner:
 
     def run(self, test_mode=False):
         self.reset()
-
-        # TODO: This is hacky and should be changed!
-        if test_mode and self.test_rewards == []:
-            # This is the first testing episode
-            # We need to give the current env stats to get_agg_stats to properly calculate test stats later
-            current_env_stats = self.env.get_stats()
-            train_stats_till_now = self.env.get_agg_stats([current_env_stats])
-            # Log these stats for the trainining episodes since the last logging time till now so we don't lose them
-            for k, v in train_stats_till_now.items():
-                self.logger.log_stat(k, v, self.t_env)
 
         terminated = False
         episode_return = 0
@@ -72,7 +65,6 @@ class EpisodeRunner:
             # Receive the actions for each agent at this timestep in a batch of size 1
             actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, test_mode=test_mode)
 
-            # TODO: Return episode limit from the environment separately from env_info
             reward, terminated, env_info = self.env.step(actions[0])
             episode_return += reward
 
@@ -86,35 +78,42 @@ class EpisodeRunner:
 
             self.t += 1
 
+        last_data = {
+            "state": [self.env.get_state()],
+            "avail_actions": [self.env.get_avail_actions()],
+            "obs": [self.env.get_obs()]
+        }
+        self.batch.update(last_data, ts=self.t)
+
+        cur_stats = self.test_stats if test_mode else self.train_stats
+        cur_returns = self.test_returns if test_mode else self.train_returns
+        log_prefix = "test_" if test_mode else ""
+        cur_stats = {k: cur_stats.get(k, 0) + env_info.get(k, 0) for k in set(cur_stats) | set(env_info)}
+        cur_stats["n_episodes"] = 1 + cur_stats.get("n_episodes", 0)
+        cur_stats["ep_length"] = self.t + cur_stats.get("ep_length", 0)
+
         if not test_mode:
             self.t_env += self.t
 
         # TODO: Sort out sc2/env stats logging
-        env_stats = self.env.get_stats()
+        cur_returns.append(episode_return)
 
-        if test_mode:
-            # Always log testing stats
-            self.test_rewards.append(episode_return)
-            self.test_env_stats.append(env_stats)
-            if len(self.test_rewards) == self.args.test_nepisode:
-                # Finished testing for test_nepisodes, log stats about it for convenience
-                self.logger.log_stat("mean_test_return", np.mean(self.test_rewards), self.t_env)
-                self.logger.log_stat("std_test_return", np.std(self.test_rewards), self.t_env)
-                self.test_rewards = []
-
-                for k, v in self.env.get_agg_stats([env_stats]).items():
-                    self.logger.log_stat("test_mean_" + k, v, self.t_env)
-                self.test_env_stats = []
-            self.logger.log_stat("test_return", episode_return, self.t_env)
+        if test_mode and (len(self.test_returns) == self.args.test_nepisode):
+            self._log(cur_returns, cur_stats, log_prefix)
         elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
-            # Only log training stats if enough time has passed
-            self.logger.log_stat("train_return", episode_return, self.t_env)
-            self.logger.log_stat("ep_length", self.t, self.t_env)
+            self._log(cur_returns, cur_stats, log_prefix)
             if hasattr(self.mac.action_selector, "epsilon"):
                 self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
-            # Log the env stats
-            for k, v in self.env.get_agg_stats([env_stats]).items():
-                self.logger.log_stat(k, v, self.t_env)
             self.log_train_stats_t = self.t_env
 
         return self.batch
+
+    def _log(self, returns, stats, prefix):
+        self.logger.log_stat(prefix + "mean_return", np.mean(returns), self.t_env)
+        self.logger.log_stat(prefix + "std_return", np.std(returns), self.t_env)
+        returns.clear()
+
+        for k, v in stats.items():
+            if k != "n_episodes":
+                self.logger.log_stat(prefix + "mean_" + k, v/stats["n_episodes"], self.t_env)
+        stats.clear()

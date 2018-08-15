@@ -97,7 +97,7 @@ def run_sequential(args, logger):
         "actions": ("actions_onehot", [OneHot(out_dim=args.n_actions)])
     }
 
-    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"],
+    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"] + 1,
                           preprocess=preprocess, device=args.device)
 
     # Setup multiagent controller here

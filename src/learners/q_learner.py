@@ -36,12 +36,11 @@ class QLearner:
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         # Get the relevant quantities
-        rewards = batch["reward"]
-        actions = batch["actions"]
-        terminated = batch["terminated"]
-        mask = batch["filled"].float()
-        # can't train using last step unless terminal
-        mask[:, -1] = terminated[:, -1]
+        rewards = batch["reward"][:, :-1]
+        actions = batch["actions"][:, :-1]
+        terminated = batch["terminated"][:, :-1].float()
+        mask = batch["filled"][:, :-1].float()
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
 
         # Calculate the Q-Values necessary for the target
         target_mac_out = []
@@ -50,10 +49,8 @@ class QLearner:
             target_agent_outs = self.target_mac.forward(batch, t=t)
             target_mac_out.append(target_agent_outs)
 
-        target_mac_out = th.stack(target_mac_out, dim=1)  # Concat across time
-
         # We don't need the first timesteps Q-Value estimate for calculating targets
-        target_mac_out = target_mac_out[:, 1:]
+        target_mac_out = th.stack(target_mac_out[1:], dim=1)  # Concat across time
 
         # Mask out unavailable actions
         avail_actions = batch["avail_actions"][:, 1:]
@@ -62,16 +59,13 @@ class QLearner:
         # Max over target Q-Values
         target_max_qvals = target_mac_out.max(dim=3)[0]
 
-        # Add dummy target to allow training when last state is terminal
-        target_max_qvals = th.cat([target_max_qvals, th.zeros_like(target_max_qvals[:, -1:])], dim=1)
-
         # Calculate 1-step Q-Learning targets
-        targets = rewards + self.args.gamma * (1 - terminated).float() * target_max_qvals
+        targets = rewards + self.args.gamma * (1 - terminated) * target_max_qvals
 
         # Calculate estimated Q-Values
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
-        for t in range(batch.max_seq_length):
+        for t in range(batch.max_seq_length - 1):
             agent_outs = self.mac.forward(batch, t=t)
             mac_out.append(agent_outs)
         mac_out = th.stack(mac_out, dim=1)  # Concat over time again
@@ -87,11 +81,13 @@ class QLearner:
         # Td-error
         td_error = (chosen_action_qvals - targets.detach())
 
+        mask = mask.expand_as(td_error)
+
         # 0-out the targets that came from padded data
         masked_td_error = td_error * mask
 
         # Normal L2 loss, take mean over actual data
-        loss = (masked_td_error ** 2).sum() / mask.sum() # Not dividing by number of agents, only # valid timesteps
+        loss = (masked_td_error ** 2).sum() / mask.sum()
 
         # Optimise
         self.optimiser.zero_grad()
