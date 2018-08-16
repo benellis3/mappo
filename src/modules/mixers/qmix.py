@@ -27,7 +27,7 @@ class QMixer(nn.Module):
 
     def forward(self, agent_qs, batch):
         bs = agent_qs.size(0)
-        states = batch["state"]
+        states = batch["state"][:, :-1]
         states = states.reshape(-1, self.state_dim)
 
         agent_qs = agent_qs.view(-1, 1, self.n_agents)

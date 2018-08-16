@@ -108,11 +108,11 @@ class COMALearner:
         q_vals = th.zeros_like(target_q_vals)
 
         running_log = {
-            "critic_loss" : [],
-            "critic_grad_norm" : [],
-            "abs_td_error" : [],
-            "mean_q_taken" : [],
-            "mean_target" : []
+            "critic_loss": [],
+            "critic_grad_norm": [],
+            "td_error_abs": [],
+            "target_mean": [],
+            "q_taken_mean": [],
         }
 
         for t in reversed(range(rewards.size(1))):
@@ -140,16 +140,15 @@ class COMALearner:
 
             running_log["critic_loss"].append(loss.item())
             running_log["critic_grad_norm"].append(grad_norm)
-            running_log["abs_td_error"].append((masked_td_error.abs().sum().item() / mask_t.sum()))
-            running_log["mean_q_taken"].append((q_taken * mask_t).sum().item() / (mask_t.sum()))
-            running_log["mean_target"].append((targets_t * mask_t).sum().item() / mask_t.sum())
+            running_log["td_error_abs"].append((masked_td_error.abs().sum().item() / mask_t.sum()))
+            running_log["q_taken_mean"].append((q_taken * mask_t).sum().item() / (mask_t.sum()))
+            running_log["target_mean"].append((targets_t * mask_t).sum().item() / mask_t.sum())
 
         ts_logged = len(running_log["critic_loss"])
-        for key in ["critic_loss", "critic_grad_norm", "abs_td_error", "mean_q_taken", "mean_target"]:
+        for key in ["critic_loss", "critic_grad_norm", "td_error_abs", "q_taken_mean", "target_mean"]:
             self.logger.log_stat(key, sum(running_log[key])/ts_logged, t_env)
 
         return q_vals.view(-1, self.n_actions)
-
 
     def _update_targets(self):
         self.target_critic.load_state_dict(self.critic.state_dict())

@@ -41,12 +41,14 @@ class Logger:
 
     def print_recent_stats(self):
         log_str = "Recent Stats | t_env: {:>10} | Episode: {:>8}\n".format(*self.stats["episode"][-1])
-        for i, (k, v) in enumerate(self.stats.items()):
+        i = 0
+        for (k, v) in sorted(self.stats.items()):
             if k == "episode":
                 continue
+            i += 1
             item = "{:.4f}".format(np.mean([x[1] for x in self.stats[k][-10:]]))
             log_str += "{:<25}{:>8}".format(k + ":", item)
-            log_str += "\n" if (i + 1) % 4 == 0 else "\t"
+            log_str += "\n" if i % 4 == 0 else "\t"
         self.console_logger.info(log_str)
 
 # set up a custom logger

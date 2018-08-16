@@ -190,13 +190,13 @@ class ParallelRunner:
         return self.batch
 
     def _log(self, returns, stats, prefix):
-        self.logger.log_stat(prefix + "mean_return", np.mean(returns), self.t_env)
-        self.logger.log_stat(prefix + "std_return", np.std(returns), self.t_env)
+        self.logger.log_stat(prefix + "return_mean", np.mean(returns), self.t_env)
+        self.logger.log_stat(prefix + "return_std", np.std(returns), self.t_env)
         returns.clear()
 
         for k, v in stats.items():
             if k != "n_episodes":
-                self.logger.log_stat(prefix + "mean_" + k, v/stats["n_episodes"], self.t_env)
+                self.logger.log_stat(prefix + k + "_mean" , v/stats["n_episodes"], self.t_env)
         stats.clear()
 
 
