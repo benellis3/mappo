@@ -8,16 +8,16 @@ epsilon_anneal_time: 50000
 runner: "parallel"
 t_max: 500000
 
-buffer_size: 32
-batch_size_run: 32
-batch_size: 32
+buffer_size: 8
+batch_size_run: 8
+batch_size: 8
 
 # update the target network every {} training steps
-target_update_interval: 250
+target_update_interval: 500
 
-lr: 0.0008
-critic_lr: 0.0008
-td_lambda: 0.7
+lr: 0.001
+critic_lr: 0.001
+td_lambda: 0.8
 
 # use COMA
 agent_output_type: "pi_logits"
