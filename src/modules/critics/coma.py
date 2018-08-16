@@ -14,14 +14,14 @@ class COMACritic(nn.Module):
         input_shape = self._get_input_shape(scheme)
 
         # Set up network layers
-        self.fc1 = nn.Linear(input_shape, 128)
-        self.fc2 = nn.Linear(128, 64)
+        self.fc1 = nn.Linear(input_shape, 64)
+        # self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, self.n_actions)
 
     def forward(self, batch, t=None):
         inputs = self._build_inputs(batch, t=t)
         x = F.relu(self.fc1(inputs))
-        x = F.relu(self.fc2(x))
+        # x = F.relu(self.fc2(x))
         q = self.fc3(x)
         return q
 

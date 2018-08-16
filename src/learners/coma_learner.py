@@ -69,6 +69,14 @@ class COMALearner:
         pi_taken[mask == 0] = 1.0
         log_pi_taken = th.log(pi_taken)
 
+        # q_taken_reshape = q_taken.reshape(bs, max_t-1, self.n_agents)
+        # next_qs = q_taken_reshape[:, 1:]
+        # one_step_qsa = rewards[:, :-1] + self.args.gamma * next_qs
+        # hacky_thing = q_taken_reshape.clone()
+        # hacky_thing[:, 1:] = hacky_thing[:, 1:] * 1.0
+        # hacky_thing[:, :-1] = hacky_thing[:, :-1] + 0.0 * one_step_qsa
+        # advantages = (hacky_thing.view(-1) - baseline).detach()
+
         advantages = (q_taken - baseline).detach()
 
         coma_loss = - ((advantages * log_pi_taken) * mask).sum() / mask.sum()
@@ -103,7 +111,7 @@ class COMALearner:
             "critic_loss" : [],
             "critic_grad_norm" : [],
             "abs_td_error" : [],
-            "mean_q_value" : [],
+            "mean_q_taken" : [],
             "mean_target" : []
         }
 
@@ -133,11 +141,11 @@ class COMALearner:
             running_log["critic_loss"].append(loss.item())
             running_log["critic_grad_norm"].append(grad_norm)
             running_log["abs_td_error"].append((masked_td_error.abs().sum().item() / mask_t.sum()))
-            running_log["mean_q_value"].append((q_taken * mask_t).sum().item() / (mask_t.sum()))
+            running_log["mean_q_taken"].append((q_taken * mask_t).sum().item() / (mask_t.sum()))
             running_log["mean_target"].append((targets_t * mask_t).sum().item() / mask_t.sum())
 
         ts_logged = len(running_log["critic_loss"])
-        for key in ["critic_loss", "critic_grad_norm", "abs_td_error", "mean_q_value", "mean_target"]:
+        for key in ["critic_loss", "critic_grad_norm", "abs_td_error", "mean_q_taken", "mean_target"]:
             self.logger.log_stat(key, sum(running_log[key])/ts_logged, t_env)
 
         return q_vals.view(-1, self.n_actions)
