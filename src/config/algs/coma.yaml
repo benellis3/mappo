@@ -6,7 +6,6 @@ epsilon_finish: .0
 epsilon_anneal_time: 50000
 
 runner: "parallel"
-t_max: 500000
 
 buffer_size: 8
 batch_size_run: 8
@@ -22,6 +21,5 @@ td_lambda: 0.8
 # use COMA
 agent_output_type: "pi_logits"
 learner: "coma_learner"
-mixer: # mixer becomes None
 
 name: "coma"

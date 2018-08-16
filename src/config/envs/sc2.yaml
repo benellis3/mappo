@@ -23,7 +23,7 @@ env_args:
 
 test_nepisode: 20
 test_interval: 10000
-log_interval: 20000
-runner_log_interval: 20000
-trainer_log_interval: 20000
+log_interval: 10000
+runner_log_interval: 10000
+learner_log_interval: 10000
 t_max: 2000000
