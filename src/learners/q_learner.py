@@ -65,8 +65,7 @@ class QLearner:
         target_mac_out = th.stack(target_mac_out[1:], dim=1)  # Concat across time
 
         # Mask out unavailable actions
-        avail_actions = avail_actions[:, 1:]
-        target_mac_out[avail_actions == 0] = -9999999  # From OG deepmarl
+        target_mac_out[avail_actions[:, 1:] == 0] = -9999999  # From OG deepmarl
 
         # Max over target Q-Values
         if self.args.double_q:
