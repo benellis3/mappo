@@ -243,9 +243,10 @@ def env_worker(remote, env_fn):
             remote.send(env.get_env_info())
         elif cmd == "get_stats":
             remote.send(env.get_stats())
-        elif cmd == "agg_stats":
-            agg_stats = env.get_agg_stats(data)
-            remote.send(agg_stats)
+        # TODO: unused now?
+        # elif cmd == "agg_stats":
+        #     agg_stats = env.get_agg_stats(data)
+        #     remote.send(agg_stats)
         else:
             raise NotImplementedError
 
