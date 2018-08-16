@@ -54,10 +54,6 @@ class QLearner:
         # Pick the Q-Values for the actions taken by each agent
         chosen_action_qvals = th.gather(mac_out[:, :-1], dim=3, index=actions).squeeze(3)  # Remove the last dim
 
-        # Get actions that maximise live Q (for double q-learning)
-        mac_out[avail_actions == 0] = -9999999
-        cur_max_actions = mac_out[:, 1:].max(dim=3, keepdim=True)[1]
-
         # Calculate the Q-Values necessary for the target
         target_mac_out = []
         self.target_mac.init_hidden(batch.batch_size)
@@ -74,17 +70,20 @@ class QLearner:
 
         # Max over target Q-Values
         if self.args.double_q:
+            # Get actions that maximise live Q (for double q-learning)
+            mac_out[avail_actions == 0] = -9999999
+            cur_max_actions = mac_out[:, 1:].max(dim=3, keepdim=True)[1]
             target_max_qvals = th.gather(target_mac_out, 3, cur_max_actions).squeeze(3)
         else:
             target_max_qvals = target_mac_out.max(dim=3)[0]
 
-        # Calculate 1-step Q-Learning targets
-        targets = rewards + self.args.gamma * (1 - terminated) * target_max_qvals
-
         # Mix
         if self.mixer is not None:
             chosen_action_qvals = self.mixer(chosen_action_qvals, batch["state"][:, :-1])
-            targets = self.target_mixer(targets, batch["state"][:, 1:])
+            target_max_qvals = self.target_mixer(target_max_qvals, batch["state"][:, 1:])
+
+        # Calculate 1-step Q-Learning targets
+        targets = rewards + self.args.gamma * (1 - terminated) * target_max_qvals
 
         # Td-error
         td_error = (chosen_action_qvals - targets.detach())
