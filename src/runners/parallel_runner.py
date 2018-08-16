@@ -46,7 +46,7 @@ class ParallelRunner:
 
     def setup(self, scheme, groups, preprocess, mac):
         self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit + 1,
-                                 preprocess=preprocess, device=self.args.device)
+                                 preprocess=preprocess, device="cpu")
         self.mac = mac
         # TODO: Remove these if the runner doesn't need them
         self.scheme = scheme
