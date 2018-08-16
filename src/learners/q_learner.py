@@ -41,6 +41,22 @@ class QLearner:
         terminated = batch["terminated"][:, :-1].float()
         mask = batch["filled"][:, :-1].float()
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
+        avail_actions = batch["avail_actions"]
+
+        # Calculate estimated Q-Values
+        mac_out = []
+        self.mac.init_hidden(batch.batch_size)
+        for t in range(batch.max_seq_length):
+            agent_outs = self.mac.forward(batch, t=t)
+            mac_out.append(agent_outs)
+        mac_out = th.stack(mac_out, dim=1)  # Concat over time
+
+        # Pick the Q-Values for the actions taken by each agent
+        chosen_action_qvals = th.gather(mac_out[:, :-1], dim=3, index=actions).squeeze(3)  # Remove the last dim
+
+        # Get actions that maximise live Q (for double q-learning)
+        mac_out[avail_actions == 0] = -9999999
+        cur_max_actions = mac_out[:, 1:].max(dim=3, keepdim=True)[1]
 
         # Calculate the Q-Values necessary for the target
         target_mac_out = []
@@ -53,30 +69,22 @@ class QLearner:
         target_mac_out = th.stack(target_mac_out[1:], dim=1)  # Concat across time
 
         # Mask out unavailable actions
-        avail_actions = batch["avail_actions"][:, 1:]
+        avail_actions = avail_actions[:, 1:]
         target_mac_out[avail_actions == 0] = -9999999  # From OG deepmarl
 
         # Max over target Q-Values
-        target_max_qvals = target_mac_out.max(dim=3)[0]
+        if self.args.double_q:
+            target_max_qvals = th.gather(target_mac_out, 3, cur_max_actions).squeeze(3)
+        else:
+            target_max_qvals = target_mac_out.max(dim=3)[0]
 
         # Calculate 1-step Q-Learning targets
         targets = rewards + self.args.gamma * (1 - terminated) * target_max_qvals
 
-        # Calculate estimated Q-Values
-        mac_out = []
-        self.mac.init_hidden(batch.batch_size)
-        for t in range(batch.max_seq_length - 1):
-            agent_outs = self.mac.forward(batch, t=t)
-            mac_out.append(agent_outs)
-        mac_out = th.stack(mac_out, dim=1)  # Concat over time again
-
-        # Pick the Q-Values for the actions taken by each agent
-        chosen_action_qvals = th.gather(mac_out, dim=3, index=actions).squeeze(3)  # Remove the last dim
-
         # Mix
         if self.mixer is not None:
-            chosen_action_qvals = self.mixer(chosen_action_qvals, batch)
-            targets = self.target_mixer(targets, batch)
+            chosen_action_qvals = self.mixer(chosen_action_qvals, batch["state"][:, :-1])
+            targets = self.target_mixer(targets, batch["state"][:, 1:])
 
         # Td-error
         td_error = (chosen_action_qvals - targets.detach())
