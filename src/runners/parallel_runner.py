@@ -1,11 +1,11 @@
 from envs import REGISTRY as env_REGISTRY
 from functools import partial
 from components.episode_buffer import EpisodeBatch
-from torch.multiprocessing import Process, Pipe
+import torch.multiprocessing as mp
 import numpy as np
 import torch as th
 
-
+mp = mp.get_context("spawn")
 # Based (very) heavily on SubprocVecEnv from OpenAI Baselines
 # https://github.com/openai/baselines/blob/master/baselines/common/vec_env/subproc_vec_env.py
 class ParallelRunner:
@@ -17,9 +17,9 @@ class ParallelRunner:
 
         # Make subprocesses for the envs
         # TODO: Add a delay when making sc2 envs
-        self.parent_conns, self.worker_conns = zip(*[Pipe() for _ in range(self.batch_size)])
+        self.parent_conns, self.worker_conns = zip(*[mp.Pipe() for _ in range(self.batch_size)])
         env_fn = env_REGISTRY[self.args.env]
-        self.ps = [Process(target=env_worker, args=(worker_conn, CloudpickleWrapper(partial(env_fn, env_args=self.args.env_args))))
+        self.ps = [mp.Process(target=env_worker, args=(worker_conn, CloudpickleWrapper(partial(env_fn, env_args=self.args.env_args))))
                             for worker_conn in self.worker_conns]
 
         for p in self.ps:
