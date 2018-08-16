@@ -1,11 +1,11 @@
 from envs import REGISTRY as env_REGISTRY
 from functools import partial
 from components.episode_buffer import EpisodeBatch
-import torch.multiprocessing as mp
+from multiprocessing import Pipe, Process
 import numpy as np
 import torch as th
 
-mp = mp.get_context("spawn")
+
 # Based (very) heavily on SubprocVecEnv from OpenAI Baselines
 # https://github.com/openai/baselines/blob/master/baselines/common/vec_env/subproc_vec_env.py
 class ParallelRunner:
@@ -17,9 +17,9 @@ class ParallelRunner:
 
         # Make subprocesses for the envs
         # TODO: Add a delay when making sc2 envs
-        self.parent_conns, self.worker_conns = zip(*[mp.Pipe() for _ in range(self.batch_size)])
+        self.parent_conns, self.worker_conns = zip(*[Pipe() for _ in range(self.batch_size)])
         env_fn = env_REGISTRY[self.args.env]
-        self.ps = [mp.Process(target=env_worker, args=(worker_conn, CloudpickleWrapper(partial(env_fn, env_args=self.args.env_args))))
+        self.ps = [Process(target=env_worker, args=(worker_conn, CloudpickleWrapper(partial(env_fn, env_args=self.args.env_args))))
                             for worker_conn in self.worker_conns]
 
         for p in self.ps:
@@ -96,17 +96,17 @@ class ParallelRunner:
             # Pass the entire batch of experiences up till now to the agents
             # Receive the actions for each agent at this timestep in a batch for each un-terminated env
             actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, bs=envs_not_terminated, test_mode=test_mode)
-
+            cpu_actions = actions.to("cpu").numpy()
             # Send actions to each env
             action_idx = 0
             for idx, parent_conn in enumerate(self.parent_conns):
                 if not terminated[idx]:
-                    parent_conn.send(("step", actions[action_idx]))
+                    parent_conn.send(("step", cpu_actions[action_idx]))
                     action_idx += 1 # actions is not a list over every env
 
             # Post step data we will insert for the current timestep
             post_transition_data = {
-                "actions": [],
+                "actions": actions.unsqueeze(1),
                 "reward": [],
                 "terminated": []
             }
@@ -122,7 +122,6 @@ class ParallelRunner:
                 if not terminated[idx]:
                     data = parent_conn.recv()
                     # Remaining data for this current timestep
-                    post_transition_data["actions"].append(data["actions"])
                     post_transition_data["reward"].append((data["reward"],))
 
                     episode_returns[idx] += data["reward"]
@@ -142,10 +141,6 @@ class ParallelRunner:
                     pre_transition_data["state"].append(data["state"])
                     pre_transition_data["avail_actions"].append(data["avail_actions"])
                     pre_transition_data["obs"].append(data["obs"])
-
-            # Actions are a tensor, need to stack them
-            # TODO: Make a bit cleaner
-            post_transition_data["actions"] = th.stack(post_transition_data["actions"], dim=0).unsqueeze(1)
 
             # Add post_transiton data into the batch
             self.batch.update(post_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=False)
@@ -224,7 +219,6 @@ def env_worker(remote, env_fn):
                 "avail_actions": avail_actions,
                 "obs": obs,
                 # Rest of the data for the current timestep
-                "actions": actions,
                 "reward": reward,
                 "terminated": terminated,
                 "info": env_info
