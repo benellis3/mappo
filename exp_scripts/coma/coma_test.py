@@ -28,6 +28,7 @@ for lr in [0.0001, 0.0005, 0.001]:
         {
             "name": "coma_sc2_5m",
             "lr": lr,
+            "critic_lr": lr,
             "env_args.map_name": "5m_5m"
         },
         repeats=2)
