@@ -25,7 +25,7 @@ buffer_size: 32 # Size of the replay buffer
 lr: 0.0005 # Learning rate for agents
 critic_lr: 0.0005 # Learning rate for critics
 optim_alpha: 0.99 # RMSProp alpha
-optim_eps: 0.01 # RMSProp epsilon
+optim_eps: 0.00001 # RMSProp epsilon
 grad_norm_clip: 10 # Reduce magnitude of gradients above this L2 norm
 
 # --- Agent parameters ---
