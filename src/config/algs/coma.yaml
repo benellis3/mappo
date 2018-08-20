@@ -11,6 +11,9 @@ buffer_size: 8
 batch_size_run: 8
 batch_size: 8
 
+env_args:
+  state_last_action: False # coma critic adds last action internally
+
 # update the target network every {} training steps
 target_update_interval: 500
 
