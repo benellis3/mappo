@@ -17,6 +17,8 @@ class COMALearner:
         self.last_target_update_step = 0
         self.critic_training_steps = 0
 
+        self.log_stats_t = -self.args.learner_log_interval - 1
+
         self.critic = COMACritic(scheme, args)
         self.target_critic = copy.deepcopy(self.critic)
 
@@ -24,8 +26,8 @@ class COMALearner:
         self.critic_params = list(self.critic.parameters())
         self.params = self.agent_params + self.critic_params
 
-        self.agent_optimiser = RMSprop(params=self.agent_params, lr=args.lr)
-        self.critic_optimiser = RMSprop(params=self.critic_params, lr=args.critic_lr)
+        self.agent_optimiser = RMSprop(params=self.agent_params, lr=args.lr, alpha=args.optim_alpha, eps=args.optim_eps)
+        self.critic_optimiser = RMSprop(params=self.critic_params, lr=args.critic_lr, alpha=args.optim_alpha, eps=args.optim_eps)
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         # Get the relevant quantities
@@ -42,7 +44,8 @@ class COMALearner:
 
         mask = mask.repeat(1, 1, self.n_agents).view(-1)
 
-        q_vals = self._train_critic(batch, rewards, terminated, actions, avail_actions, critic_mask, bs, max_t, t_env)
+        q_vals, critic_train_stats = self._train_critic(batch, rewards, terminated, actions, avail_actions,
+                                                        critic_mask, bs, max_t, t_env)
 
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
@@ -60,11 +63,8 @@ class COMALearner:
         pi = mac_out.view(-1, self.n_actions)
         baseline = (pi * q_vals).sum(-1).detach()
 
-        self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum(), t_env)
-
         # Calculate policy grad with mask
         q_taken = th.gather(q_vals, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
-        # log_pi = mac_out.log_softmax(dim=-1).view(-1, self.n_actions)
         pi_taken = th.gather(pi, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
         pi_taken[mask == 0] = 1.0
         log_pi_taken = th.log(pi_taken)
@@ -81,8 +81,6 @@ class COMALearner:
 
         coma_loss = - ((advantages * log_pi_taken) * mask).sum() / mask.sum()
 
-        self.logger.log_stat("advantage_mean", (advantages * mask).sum().item() / mask.sum(), t_env)
-
         # Optimise agents
         self.agent_optimiser.zero_grad()
         coma_loss.backward()
@@ -93,8 +91,16 @@ class COMALearner:
             self._update_targets()
             self.last_target_update_step = self.critic_training_steps
 
-        self.logger.log_stat("coma_loss", coma_loss.item(), t_env)
-        self.logger.log_stat("agent_grad_norm", grad_norm, t_env)
+        if t_env - self.log_stats_t >= self.args.learner_log_interval:
+            ts_logged = len(critic_train_stats["critic_loss"])
+            for key in ["critic_loss", "critic_grad_norm", "td_error_abs", "q_taken_mean", "target_mean"]:
+                self.logger.log_stat(key, sum(critic_train_stats[key])/ts_logged, t_env)
+
+            self.logger.log_stat("advantage_mean", (advantages * mask).sum().item() / mask.sum(), t_env)
+            self.logger.log_stat("coma_loss", coma_loss.item(), t_env)
+            self.logger.log_stat("agent_grad_norm", grad_norm, t_env)
+            self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum(), t_env)
+            self.log_stats_t = t_env
 
     def _train_critic(self, batch, rewards, terminated, actions, avail_actions, mask, bs, max_t, t_env):
         # Optimise critic
@@ -134,7 +140,7 @@ class COMALearner:
             loss = (masked_td_error ** 2).sum() / mask_t.sum()  # Not dividing by number of agents, only # valid timesteps
             self.critic_optimiser.zero_grad()
             loss.backward()
-            grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, 5)
+            grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, self.args.grad_norm_clip)
             self.critic_optimiser.step()
             self.critic_training_steps += 1
 
@@ -144,11 +150,7 @@ class COMALearner:
             running_log["q_taken_mean"].append((q_taken * mask_t).sum().item() / (mask_t.sum()))
             running_log["target_mean"].append((targets_t * mask_t).sum().item() / mask_t.sum())
 
-        ts_logged = len(running_log["critic_loss"])
-        for key in ["critic_loss", "critic_grad_norm", "td_error_abs", "q_taken_mean", "target_mean"]:
-            self.logger.log_stat(key, sum(running_log[key])/ts_logged, t_env)
-
-        return q_vals.view(-1, self.n_actions)
+        return q_vals.view(-1, self.n_actions), running_log
 
     def _update_targets(self):
         self.target_critic.load_state_dict(self.critic.state_dict())
