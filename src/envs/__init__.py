@@ -2,14 +2,17 @@ from functools import partial
 
 from .predator_prey import PredatorPreyCapture
 from .box_pushing import CoopBoxPushing
-#from .predator_prey import PredatorPreyCaptureCython
 from .predator_prey__old import PredatorPreyEnv as PredatorPreyOldEnv
 from .matrix_game import NormalFormMatrixGame
 from .test import IntegrationTestEnv
+from .multiagentenv import MultiAgentEnv
 
-def env_fn(env, **kwargs): # TODO: this may be a more complex function
+
+# TODO: Do we need this?
+def env_fn(env, **kwargs) -> MultiAgentEnv: # TODO: this may be a more complex function
     # env_args = kwargs.get("env_args", {})
     return env(**kwargs)
+
 
 REGISTRY = {}
 REGISTRY["pred_prey__old"] = partial(env_fn, env=PredatorPreyOldEnv)

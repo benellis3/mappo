@@ -55,8 +55,6 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.batch_mode = batch_size is not None
         self.batch_size = batch_size if self.batch_mode else 1
 
-        assert self.batch_size == 1, "BatchSize of 1 only for PredPrey environment!"
-
         # Define the environment grid
         self.intersection_id_coded = getattr(args, "intersection_id_coded", False)
         self.intersection_global_view = getattr(args, "intersection_global_view", False)
@@ -79,7 +77,7 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.n_prey = args.n_prey
         self.agent_obs = args.agent_obs
         self.agent_obs_dim = np.asarray(self.agent_obs, dtype=int_type)
-        self.fully_observable = getattr(args, "fully_observable", False)
+        self.fully_observable = args.fully_observable
         self.obs_size = self.state_size if self.fully_observable else 2*(2*args.agent_obs[0]+1)*(2*args.agent_obs[1]+1)
 
         # Define the episode and rewards
@@ -410,13 +408,11 @@ class PredatorPreyCapture(MultiAgentEnv):
         # Terminate if episode_limit is reached
         info = {}
         self.steps += 1
-        if not terminated[0] and self.steps >= self.episode_limit:
-            # Only set the episode limit flag if the environment didn't terminate itself on the last step
+        if self.steps >= self.episode_limit:
+            terminated = [True for _ in range(self.batch_size)]
             info["episode_limit"] = self.truncate_episodes      # by default True
-            # self.episode_limit += 5
-            # if self.episode_limit < 10:
-            #     self.episode_limit = 50
-            terminated[0] = True
+        else:
+            info["episode_limit"] = False
 
         if self.batch_mode:
             return reward, terminated, info

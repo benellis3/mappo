@@ -76,7 +76,7 @@ def run_sequential(args, logger):
     runner = r_REGISTRY[args.runner](args=args, logger=logger)
 
     # Set up schemes and groups here
-    env_info = runner.env.get_env_info()
+    env_info = runner.get_env_info()
     args.n_agents = env_info["n_agents"]
     args.n_actions = env_info["n_actions"]
     args.state_shape = env_info["state_shape"]
@@ -88,7 +88,7 @@ def run_sequential(args, logger):
         "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},
         "avail_actions": {"vshape": (env_info["n_actions"],), "group": "agents", "dtype": th.int},
         "reward": {"vshape": (1,)},
-        "terminated": {"vshape": (1,), "dtype": th.uint8}
+        "terminated": {"vshape": (1,), "dtype": th.uint8},
     }
     groups = {
         "agents": args.n_agents
@@ -97,18 +97,17 @@ def run_sequential(args, logger):
         "actions": ("actions_onehot", [OneHot(out_dim=args.n_actions)])
     }
 
-    # TODO: Add device
-    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"],
+    buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"] + 1,
                           preprocess=preprocess, device=args.device)
 
     # Setup multiagent controller here
-    mac = mac_REGISTRY[args.mac](buffer.scheme, groups, args)  # Dummy for testing
+    mac = mac_REGISTRY[args.mac](buffer.scheme, groups, args)
 
     # Give runner the scheme
     runner.setup(scheme=scheme, groups=groups, preprocess=preprocess, mac=mac)
 
     # Learner
-    learner = le_REGISTRY[args.learner](mac, logger, args)
+    learner = le_REGISTRY[args.learner](mac, buffer.scheme, logger, args)
 
     if args.use_cuda:
         learner.cuda()
@@ -182,6 +181,11 @@ def args_sanity_check(config, _log):
     if config["use_cuda"] and not th.cuda.is_available():
         config["use_cuda"] = False
         _log.warning("CUDA flag use_cuda was switched OFF automatically because no CUDA devices are available!")
+
+    if config["test_nepisode"] < config["batch_size_run"]:
+        config["test_nepisode"] = config["batch_size_run"]
+    else:
+        config["test_nepisode"] = (config["test_nepisode"]//config["batch_size_run"]) * config["batch_size_run"]
 
     # assert (config["run_mode"] in ["parallel_subproc"] and config["use_replay_buffer"]) or (not config["run_mode"] in ["parallel_subproc"]),  \
     #     "need to use replay buffer if running in parallel mode!"

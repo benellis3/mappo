@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import collections
 from os.path import dirname, abspath
 import pymongo
 from sacred import Experiment, SETTINGS
@@ -85,6 +86,14 @@ def _get_config(params, arg_name, subfolder):
                 assert False, "{}.yaml error: {}".format(config_name, exc)
         return config_dict
 
+def recursive_dict_update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.Mapping):
+            d[k] = recursive_dict_update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
+
 if __name__ == '__main__':
     import os
 
@@ -101,9 +110,11 @@ if __name__ == '__main__':
             assert False, "default.yaml error: {}".format(exc)
 
     # Load algorithm and env base configs
-    alg_config = _get_config(params, "--config", "algs")
     env_config = _get_config(params, "--env-config", "envs")
-    config_dict = {**config_dict, **alg_config, **env_config}
+    alg_config = _get_config(params, "--config", "algs")
+    # config_dict = {**config_dict, **env_config, **alg_config}
+    config_dict = recursive_dict_update(config_dict, env_config)
+    config_dict = recursive_dict_update(config_dict, alg_config)
 
     # now add all the config to sacred
     ex.add_config(config_dict)
