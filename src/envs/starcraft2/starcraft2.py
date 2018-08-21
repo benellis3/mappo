@@ -53,14 +53,13 @@ difficulties = {
 }
 
 sz_maps = ['2s_3z', '3s_5z', '5s_7z' ]
-ssz_maps = [ '2s_2s_3z' ]
 csz_maps = [ '1c_3s_5z', '2c_3s_5z' ]
 s_v_z_maps = ['3s_v_3z', '3s_v_4z']
 
 action_move_id = 16     #    target: PointOrUnit
-action_attack_id = 23    #    target: PointOrUnit
+action_attack_id = 23   #    target: PointOrUnit
 action_stop_id = 4      #    target: None
-action_heal_id = 386      #    target: Unit
+action_heal_id = 386    #    target: Unit
 
 '''
 StarCraft II
@@ -163,10 +162,6 @@ class SC2(MultiAgentEnv):
             self.map_type = 'sz'
             self.unit_type_bits = 2
             self.shield_bits = 1
-        elif self.map_name in ssz_maps:
-            self.map_type = 'ssz'
-            self.unit_type_bits = 3
-            self.shield_bits = 1
         elif self.map_name in csz_maps:
             self.map_type = 'csz'
             self.unit_type_bits = 3
@@ -190,10 +185,6 @@ class SC2(MultiAgentEnv):
         if self.map_type == 'sz':
             self.stalker_id = min_unit_type
             self.zealot_id = min_unit_type + 1
-        elif self.map_type == 'ssz':
-            self.sentry_id = min_unit_type
-            self.stalker_id = min_unit_type + 1
-            self.zealot_id = min_unit_type + 2
         elif self.map_type == 'csz':
             self.colossus_id = min_unit_type
             self.stalker_id = min_unit_type + 1
@@ -794,13 +785,6 @@ class SC2(MultiAgentEnv):
             if self.map_type == 'sz':
                 # id(Stalker) + 1 = id(Zealot)
                 type_id = unit.unit_type - self.stalker_id
-            elif self.map_type == 'ssz':
-                if unit.unit_type == self.sentry_id:
-                    type_id = 0
-                elif unit.unit_type == self.zealot_id:
-                    type_id = 1
-                else:
-                    type_id = 2
             elif self.map_type == 'csz':
                 if unit.unit_type == self.colossus_id:
                     type_id = 0
@@ -821,14 +805,6 @@ class SC2(MultiAgentEnv):
             if self.map_type == 'sz':
                 # id(Stalker) = 74, id(Zealot) = 73
                 type_id = unit.unit_type - 73
-            elif self.map_type == 'ssz':
-                # id(Stalker) = 74, id(Zealot) = 73, id(Sentry) = 77
-                if unit.unit_type == 77:
-                    type_id = 0
-                elif unit.unit_type == 73:
-                    type_id = 1
-                else:
-                    type_id = 2
             elif self.map_type == 'csz':
                 # id(Stalker) = 74, id(Zealot) = 73, id(Colossus) = 4
                 if unit.unit_type == 4:
