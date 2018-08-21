@@ -16,8 +16,9 @@ env_args:
   reward_win: 200
   state_last_action: True
   step_mul: 8
-  obs_ignore_ally: False
   obs_instead_of_state: False
+  obs_own_health: True
+  obs_target: False
   continuing_episode: False
   game_version: "3.16.1"
 

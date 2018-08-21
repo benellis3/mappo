@@ -109,7 +109,6 @@ class SC2(MultiAgentEnv):
         self.seed = args.seed
         self.heuristic = args.heuristic
         self.measure_fps = args.measure_fps
-        self.obs_ignore_ally = args.obs_ignore_ally
         self.obs_instead_of_state = args.obs_instead_of_state
         self.window_size = (1920, 1200)
 
@@ -626,8 +625,7 @@ class SC2(MultiAgentEnv):
 
         move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
-        if not self.obs_ignore_ally:
-            ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
+        ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
 
         if unit.health > 0: # otherwise dead, return all zeros
             x = unit.pos.x
@@ -655,33 +653,28 @@ class SC2(MultiAgentEnv):
                         type_id = self.get_unit_type_id(e_unit, False)
                         enemy_feats[e_id, 4 + type_id] = 1
 
-            if not self.obs_ignore_ally:
-                # place the features of the agent himself always at the first place
-                al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
-                for i, al_id in enumerate(al_ids):
+            # place the features of the agent himself always at the first place
+            al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
+            for i, al_id in enumerate(al_ids):
 
-                    al_unit = self.get_unit_by_id(al_id)
-                    al_x = al_unit.pos.x
-                    al_y = al_unit.pos.y
-                    dist = self.distance(x, y, al_x, al_y)
+                al_unit = self.get_unit_by_id(al_id)
+                al_x = al_unit.pos.x
+                al_y = al_unit.pos.y
+                dist = self.distance(x, y, al_x, al_y)
 
-                    if dist < sight_range and al_unit.health > 0: # visible and alive
-                        ally_feats[i, 0] = 1 # visible
-                        ally_feats[i, 1] = dist / sight_range # distance
-                        ally_feats[i, 2] = (al_x - x) / sight_range # relative X
-                        ally_feats[i, 3] = (al_y - y) / sight_range # relative Y
+                if dist < sight_range and al_unit.health > 0: # visible and alive
+                    ally_feats[i, 0] = 1 # visible
+                    ally_feats[i, 1] = dist / sight_range # distance
+                    ally_feats[i, 2] = (al_x - x) / sight_range # relative X
+                    ally_feats[i, 3] = (al_y - y) / sight_range # relative Y
 
-                        if self.unit_type_bits > 0:
-                            type_id = self.get_unit_type_id(al_unit, True)
-                            ally_feats[i, 4 + type_id] = 1
+                    if self.unit_type_bits > 0:
+                        type_id = self.get_unit_type_id(al_unit, True)
+                        ally_feats[i, 4 + type_id] = 1
 
-        if not self.obs_ignore_ally:
-            agent_obs = np.concatenate((move_feats.flatten(),
-                                        enemy_feats.flatten(),
-                                        ally_feats.flatten()))
-        else:
-            agent_obs = np.concatenate((move_feats.flatten(),
-                                        enemy_feats.flatten()))
+        agent_obs = np.concatenate((move_feats.flatten(),
+                                    enemy_feats.flatten(),
+                                    ally_feats.flatten()))
 
 
         agent_obs = agent_obs.astype(dtype=np.float32)
@@ -692,8 +685,7 @@ class SC2(MultiAgentEnv):
             print("Available Actions\n", self.get_avail_agent_actions(agent_id))
             print("Move feats\n", move_feats)
             print("Enemy feats\n", enemy_feats)
-            if not self.obs_ignore_ally:
-                print("Ally feats\n", ally_feats)
+            print("Ally feats\n", ally_feats)
             print("***************************************")
 
         return agent_obs
@@ -1027,11 +1019,7 @@ class SC2(MultiAgentEnv):
 
     def get_obs_size(self):
 
-        if not self.obs_ignore_ally:
-            nf_al = 4 + self.unit_type_bits
-        else:
-            nf_al = 0
-
+        nf_al = 4 + self.unit_type_bits
         nf_en = 4 + self.unit_type_bits
 
         move_feats = self.n_actions_no_attack - 2
