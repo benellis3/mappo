@@ -21,12 +21,9 @@ from s2clientprotocol import debug_pb2 as d_pb
 from utils.dict2namedtuple import convert
 
 from absl import flags
-import sys
 
 FLAGS = flags.FLAGS
 FLAGS(['main.py'])
-
-# Copyright 2018, Mika Samvelyan
 
 _possible_results = {
     sc_pb.Victory: 1,
@@ -97,6 +94,10 @@ class SC2(MultiAgentEnv):
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         self.difficulty = args.difficulty
+        # Observations and state
+        self.obs_own_health = args.obs_own_health
+        self.obs_targets = args.obs_targets
+        self.obs_instead_of_state = args.obs_instead_of_state
         self.state_last_action = args.state_last_action
         # Rewards args
         self.reward_only_positive = args.reward_only_positive
@@ -109,7 +110,6 @@ class SC2(MultiAgentEnv):
         self.seed = args.seed
         self.heuristic = args.heuristic
         self.measure_fps = args.measure_fps
-        self.obs_instead_of_state = args.obs_instead_of_state
         self.window_size = (1920, 1200)
 
         self.debug_inputs = False
@@ -676,12 +676,16 @@ class SC2(MultiAgentEnv):
                                     enemy_feats.flatten(),
                                     ally_feats.flatten()))
 
+        if self.obs_own_health:
+            agent_obs = np.append(agent_obs, unit.health / unit.health_max)
 
         agent_obs = agent_obs.astype(dtype=np.float32)
 
         if self.debug_inputs:
             print("***************************************")
             print("Agent: ", agent_id)
+            if self.obs_own_health:
+                print("Health: ", unit.health / unit.health_max)
             print("Available Actions\n", self.get_avail_agent_actions(agent_id))
             print("Move feats\n", move_feats)
             print("Enemy feats\n", enemy_feats)
@@ -1026,7 +1030,9 @@ class SC2(MultiAgentEnv):
         enemy_feats = self.n_enemies * nf_en
         ally_feats = (self.n_agents - 1) * nf_al
 
-        return move_feats + enemy_feats + ally_feats
+        health = 1 if self.obs_own_health else 0
+
+        return move_feats + enemy_feats + ally_feats + health
 
     def close(self):
         print("Closing StarCraftII")
