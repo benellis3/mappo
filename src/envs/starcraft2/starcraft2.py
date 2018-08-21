@@ -69,14 +69,14 @@ StarCraft II
 '''
 
 # map parameter registry
-map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60},
-                      "5m_5m": {"n_agents": 5, "n_enemies": 5, "limit": 60},
-                      "8m_8m": {"n_agents": 8, "n_enemies": 8, "limit": 120},
-                      "2s_3z": {"n_agents": 5, "n_enemies": 5, "limit": 120},
-                      "3s_5z": {"n_agents": 8, "n_enemies": 8, "limit": 150},
-                      "1c_3s_5z": {"n_agents": 9, "n_enemies": 9, "limit": 200},
-                      "2c_3s_5z": {"n_agents": 10, "n_enemies": 10, "limit": 200},
-                      "MMM": {"n_agents": 10, "n_enemies": 10, "limit": 150},
+map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60, "a_race": "T", "b_race": "T"},
+                      "5m_5m": {"n_agents": 5, "n_enemies": 5, "limit": 60, "a_race": "T", "b_race": "T"},
+                      "8m_8m": {"n_agents": 8, "n_enemies": 8, "limit": 120, "a_race": "T", "b_race": "T"},
+                      "2s_3z": {"n_agents": 5, "n_enemies": 5, "limit": 120, "a_race": "P", "b_race": "P"},
+                      "3s_5z": {"n_agents": 8, "n_enemies": 8, "limit": 150, "a_race": "P", "b_race": "P"},
+                      "1c_3s_5z": {"n_agents": 9, "n_enemies": 9, "limit": 200, "a_race": "P", "b_race": "P"},
+                      "2c_3s_5z": {"n_agents": 10, "n_enemies": 10, "limit": 200, "a_race": "P", "b_race": "P"},
+                      "MMM": {"n_agents": 10, "n_enemies": 10, "limit": 150, "a_race": "T", "b_race":"T"},
                      }
 
 class SC2(MultiAgentEnv):
@@ -111,6 +111,7 @@ class SC2(MultiAgentEnv):
         self.measure_fps = args.measure_fps
         self.obs_ignore_ally = args.obs_ignore_ally
         self.obs_instead_of_state = args.obs_instead_of_state
+        self.window_size = (1920, 1200)
 
         self.debug_inputs = False
         self.debug_rewards = False
@@ -121,14 +122,16 @@ class SC2(MultiAgentEnv):
 
         self.continuing_episode = args.continuing_episode
 
+        self._agent_race = map_param_registry[self.map_name]["a_race"]
+        self._bot_race = map_param_registry[self.map_name]["b_race"]
+
         self.map_settings()
 
         if sys.platform == 'linux':
             os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
             self.game_version = args.game_version
         else:
-            self.game_version = "4.1.2"
-
+            self.game_version = "4.3.2"
 
         # Launch the game
         self._launch()
@@ -158,32 +161,22 @@ class SC2(MultiAgentEnv):
             self.map_type = 'stalker_zaelot'
             self.unit_type_bits = 2
             self.shield_bits = 1
-            self._agent_race = "P"
-            self._bot_race = "P"
         elif self.map_name in ssz_maps:
             self.map_type = 'ssz'
             self.unit_type_bits = 3
             self.shield_bits = 1
-            self._agent_race = "P"
-            self._bot_race = "P"
         elif self.map_name in csz_maps:
             self.map_type = 'csz'
             self.unit_type_bits = 3
             self.shield_bits = 1
-            self._agent_race = "P"
-            self._bot_race = "P"
         elif self.map_name == 'MMM':
             self.map_type = 'MMM'
             self.unit_type_bits = 3
             self.shield_bits = 0
-            self._agent_race = "T"
-            self._bot_race = "T"
         else:
             self.map_type = 'marines'
             self.unit_type_bits = 0
             self.shield_bits = 0
-            self._agent_race = "T"
-            self._bot_race = "T"
 
         self.stalker_id = self.sentry_id = self.zealot_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
@@ -218,7 +211,7 @@ class SC2(MultiAgentEnv):
                 raw = True, # raw, feature-level data
                 score = True)
 
-        self._sc2_procs = [self._run_config.start(game_version=self.game_version)]
+        self._sc2_procs = [self._run_config.start(game_version=self.game_version, window_size=self.window_size)]
         self._controllers = [p.controller for p in self._sc2_procs]
 
         # All the communication with SC2 will go through the controller
