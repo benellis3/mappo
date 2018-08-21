@@ -1,4 +1,5 @@
 from ..multiagentenv import MultiAgentEnv
+from .map_params import get_map_params, map_present
 import numpy as np
 import pygame
 import sys
@@ -65,19 +66,6 @@ action_heal_id = 386    #    target: Unit
 StarCraft II
 '''
 
-# map parameter registry
-map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60, "a_race": "T", "b_race": "T"},
-                      "5m_5m": {"n_agents": 5, "n_enemies": 5, "limit": 60, "a_race": "T", "b_race": "T"},
-                      "8m_8m": {"n_agents": 8, "n_enemies": 8, "limit": 120, "a_race": "T", "b_race": "T"},
-                      "2s_3z": {"n_agents": 5, "n_enemies": 5, "limit": 120, "a_race": "P", "b_race": "P"},
-                      "3s_5z": {"n_agents": 8, "n_enemies": 8, "limit": 150, "a_race": "P", "b_race": "P"},
-                      "1c_3s_5z": {"n_agents": 9, "n_enemies": 9, "limit": 200, "a_race": "P", "b_race": "P"},
-                      "2c_3s_5z": {"n_agents": 10, "n_enemies": 10, "limit": 200, "a_race": "P", "b_race": "P"},
-                      "MMM": {"n_agents": 10, "n_enemies": 10, "limit": 150, "a_race": "T", "b_race":"T"},
-                      "3s_v_3z": {"n_agents": 3, "n_enemies": 3, "limit": 120, "a_race": "P", "b_race": "P"},
-                      "3s_v_4z": {"n_agents": 3, "n_enemies": 4, "limit": 120, "a_race": "P", "b_race": "P"},
-                     }
-
 class SC2(MultiAgentEnv):
 
     def __init__(self, **kwargs):
@@ -85,14 +73,14 @@ class SC2(MultiAgentEnv):
         args = kwargs["env_args"]
         if isinstance(args, dict):
             args = convert(args)
-        self.map_param_registry = kwargs.get("map_param_registry", map_param_registry)
         # Read arguments
         self.map_name = args.map_name
-        assert self.map_name in map_param_registry, \
+        assert map_present(self.map_name), \
             "map {} not in map registry! please add.".format(self.map_name)
-        self.n_agents = map_param_registry[self.map_name]["n_agents"]
-        self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        self.episode_limit = map_param_registry[self.map_name]["limit"]
+        map_params = get_map_params(self.map_name)
+        self.n_agents = map_params["n_agents"]
+        self.n_enemies = map_params["n_enemies"]
+        self.episode_limit = map_params["limit"]
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         self.difficulty = args.difficulty
@@ -123,10 +111,11 @@ class SC2(MultiAgentEnv):
 
         self.continuing_episode = args.continuing_episode
 
-        self._agent_race = map_param_registry[self.map_name]["a_race"]
-        self._bot_race = map_param_registry[self.map_name]["b_race"]
-
-        self.map_settings()
+        self._agent_race = map_params["a_race"]
+        self._bot_race = map_params["b_race"]
+        self.shield_bits = 1 if map_params["shield"] else 0
+        self.unit_type_bits = map_params["unit_type_bits"]
+        self.map_type = map_params["map_type"]
 
         if sys.platform == 'linux':
             os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
@@ -156,31 +145,10 @@ class SC2(MultiAgentEnv):
 
         self.last_stats = None
 
-    def map_settings(self):
-
-        if self.map_name in sz_maps:
-            self.map_type = 'sz'
-            self.unit_type_bits = 2
-            self.shield_bits = 1
-        elif self.map_name in csz_maps:
-            self.map_type = 'csz'
-            self.unit_type_bits = 3
-            self.shield_bits = 1
-        elif self.map_name == 'MMM':
-            self.map_type = 'MMM'
-            self.unit_type_bits = 3
-            self.shield_bits = 0
-        else:
-            self.map_type = 'marines'
-            self.unit_type_bits = 0
-            self.shield_bits = 0
-
-        self.stalker_id = self.sentry_id = self.zealot_id = 0
-        self.marine_id = self.marauder_id= self.medivac_id = 0
-
     def init_ally_unit_types(self, min_unit_type):
         # This should be called once from the init_units function
-        # Don't need for marine maps
+        self.stalker_id = self.sentry_id = self.zealot_id = 0
+        self.marine_id = self.marauder_id= self.medivac_id = 0
 
         if self.map_type == 'sz':
             self.stalker_id = min_unit_type
