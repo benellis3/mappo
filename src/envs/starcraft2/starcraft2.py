@@ -685,6 +685,10 @@ class SC2(MultiAgentEnv):
                 max_shield = self.unit_max_shield(unit)
                 agent_obs = np.append(agent_obs, unit.shield / max_shield)
 
+        if self.unit_type_bits > 0:
+            unit_type = self.one_hot(self.get_unit_type_id(unit, ally=True), self.unit_type_bits)[0]
+            agent_obs = np.append(agent_obs, unit_type)
+
         agent_obs = agent_obs.astype(dtype=np.float32)
 
         if self.debug_inputs:
@@ -695,6 +699,9 @@ class SC2(MultiAgentEnv):
                 if self.shield_bits == 1:
                     max_shield = self.unit_max_shield(unit)
                     print("Shield: ", unit.shield / max_shield)
+            if self.unit_type_bits > 0:
+                unit_type = self.one_hot(self.get_unit_type_id(unit, ally=True), self.unit_type_bits)[0]
+                print("Unit type: ", unit_type)
             print("Available Actions\n", self.get_avail_agent_actions(agent_id))
             print("Move feats\n", move_feats)
             print("Enemy feats\n", enemy_feats)
@@ -1042,7 +1049,7 @@ class SC2(MultiAgentEnv):
 
         health = 1 + self.shield_bits if self.obs_own_health else 0
 
-        return move_feats + enemy_feats + ally_feats + health
+        return move_feats + enemy_feats + ally_feats + health + self.unit_type_bits
 
     def close(self):
         print("Closing StarCraftII")
