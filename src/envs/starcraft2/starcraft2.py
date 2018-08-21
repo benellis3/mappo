@@ -52,9 +52,10 @@ difficulties = {
     "A": sc_pb.CheatInsane,
 }
 
-stalker_zaelot_maps = ['2s_3z', '3s_5z', '5s_7z' ]
+sz_maps = ['2s_3z', '3s_5z', '5s_7z' ]
 ssz_maps = [ '2s_2s_3z' ]
 csz_maps = [ '1c_3s_5z', '2c_3s_5z' ]
+s_v_z_maps = ['3s_v_3z', '3s_v_4z']
 
 action_move_id = 16     #    target: PointOrUnit
 action_attack_id = 23    #    target: PointOrUnit
@@ -74,6 +75,8 @@ map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60, "a_r
                       "1c_3s_5z": {"n_agents": 9, "n_enemies": 9, "limit": 200, "a_race": "P", "b_race": "P"},
                       "2c_3s_5z": {"n_agents": 10, "n_enemies": 10, "limit": 200, "a_race": "P", "b_race": "P"},
                       "MMM": {"n_agents": 10, "n_enemies": 10, "limit": 150, "a_race": "T", "b_race":"T"},
+                      "3s_v_3z": {"n_agents": 3, "n_enemies": 3, "limit": 120, "a_race": "P", "b_race": "P"},
+                      "3s_v_4z": {"n_agents": 3, "n_enemies": 4, "limit": 120, "a_race": "P", "b_race": "P"},
                      }
 
 class SC2(MultiAgentEnv):
@@ -156,8 +159,8 @@ class SC2(MultiAgentEnv):
 
     def map_settings(self):
 
-        if self.map_name in stalker_zaelot_maps:
-            self.map_type = 'stalker_zaelot'
+        if self.map_name in sz_maps:
+            self.map_type = 'sz'
             self.unit_type_bits = 2
             self.shield_bits = 1
         elif self.map_name in ssz_maps:
@@ -184,7 +187,7 @@ class SC2(MultiAgentEnv):
         # This should be called once from the init_units function
         # Don't need for marine maps
 
-        if self.map_type == 'stalker_zaelot':
+        if self.map_type == 'sz':
             self.stalker_id = min_unit_type
             self.zealot_id = min_unit_type + 1
         elif self.map_type == 'ssz':
@@ -678,6 +681,9 @@ class SC2(MultiAgentEnv):
 
         if self.obs_own_health:
             agent_obs = np.append(agent_obs, unit.health / unit.health_max)
+            if self.shield_bits == 1:
+                max_shield = self.unit_max_shield(unit)
+                agent_obs = np.append(agent_obs, unit.shield / max_shield)
 
         agent_obs = agent_obs.astype(dtype=np.float32)
 
@@ -686,10 +692,14 @@ class SC2(MultiAgentEnv):
             print("Agent: ", agent_id)
             if self.obs_own_health:
                 print("Health: ", unit.health / unit.health_max)
+                if self.shield_bits == 1:
+                    max_shield = self.unit_max_shield(unit)
+                    print("Shield: ", unit.shield / max_shield)
             print("Available Actions\n", self.get_avail_agent_actions(agent_id))
             print("Move feats\n", move_feats)
             print("Enemy feats\n", enemy_feats)
             print("Ally feats\n", ally_feats)
+            print(agent_obs)
             print("***************************************")
 
         return agent_obs
@@ -774,7 +784,7 @@ class SC2(MultiAgentEnv):
 
         if ally == True: # we use new SC2 unit types
 
-            if self.map_type == 'stalker_zaelot':
+            if self.map_type == 'sz':
                 # id(Stalker) + 1 = id(Zealot)
                 type_id = unit.unit_type - self.stalker_id
             elif self.map_type == 'ssz':
@@ -801,7 +811,7 @@ class SC2(MultiAgentEnv):
 
         else: # 'We use default SC2 unit types'
 
-            if self.map_type == 'stalker_zaelot':
+            if self.map_type == 'sz':
                 # id(Stalker) = 74, id(Zealot) = 73
                 type_id = unit.unit_type - 73
             elif self.map_type == 'ssz':
@@ -1030,7 +1040,7 @@ class SC2(MultiAgentEnv):
         enemy_feats = self.n_enemies * nf_en
         ally_feats = (self.n_agents - 1) * nf_al
 
-        health = 1 if self.obs_own_health else 0
+        health = 1 + self.shield_bits if self.obs_own_health else 0
 
         return move_feats + enemy_feats + ally_feats + health
 
