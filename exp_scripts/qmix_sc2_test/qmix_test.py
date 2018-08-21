@@ -36,4 +36,4 @@ for mixer in [None, "vdn", "qmix"]:
             "mixer": mixer,
             "env_args.map_name": "5m_5m"
         },
-        repeats=2)
+        repeats=3)

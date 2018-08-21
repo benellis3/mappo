@@ -23,4 +23,4 @@ git fetch -q origin
 git reset --hard origin/refactor -q
 
 # Run the experiment $N_REPEAT times on GPU $GPU
-bash ./run.sh $GPU_ID "bash exp_scripts/repeat_exp.sh $N_REPEAT $PARAMS"
+bash ./run.sh $GPU_ID "bash exp_scripts/repeat_exp.sh $N_REPEAT $PARAMS" &

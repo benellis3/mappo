@@ -83,7 +83,7 @@ def main(config_name, run=False):
             else:
                 print(command)
             # time.sleep(2)
-        with open("exp_logs/" + config_name + "_log.txt", "w") as f:
+        with open("exp_logs/" + config.label + "_log.txt", "w") as f:
             for line in log:
                 f.write(line + "\n")
     else:
@@ -115,7 +115,7 @@ def main(config_name, run=False):
 
                     exp_idx += 1
 
-        with open("exp_logs/" + config_name + "_log.txt", "w") as f:
+        with open("exp_logs/" + config.label + "_log.txt", "w") as f:
             for line in log:
                 f.write(line + "\n\n")
 

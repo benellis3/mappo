@@ -28,5 +28,5 @@ if [ $GPU_ID == "reset" ]; then
     ssh -A $SERVER 'bash -s' < exp_scripts/reset_server.sh
 else
     echo "Running exps on Server ${SERVER} on GPU ${GPU_ID} ${N_REPEAT} times"
-    ssh -A $SERVER "EXP_DIR=${EXP_DIR} bash -s" < exp_scripts/execute_on_server.sh $GPU_ID $N_REPEAT $PARAMS
+    ssh -A $SERVER "EXP_DIR=${EXP_DIR} bash -s" < exp_scripts/execute_on_server.sh $GPU_ID $N_REPEAT $PARAMS &
 fi
