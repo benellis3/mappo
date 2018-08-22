@@ -172,11 +172,8 @@ class SC2(MultiAgentEnv):
                 raw = True, # raw, feature-level data
                 score = True)
 
-        self._sc2_procs = [self._run_config.start(game_version=self.game_version, window_size=self.window_size)]
-        self._controllers = [p.controller for p in self._sc2_procs]
-
-        # All the communication with SC2 will go through the controller
-        self.controller = self._controllers[0]
+        self._sc2_proc = self._run_config.start(game_version=self.game_version, window_size=self.window_size)
+        self.controller = self._sc2_proc.controller
 
         # Create the game.
         create = sc_pb.RequestCreateGame(realtime = False,
@@ -259,7 +256,7 @@ class SC2(MultiAgentEnv):
 
     def full_restart(self):
         # End episode and restart a new one
-        self.controller.quit()
+        self._sc2_proc.close()
         self._launch()
         self.force_restarts += 1
 
