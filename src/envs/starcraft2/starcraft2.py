@@ -994,7 +994,7 @@ class SC2(MultiAgentEnv):
 
     def close(self):
         print("Closing StarCraftII")
-        self.controller.quit()
+        self._sc2_proc.close()
 
     def render(self):
         pass
