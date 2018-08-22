@@ -1,7 +1,7 @@
 import copy
 from components.episode_buffer import EpisodeBatch
 from modules.critics.coma import COMACritic
-from utils.rl_utils import build_targets
+from utils.rl_utils import build_td_lambd_targets
 import torch as th
 from torch.optim import RMSprop
 
@@ -45,7 +45,7 @@ class COMALearner:
         mask = mask.repeat(1, 1, self.n_agents).view(-1)
 
         q_vals, critic_train_stats = self._train_critic(batch, rewards, terminated, actions, avail_actions,
-                                                        critic_mask, bs, max_t, t_env)
+                                                        critic_mask, bs, max_t)
 
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
@@ -102,14 +102,14 @@ class COMALearner:
             self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum().item(), t_env)
             self.log_stats_t = t_env
 
-    def _train_critic(self, batch, rewards, terminated, actions, avail_actions, mask, bs, max_t, t_env):
+    def _train_critic(self, batch, rewards, terminated, actions, avail_actions, mask, bs, max_t):
         # Optimise critic
         target_q_vals = self.target_critic(batch)
         target_q_vals = target_q_vals.view(bs, max_t, self.n_agents, self.n_actions)[:, 1:]
         targets_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
 
         # Calculate td-lambda targets
-        targets = build_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
+        targets = build_td_lambd_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
 
         q_vals = th.zeros_like(target_q_vals)
 
