@@ -72,7 +72,7 @@ map_param_registry = {
         "shield": True,
         "unit_type_bits": 3,
         "map_type": 'csz'},
-    "3s_v_3z": {
+    "3s_vs_3z": {
         "n_agents": 3,
         "n_enemies": 3,
         "limit": 120,
@@ -81,7 +81,7 @@ map_param_registry = {
         "shield": True,
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
-    "3s_v_4z": {
+    "3s_vs_4z": {
         "n_agents": 3,
         "n_enemies": 4,
         "limit": 120,

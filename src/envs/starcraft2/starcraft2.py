@@ -77,10 +77,10 @@ class SC2(MultiAgentEnv):
         self.map_name = args.map_name
         assert map_present(self.map_name), \
             "map {} not in map registry! please add.".format(self.map_name)
-        map_params = get_map_params(self.map_name)
-        self.n_agents = map_params["n_agents"]
-        self.n_enemies = map_params["n_enemies"]
-        self.episode_limit = map_params["limit"]
+        map_params = convert(get_map_params(self.map_name))
+        self.n_agents = map_params.n_agents
+        self.n_enemies = map_params.n_enemies
+        self.episode_limit = map_params.limit
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         self.difficulty = args.difficulty
@@ -111,11 +111,11 @@ class SC2(MultiAgentEnv):
 
         self.continuing_episode = args.continuing_episode
 
-        self._agent_race = map_params["a_race"]
-        self._bot_race = map_params["b_race"]
-        self.shield_bits = 1 if map_params["shield"] else 0
-        self.unit_type_bits = map_params["unit_type_bits"]
-        self.map_type = map_params["map_type"]
+        self._agent_race = map_params.a_race
+        self._bot_race = map_params.b_race
+        self.shield_bits = 1 if map_params.shield else 0
+        self.unit_type_bits = map_params.unit_type_bits
+        self.map_type = map_params.map_type
 
         if sys.platform == 'linux':
             os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
@@ -150,7 +150,7 @@ class SC2(MultiAgentEnv):
         self.stalker_id = self.sentry_id = self.zealot_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
 
-        if self.map_type == 'sz':
+        if self.map_type == 'sz' or self.map_type == 's_v_z':
             self.stalker_id = min_unit_type
             self.zealot_id = min_unit_type + 1
         elif self.map_type == 'csz':
