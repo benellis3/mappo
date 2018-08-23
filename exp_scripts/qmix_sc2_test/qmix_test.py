@@ -1,7 +1,7 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("gimli", [0,1,2,3,4], 1),
+    ("gimli", [0,1,2,3,4], 2),
 ]
 
 label = "qmix_s_vs_z"
