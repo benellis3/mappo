@@ -23,6 +23,8 @@ td_lambda: 0.8
 
 # use COMA
 agent_output_type: "pi_logits"
-learner: "coma_learner"
+learner: "policy_grad_learner"
+policy_grad_q_fn: "coma"
+policy_grad_baseline_fn: "coma"
 
 name: "coma"

@@ -12,18 +12,19 @@ class CentralVCritic(nn.Module):
         self.n_agents = args.n_agents
 
         input_shape = self._get_input_shape(scheme)
+        self.output_type = "v"
 
         # Set up network layers
         self.fc1 = nn.Linear(input_shape, 64)
         # self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, self.n_actions)
+        self.fc3 = nn.Linear(64, 1)
 
     def forward(self, batch, t=None):
-        inputs = self._build_inputs(batch, t=t)
+        inputs, bs, max_t = self._build_inputs(batch, t=t)
         x = F.relu(self.fc1(inputs))
         # x = F.relu(self.fc2(x))
         q = self.fc3(x)
-        return q
+        return q.view(bs, max_t, 1, -1).repeat(1, 1, self.n_agents, 1)
 
     def _build_inputs(self, batch, t=None):
         bs = batch.batch_size
@@ -44,7 +45,7 @@ class CentralVCritic(nn.Module):
             inputs.append(last_actions)
 
         inputs = th.cat([x.reshape(bs * max_t, -1) for x in inputs], dim=1)
-        return inputs
+        return inputs, bs, max_t
 
     def _get_input_shape(self, scheme):
         # state
