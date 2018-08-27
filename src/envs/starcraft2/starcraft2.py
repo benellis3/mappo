@@ -1,5 +1,4 @@
 from ..multiagentenv import MultiAgentEnv
-from .map_params import get_map_params, map_present
 import numpy as np
 import pygame
 import sys
@@ -22,6 +21,7 @@ from s2clientprotocol import debug_pb2 as d_pb
 from utils.dict2namedtuple import convert
 
 from absl import flags
+import sys
 
 FLAGS = flags.FLAGS
 FLAGS(['main.py'])
@@ -53,18 +53,29 @@ difficulties = {
     "A": sc_pb.CheatInsane,
 }
 
-sz_maps = ['2s_3z', '3s_5z', '5s_7z' ]
+stalker_zaelot_maps = ['2s_3z', '3s_5z', '5s_7z' ]
+ssz_maps = [ '2s_2s_3z' ]
 csz_maps = [ '1c_3s_5z', '2c_3s_5z' ]
-s_v_z_maps = ['3s_v_3z', '3s_v_4z']
 
 action_move_id = 16     #    target: PointOrUnit
-action_attack_id = 23   #    target: PointOrUnit
+action_attack_id = 23    #    target: PointOrUnit
 action_stop_id = 4      #    target: None
-action_heal_id = 386    #    target: Unit
+action_heal_id = 386      #    target: Unit
 
 '''
 StarCraft II
 '''
+
+# map parameter registry
+map_param_registry = {"3m_3m": {"n_agents": 3, "n_enemies": 3, "limit": 60},
+                      "5m_5m": {"n_agents": 5, "n_enemies": 5, "limit": 60},
+                      "8m_8m": {"n_agents": 8, "n_enemies": 8, "limit": 120},
+                      "2s_3z": {"n_agents": 5, "n_enemies": 5, "limit": 120},
+                      "3s_5z": {"n_agents": 8, "n_enemies": 8, "limit": 150},
+                      "1c_3s_5z": {"n_agents": 9, "n_enemies": 9, "limit": 200},
+                      "2c_3s_5z": {"n_agents": 10, "n_enemies": 10, "limit": 200},
+                      "MMM": {"n_agents": 10, "n_enemies": 10, "limit": 150},
+                     }
 
 class SC2(MultiAgentEnv):
 
@@ -73,26 +84,26 @@ class SC2(MultiAgentEnv):
         args = kwargs["env_args"]
         if isinstance(args, dict):
             args = convert(args)
+
+        self.flounderl_delegate_if_zero_ck = getattr(kwargs["args"], "flounderl_delegate_if_zero_ck", False)
+
+        self.map_param_registry = kwargs.get("map_param_registry", map_param_registry)
         # Read arguments
         self.map_name = args.map_name
-        assert map_present(self.map_name), \
+        assert self.map_name in map_param_registry, \
             "map {} not in map registry! please add.".format(self.map_name)
-        map_params = convert(get_map_params(self.map_name))
-        self.n_agents = map_params.n_agents
-        self.n_enemies = map_params.n_enemies
-        self.episode_limit = map_params.limit
+        self.n_agents = map_param_registry[self.map_name]["n_agents"]
+        self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
+        self.episode_limit = map_param_registry[self.map_name]["limit"]
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         self.difficulty = args.difficulty
-        # Observations and state
-        self.obs_own_health = args.obs_own_health
-        self.obs_targets = args.obs_targets
-        self.obs_instead_of_state = args.obs_instead_of_state
         self.state_last_action = args.state_last_action
         # Rewards args
         self.reward_only_positive = args.reward_only_positive
         self.reward_negative_scale = args.reward_negative_scale
         self.reward_death_value = args.reward_death_value
+        self.reward_damage_coef = args.reward_damage_coef
         self.reward_win = args.reward_win
         self.reward_scale = args.reward_scale
         self.reward_scale_rate = args.reward_scale_rate
@@ -100,6 +111,8 @@ class SC2(MultiAgentEnv):
         self.seed = args.seed
         self.heuristic = args.heuristic
         self.measure_fps = args.measure_fps
+        self.obs_ignore_ally = args.obs_ignore_ally
+        self.obs_instead_of_state = args.obs_instead_of_state
         self.window_size = (1920, 1200)
 
         self.debug_inputs = False
@@ -109,19 +122,22 @@ class SC2(MultiAgentEnv):
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
+        self.fully_observable = args.fully_observable if hasattr(args, "fully_observable") else False
+        self.relax_pairwise_aa = args.relax_pairwise_aa if hasattr(args, "relax_pairwise_aa") else False
+
         self.continuing_episode = args.continuing_episode
 
-        self._agent_race = map_params.a_race
-        self._bot_race = map_params.b_race
-        self.shield_bits = 1 if map_params.shield else 0
-        self.unit_type_bits = map_params.unit_type_bits
-        self.map_type = map_params.map_type
+        self.map_settings()
 
         if sys.platform == 'linux':
-            os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
-            self.game_version = args.game_version
+            self.game_version = args.game_version if hasattr(args, "game_version") else "3.16.1"
+            if os.path.exists(os.path.join(os.getcwd(), "3rdparty", 'StarCraftII__{}'.format(self.game_version))):
+                os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII__{}'.format(self.game_version))
+            else:
+                os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
         else:
             self.game_version = "4.3.2"
+
 
         # Launch the game
         self._launch()
@@ -143,16 +159,53 @@ class SC2(MultiAgentEnv):
         self.timeouts = 0
         self.force_restarts = 0
 
-        self.last_stats = None
+    def map_settings(self):
 
-    def init_ally_unit_types(self, min_unit_type):
-        # This should be called once from the init_units function
+        if self.map_name in stalker_zaelot_maps:
+            self.map_type = 'stalker_zaelot'
+            self.unit_type_bits = 2
+            self.shield_bits = 1
+            self._agent_race = "P"
+            self._bot_race = "P"
+        elif self.map_name in ssz_maps:
+            self.map_type = 'ssz'
+            self.unit_type_bits = 3
+            self.shield_bits = 1
+            self._agent_race = "P"
+            self._bot_race = "P"
+        elif self.map_name in csz_maps:
+            self.map_type = 'csz'
+            self.unit_type_bits = 3
+            self.shield_bits = 1
+            self._agent_race = "P"
+            self._bot_race = "P"
+        elif self.map_name == 'MMM':
+            self.map_type = 'MMM'
+            self.unit_type_bits = 3
+            self.shield_bits = 0
+            self._agent_race = "T"
+            self._bot_race = "T"
+        else:
+            self.map_type = 'marines'
+            self.unit_type_bits = 0
+            self.shield_bits = 0
+            self._agent_race = "T"
+            self._bot_race = "T"
+
         self.stalker_id = self.sentry_id = self.zealot_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
 
-        if self.map_type == 'sz' or self.map_type == 's_v_z':
+    def init_ally_unit_types(self, min_unit_type):
+        # This should be called once from the init_units function
+        # Don't need for marine maps
+
+        if self.map_type == 'stalker_zaelot':
             self.stalker_id = min_unit_type
             self.zealot_id = min_unit_type + 1
+        elif self.map_type == 'ssz':
+            self.sentry_id = min_unit_type
+            self.stalker_id = min_unit_type + 1
+            self.zealot_id = min_unit_type + 2
         elif self.map_type == 'csz':
             self.colossus_id = min_unit_type
             self.stalker_id = min_unit_type + 1
@@ -267,13 +320,9 @@ class SC2(MultiAgentEnv):
 
     def step(self, actions):
 
-        # TODO: Check this, maybe we want to be able to handle tensors here
-        # Make actions a list of ints
-        actions = [int(a) for a in actions]
-
         self.last_action = self.one_hot(actions, self.n_actions)
 
-        # Collect individual actions
+      # Collect individual actions
         sc_actions = []
         for a_id, action in enumerate(actions):
             if not self.heuristic:
@@ -308,7 +357,7 @@ class SC2(MultiAgentEnv):
 
         terminated = False
         reward = self.reward_battle()
-        info = {"battle_won": False}
+        info = {}
 
         if end_game is not None:
             # Battle is over
@@ -316,7 +365,6 @@ class SC2(MultiAgentEnv):
             self.battles_game += 1
             if end_game == 1:
                 self.battles_won += 1
-                info["battle_won"] = True
                 reward += self.reward_win
 
         elif self.episode_limit > 0 and self._episode_steps >= self.episode_limit:
@@ -515,7 +563,7 @@ class SC2(MultiAgentEnv):
                 print("Reward: ", delta_enemy + delta_deaths)
                 print("--------------------------")
 
-            reward = delta_enemy + delta_deaths
+            reward = delta_enemy * self.reward_damage_coef + delta_deaths
             reward = abs(reward) # shield regeration
         else:
             if self.debug_rewards:
@@ -526,7 +574,7 @@ class SC2(MultiAgentEnv):
                 print("Reward: ", delta_enemy + delta_deaths)
                 print("--------------------------")
 
-            reward = delta_enemy + delta_deaths - delta_ally
+            reward = delta_enemy * self.reward_damage_coef + delta_deaths - delta_ally * self.reward_damage_coef
 
         return reward
 
@@ -577,6 +625,9 @@ class SC2(MultiAgentEnv):
 
     def get_obs_agent(self, agent_id):
 
+        if self.fully_observable:
+            return self.get_state()
+
         unit = self.get_unit_by_id(agent_id)
 
         nf_al = 4 + self.unit_type_bits
@@ -584,7 +635,8 @@ class SC2(MultiAgentEnv):
 
         move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
-        ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
+        if not self.obs_ignore_ally:
+            ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
 
         if unit.health > 0: # otherwise dead, return all zeros
             x = unit.pos.x
@@ -612,57 +664,45 @@ class SC2(MultiAgentEnv):
                         type_id = self.get_unit_type_id(e_unit, False)
                         enemy_feats[e_id, 4 + type_id] = 1
 
-            # place the features of the agent himself always at the first place
-            al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
-            for i, al_id in enumerate(al_ids):
+            if not self.obs_ignore_ally:
+                # place the features of the agent himself always at the first place
+                al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
+                for i, al_id in enumerate(al_ids):
 
-                al_unit = self.get_unit_by_id(al_id)
-                al_x = al_unit.pos.x
-                al_y = al_unit.pos.y
-                dist = self.distance(x, y, al_x, al_y)
+                    al_unit = self.get_unit_by_id(al_id)
+                    al_x = al_unit.pos.x
+                    al_y = al_unit.pos.y
+                    dist = self.distance(x, y, al_x, al_y)
 
-                if dist < sight_range and al_unit.health > 0: # visible and alive
-                    ally_feats[i, 0] = 1 # visible
-                    ally_feats[i, 1] = dist / sight_range # distance
-                    ally_feats[i, 2] = (al_x - x) / sight_range # relative X
-                    ally_feats[i, 3] = (al_y - y) / sight_range # relative Y
+                    if dist < sight_range and al_unit.health > 0: # visible and alive
+                        ally_feats[i, 0] = 1 # visible
+                        ally_feats[i, 1] = dist / sight_range # distance
+                        ally_feats[i, 2] = (al_x - x) / sight_range # relative X
+                        ally_feats[i, 3] = (al_y - y) / sight_range # relative Y
 
-                    if self.unit_type_bits > 0:
-                        type_id = self.get_unit_type_id(al_unit, True)
-                        ally_feats[i, 4 + type_id] = 1
+                        if self.unit_type_bits > 0:
+                            type_id = self.get_unit_type_id(al_unit, True)
+                            ally_feats[i, 4 + type_id] = 1
 
-        agent_obs = np.concatenate((move_feats.flatten(),
-                                    enemy_feats.flatten(),
-                                    ally_feats.flatten()))
+        if not self.obs_ignore_ally:
+            agent_obs = np.concatenate((move_feats.flatten(),
+                                        enemy_feats.flatten(),
+                                        ally_feats.flatten()))
+        else:
+            agent_obs = np.concatenate((move_feats.flatten(),
+                                        enemy_feats.flatten()))
 
-        if self.obs_own_health:
-            agent_obs = np.append(agent_obs, unit.health / unit.health_max)
-            if self.shield_bits == 1:
-                max_shield = self.unit_max_shield(unit)
-                agent_obs = np.append(agent_obs, unit.shield / max_shield)
-
-        if self.unit_type_bits > 0:
-            unit_type = self.one_hot(self.get_unit_type_id(unit, ally=True), self.unit_type_bits)[0]
-            agent_obs = np.append(agent_obs, unit_type)
 
         agent_obs = agent_obs.astype(dtype=np.float32)
 
         if self.debug_inputs:
             print("***************************************")
             print("Agent: ", agent_id)
-            if self.obs_own_health:
-                print("Health: ", unit.health / unit.health_max)
-                if self.shield_bits == 1:
-                    max_shield = self.unit_max_shield(unit)
-                    print("Shield: ", unit.shield / max_shield)
-            if self.unit_type_bits > 0:
-                unit_type = self.one_hot(self.get_unit_type_id(unit, ally=True), self.unit_type_bits)[0]
-                print("Unit type: ", unit_type)
             print("Available Actions\n", self.get_avail_agent_actions(agent_id))
             print("Move feats\n", move_feats)
             print("Enemy feats\n", enemy_feats)
-            print("Ally feats\n", ally_feats)
-            print(agent_obs)
+            if not self.obs_ignore_ally:
+                print("Ally feats\n", ally_feats)
             print("***************************************")
 
         return agent_obs
@@ -747,9 +787,16 @@ class SC2(MultiAgentEnv):
 
         if ally == True: # we use new SC2 unit types
 
-            if self.map_type == 'sz':
+            if self.map_type == 'stalker_zaelot':
                 # id(Stalker) + 1 = id(Zealot)
                 type_id = unit.unit_type - self.stalker_id
+            elif self.map_type == 'ssz':
+                if unit.unit_type == self.sentry_id:
+                    type_id = 0
+                elif unit.unit_type == self.zealot_id:
+                    type_id = 1
+                else:
+                    type_id = 2
             elif self.map_type == 'csz':
                 if unit.unit_type == self.colossus_id:
                     type_id = 0
@@ -767,9 +814,17 @@ class SC2(MultiAgentEnv):
 
         else: # 'We use default SC2 unit types'
 
-            if self.map_type == 'sz':
+            if self.map_type == 'stalker_zaelot':
                 # id(Stalker) = 74, id(Zealot) = 73
                 type_id = unit.unit_type - 73
+            elif self.map_type == 'ssz':
+                # id(Stalker) = 74, id(Zealot) = 73, id(Sentry) = 77
+                if unit.unit_type == 77:
+                    type_id = 0
+                elif unit.unit_type == 73:
+                    type_id = 1
+                else:
+                    type_id = 2
             elif self.map_type == 'csz':
                 # id(Stalker) = 74, id(Zealot) = 73, id(Colossus) = 4
                 if unit.unit_type == 4:
@@ -799,7 +854,8 @@ class SC2(MultiAgentEnv):
             return True
 
     def get_obs_intersection(self, agent_ids):
-        """ Returns the intersection of the all of agent_ids agents' observations. """
+
+        """ Returns the intersection of all of agent_ids agents' observations. """
         # Create grid
         nf_al = 4
         nf_en = 5
@@ -810,26 +866,40 @@ class SC2(MultiAgentEnv):
             nf_en += 2
 
         # move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
-        enemy_feats = -1*np.ones((self.n_enemies, nf_en), dtype=np.float32)
-        ally_feats = -1*np.ones((self.n_agents, nf_al), dtype=np.float32)
+        enemy_feats = -1*np.ones((len(agent_ids), self.n_enemies, nf_en), dtype=np.float32)
+        ally_feats = -1*np.ones((len(agent_ids), self.n_agents, nf_al), dtype=np.float32)
+        #state = np.concatenate((enemy_feats.flatten(),
+        #                            ally_feats.flatten()))
+        # state = state.astype(dtype=np.float32)
         state = np.concatenate((enemy_feats.flatten(),
-                                    ally_feats.flatten()))
+                                ally_feats.flatten()))
         state = state.astype(dtype=np.float32)
         #Todo: Check that the dimensions are consistent.
-        a_a1 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[0])),[-1,1])
-        a_a2 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[1])),[1,-1])
+        aa1 = np.array(self.get_avail_agent_actions(agent_ids[0]))
+        aa2 = np.array(self.get_avail_agent_actions(agent_ids[1]))
+        if self.relax_pairwise_aa: # OR mode
+            aa1 = [ 1 if ((aa1[_i] == 1) or (aa2[_i] == 1)) else 0 for _i in range(aa1.shape[0]) ]
+            aa2 = aa1.copy()
+        a_a1 = np.reshape( aa1, [-1,1])
+        a_a2 = np.reshape( aa2, [1,-1])
         avail_actions = a_a1.dot(a_a2)
-        avail_all = avail_actions * 0 + 1
+        # Debug!! TODO: FIX THE IF TRUE BELOW
+        if self.flounderl_delegate_if_zero_ck:
+            avail_all = avail_actions * 0
+        else:
+            avail_all = avail_actions * 0 + 1
 
         coordinates = np.zeros([len(agent_ids), 2])
         for i, a_id in enumerate(agent_ids):
             if not (self.agents[a_id].health > 0):
-                return state, avail_all
+                return state, avail_all * 0.0 # FORCE TO DELEGATE
             else:
                 coordinates[i] = [self.agents[a_id].pos.x, self.agents[a_id].pos.y]
+
         # Calculate pairwise distances
         distances = ((coordinates[:, 0:1] - coordinates[:, 0:1].T)**2 + (coordinates[:, 1:2] - coordinates[:, 1:2].T)**2)**0.5
         sight_range = self.unit_sight_range(agent_ids[0])
+
         # Check that max pairwise distance is less than sight_range.
         if np.max(distances) > sight_range:
             return state, avail_all
@@ -840,20 +910,21 @@ class SC2(MultiAgentEnv):
         for e_id, e_unit in self.enemies.items():
             e_x = e_unit.pos.x
             e_y = e_unit.pos.y
-            dist = self.distance(x, y, e_x, e_y)
+            # dist = self.distance(x, y, e_x, e_y)
 
             if self.get_intersect(coordinates, e_unit, sight_range) and e_unit.health > 0:  # visible and alive
                 # Sight range > shoot range
-                enemy_feats[e_id, 0] = a_a1[self.n_actions_no_attack + e_id,0]   # available
-                enemy_feats[e_id, 1] = dist / sight_range # distance
-                enemy_feats[e_id, 2] = (e_x - x) / sight_range # relative X
-                enemy_feats[e_id, 3] = (e_y - y) / sight_range # relative Y
-                enemy_feats[e_id, 4] = a_a2[0,self.n_actions_no_attack + e_id]  # available
+                for i, a_id in enumerate(agent_ids):
+                    dist = self.distance(self.agents[a_id].pos.x, self.agents[a_id].pos.y, e_x, e_y)
+                    enemy_feats[i, e_id, 0] = a_a1[self.n_actions_no_attack + e_id, 0]   # available
+                    enemy_feats[i, e_id, 1] = dist / sight_range # distance
+                    enemy_feats[i, e_id, 2] = (e_x - self.agents[a_id].pos.x) / sight_range # relative X
+                    enemy_feats[i, e_id, 3] = (e_y - self.agents[a_id].pos.y) / sight_range # relative Y
+                    enemy_feats[i, e_id, 4] = a_a2[0, self.n_actions_no_attack + e_id]  # available
 
-
-                if self.map_name == '2s_3z' or self.map_name == '3s_5z':
-                    type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
-                    enemy_feats[e_id, 4 + type_id] = 1
+                    if self.map_name == '2s_3z' or self.map_name == '3s_5z':
+                        type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
+                        enemy_feats[a_id, e_id, 4 + type_id] = 1
             else:
                 avail_actions[self.n_actions_no_attack + e_id, :] = 0
                 avail_actions[:, self.n_actions_no_attack + e_id] = 0
@@ -867,20 +938,21 @@ class SC2(MultiAgentEnv):
             al_unit = self.get_unit_by_id(al_id)
             al_x = al_unit.pos.x
             al_y = al_unit.pos.y
-            dist = self.distance(x, y, al_x, al_y)
-
+            #dist = self.distance(x, y, al_x, al_y)
             if self.get_intersect(coordinates, al_unit, sight_range) and al_unit.health > 0:  # visible and alive
-                ally_feats[i, 0] = 1  # visible
-                ally_feats[i, 1] = dist / sight_range # distance
-                ally_feats[i, 2] = (al_x - x) / sight_range  # relative X
-                ally_feats[i, 3] = (al_y - y) / sight_range  # relative Y
+                for j, a_id in enumerate(agent_ids):
+                    dist = self.distance(self.agents[a_id].pos.x, self.agents[a_id].pos.y, al_x, al_y)
+                    ally_feats[j, i, 0] = 1  # visible
+                    ally_feats[j, i, 1] = dist / sight_range # distance
+                    ally_feats[j, i, 2] = (al_x - self.agents[a_id].pos.x) / sight_range  # relative X
+                    ally_feats[j, i, 3] = (al_y - self.agents[a_id].pos.y) / sight_range  # relative Y
 
-                if self.map_name == '2s_3z' or self.map_name == '3s_5z':
-                    type_id = al_unit.unit_type - self.stalker_id  # id(Stalker) = self.stalker_id, id(Zealot) = self.zealot_id
-                    ally_feats[i, 4 + type_id] = 1
+                    if self.map_name == '2s_3z' or self.map_name == '3s_5z':
+                        type_id = al_unit.unit_type - self.stalker_id  # id(Stalker) = self.stalker_id, id(Zealot) = self.zealot_id
+                        ally_feats[j, i, 4 + type_id] = 1
 
         state = np.concatenate((enemy_feats.flatten(),
-                                    ally_feats.flatten()))
+                                ally_feats.flatten()))
 
         state = state.astype(dtype=np.float32)
 
@@ -893,10 +965,10 @@ class SC2(MultiAgentEnv):
         return state, avail_actions
 
     def get_obs_intersect_pair_size(self):
-        return self.get_obs_intersect_size()
+        return self.get_obs_intersect_size()*2
 
     def get_obs_intersect_all_size(self):
-        return self.get_obs_intersect_size()
+        return self.get_obs_intersect_size()*self.n_agents
 
     def get_obs_intersect_size(self):
 
@@ -981,16 +1053,21 @@ class SC2(MultiAgentEnv):
 
     def get_obs_size(self):
 
-        nf_al = 4 + self.unit_type_bits
+        if self.fully_observable:
+            return self.get_state_size()
+
+        if not self.obs_ignore_ally:
+            nf_al = 4 + self.unit_type_bits
+        else:
+            nf_al = 0
+
         nf_en = 4 + self.unit_type_bits
 
         move_feats = self.n_actions_no_attack - 2
         enemy_feats = self.n_enemies * nf_en
         ally_feats = (self.n_agents - 1) * nf_al
 
-        health = 1 + self.shield_bits if self.obs_own_health else 0
-
-        return move_feats + enemy_feats + ally_feats + health + self.unit_type_bits
+        return move_feats + enemy_feats + ally_feats
 
     def close(self):
         print("Closing StarCraftII")
@@ -1184,83 +1261,3 @@ class SC2(MultiAgentEnv):
         stats["timeouts"] = self.timeouts
         stats["restarts"] = self.force_restarts
         return stats
-
-    def get_agg_stats(self, stats):
-
-        current_stats = {}
-        for stat in stats:
-            for _k, _v in stat.items():
-                if not (_k in current_stats):
-                    current_stats[_k] = []
-                if _k in ["win_rate"]:
-                    continue
-                current_stats[_k].append(_v)
-
-        # average over stats
-        aggregate_stats = {}
-        for _k, _v in current_stats.items():
-            if _k in ["win_rate"]:
-                aggregate_stats[_k] = np.mean([ (_a - _b)/(_c - _d) for _a, _b, _c, _d in zip(current_stats["battles_won"],
-                                                                                              [0]*len(current_stats["battles_won"]) if self.last_stats is None else self.last_stats["battles_won"],
-                                                                                              current_stats["battles_game"],
-                                                                                              [0]*len(current_stats["battles_game"]) if self.last_stats is None else
-                                                                                              self.last_stats["battles_game"])
-                                                if (_c - _d) != 0.0])
-            else:
-                aggregate_stats[_k] = np.mean([_a-_b for _a, _b in zip(_v, [0]*len(_v) if self.last_stats is None else self.last_stats[_k])])
-
-        self.last_stats = current_stats
-        return aggregate_stats
-
-# from components.transforms_old import _seq_mean
-
-class StatsAggregator():
-
-    def __init__(self):
-        self.last_stats = None
-        self.stats = []
-        pass
-
-    def aggregate(self, stats, add_stat_fn):
-
-        current_stats = {}
-        for stat in stats:
-            for _k, _v in stat.items():
-                if not (_k in current_stats):
-                    current_stats[_k] = []
-                if _k in ["win_rate"]:
-                    continue
-                current_stats[_k].append(_v)
-
-        # average over stats
-        aggregate_stats = {}
-        for _k, _v in current_stats.items():
-            if _k in ["win_rate"]:
-                aggregate_stats[_k] = np.mean([ (_a - _b)/(_c - _d) for _a, _b, _c, _d in zip(current_stats["battles_won"],
-                                                                                              [0]*len(current_stats["battles_won"]) if self.last_stats is None else self.last_stats["battles_won"],
-                                                                                              current_stats["battles_game"],
-                                                                                              [0]*len(current_stats["battles_game"]) if self.last_stats is None else
-                                                                                              self.last_stats["battles_game"])
-                                                if (_c - _d) != 0.0])
-            else:
-                aggregate_stats[_k] = np.mean([_a-_b for _a, _b in zip(_v, [0]*len(_v) if self.last_stats is None else self.last_stats[_k])])
-
-        # add stats that have just been produced to tensorboard / sacred
-        for _k, _v in aggregate_stats.items():
-            add_stat_fn(_k, _v)
-
-        # collect stats for logging horizon
-        self.stats.append(aggregate_stats)
-        # update last stats
-        self.last_stats = current_stats
-        pass
-
-    def log(self, log_directly=False):
-        assert not log_directly, "log_directly not supported."
-        logging_str = " Win rate: {}".format(_seq_mean([ stat["win_rate"] for stat in self.stats ]))\
-                    + " Timeouts: {}".format(_seq_mean([ stat["timeouts"] for stat in self.stats ]))\
-                    + " Restarts: {}".format(_seq_mean([ stat["restarts"] for stat in self.stats ]))
-
-        # flush stats
-        self.stats = []
-        return logging_str
