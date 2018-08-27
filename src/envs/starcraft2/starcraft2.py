@@ -111,8 +111,8 @@ class SC2(MultiAgentEnv):
         self.seed = args.seed
         self.heuristic = args.heuristic
         self.measure_fps = args.measure_fps
-        self.obs_ignore_ally = args.obs_ignore_ally
-        self.obs_instead_of_state = args.obs_instead_of_state
+        self.obs_ignore_ally = args.obs_ignore_ally if hasattr(args, "obs_ignore_ally") else False
+        self.obs_instead_of_state = args.obs_instead_of_state if hasattr(args, "obs_instead_of_state") else False
         self.window_size = (1920, 1200)
 
         self.debug_inputs = False
