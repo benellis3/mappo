@@ -1,7 +1,7 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("gimli", [0,1,2,3,4,5,6,7], 2),
+    ("gimli", [0,1,2,3,4,5,6,7], 1),
 ]
 
 label = "qmix_nodamage"
@@ -27,7 +27,7 @@ extend_param_dicts(param_dicts, shared_params,
         "mixer": "qmix",
         "env_args.map_name": "5m_5m"
     },
-    repeats=2)
+    repeats=4)
 
 extend_param_dicts(param_dicts, shared_params,
     {
@@ -35,4 +35,4 @@ extend_param_dicts(param_dicts, shared_params,
         "mixer": "qmix",
         "env_args.map_name": "3m_3m"
     },
-    repeats=3)
+    repeats=4)
