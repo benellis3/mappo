@@ -358,7 +358,7 @@ class SC2(MultiAgentEnv):
 
         terminated = False
         reward = self.reward_battle()
-        info = {}
+        info = {"battle_won": False}
 
         if end_game is not None:
             # Battle is over
@@ -366,6 +366,7 @@ class SC2(MultiAgentEnv):
             self.battles_game += 1
             if end_game == 1:
                 self.battles_won += 1
+                info["battle_won"] = True
                 reward += self.reward_win
 
         elif self.episode_limit > 0 and self._episode_steps >= self.episode_limit:
