@@ -319,6 +319,7 @@ class SC2(MultiAgentEnv):
         return np.eye(nb_classes)[targets]
 
     def step(self, actions):
+        actions = [int(a) for a in actions]
 
         self.last_action = self.one_hot(actions, self.n_actions)
 
