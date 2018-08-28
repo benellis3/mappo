@@ -24,7 +24,7 @@ td_lambda: 0.8
 # use COMA
 agent_output_type: "pi_logits"
 learner: "actor_critic_learner"
-critic_q_fn: "coma"
-critic_baseline_fn: "coma"
+critic_q_fn: "centralV"
+critic_baseline_fn: "centralV"
 
 name: "coma"
