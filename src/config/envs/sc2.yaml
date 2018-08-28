@@ -7,7 +7,7 @@ env_args:
   difficulty: "3"
   heuristic: False
   measure_fps: True
-  move_amount: 2
+  move_amount: 5
   reward_death_value: 10
   reward_negative_scale: 0.5
   reward_only_positive: True
@@ -18,7 +18,7 @@ env_args:
   step_mul: 8
   obs_instead_of_state: False
   obs_own_health: True
-  obs_target: False
+  obs_targets: False
   continuing_episode: False
   game_version: "3.16.1"
 

@@ -12,6 +12,7 @@ class COMACritic(nn.Module):
         self.n_agents = args.n_agents
 
         input_shape = self._get_input_shape(scheme)
+        self.output_type = "q"
 
         # Set up network layers
         self.fc1 = nn.Linear(input_shape, 64)

@@ -1,33 +1,54 @@
 import copy
 from components.episode_buffer import EpisodeBatch
 from modules.critics.coma import COMACritic
+from modules.critics.centralV import CentralVCritic
 from utils.rl_utils import build_td_lambd_targets
 import torch as th
 from torch.optim import RMSprop
 
 
-class COMALearner:
+class PolicyGradLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.n_agents = args.n_agents
         self.n_actions = args.n_actions
-        self.mac = mac
         self.logger = logger
+
+        self.mac = mac
+        self.agent_params = list(mac.parameters())
+        self.agent_optimiser = RMSprop(params=self.agent_params, lr=args.lr, alpha=args.optim_alpha, eps=args.optim_eps)
+        self.params = self.agent_params
+
+
+        if args.policy_grad_q_fn == "coma":
+            self.critic = COMACritic(scheme, args)
+        elif args.policy_grad_q_fn == "centralV":
+            self.critic = CentralVCritic(scheme, args)
+        self.target_critic = copy.deepcopy(self.critic)
+
+        self.critic_params = list(self.critic.parameters())
+        self.params += self.critic_params
+        self.critic_optimiser = RMSprop(params=self.critic_params, lr=args.critic_lr, alpha=args.optim_alpha,
+                                        eps=args.optim_eps)
+
+        self.separate_baseline_critic = False
+        if args.policy_grad_q_fn != args.policy_grad_baseline_fn:
+            self.separate_baseline_critic = True
+            if args.policy_grad_baseline_fn == "coma":
+                self.baseline_critic = COMACritic(scheme, args)
+            elif args.policy_grad_baseline_fn == "centralV":
+                self.baseline_critic = CentralVCritic(scheme, args)
+            self.target_baseline_critic = copy.deepcopy(self.baseline_critic)
+
+            self.baseline_critic_params = list(self.critic.parameters())
+            self.params += self.baseline_critic_params
+            self.baseline_critic_optimiser = RMSprop(params=self.critic_params, lr=args.critic_lr,
+                                                     alpha=args.optim_alpha,
+                                                     eps=args.optim_eps)
 
         self.last_target_update_step = 0
         self.critic_training_steps = 0
-
         self.log_stats_t = -self.args.learner_log_interval - 1
-
-        self.critic = COMACritic(scheme, args)
-        self.target_critic = copy.deepcopy(self.critic)
-
-        self.agent_params = list(mac.parameters())
-        self.critic_params = list(self.critic.parameters())
-        self.params = self.agent_params + self.critic_params
-
-        self.agent_optimiser = RMSprop(params=self.agent_params, lr=args.lr, alpha=args.optim_alpha, eps=args.optim_eps)
-        self.critic_optimiser = RMSprop(params=self.critic_params, lr=args.critic_lr, alpha=args.optim_alpha, eps=args.optim_eps)
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         # Get the relevant quantities
@@ -44,9 +65,6 @@ class COMALearner:
 
         mask = mask.repeat(1, 1, self.n_agents).view(-1)
 
-        q_vals, critic_train_stats = self._train_critic(batch, rewards, terminated, actions, avail_actions,
-                                                        critic_mask, bs, max_t)
-
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
         for t in range(batch.max_seq_length - 1):
@@ -59,25 +77,37 @@ class COMALearner:
         mac_out = mac_out/mac_out.sum(dim=-1, keepdim=True)
         mac_out[avail_actions == 0] = 0
 
-        # Calculated baseline
         pi = mac_out.view(-1, self.n_actions)
-        baseline = (pi * q_vals).sum(-1).detach()
+
+        q_sa, v_s, critic_train_stats = self.train_critic_sequential(self.critic, self.target_critic, batch,
+                                                                     rewards, terminated, actions, avail_actions,
+                                                                     critic_mask, bs, max_t)
+
+        if self.separate_baseline_critic:
+            q_sa_baseline, v_s_baseline, critic_train_stats_baseline = \
+                self.train_critic_sequential(self.baseline_critic, self.target_baseline_critic, batch,
+                                             rewards, terminated, actions, avail_actions,
+                                             critic_mask, bs, max_t)
+            if self.args.policy_grad_baseline_fn == "coma":
+                baseline = (q_sa_baseline.view(-1, self.n_actions) * pi).sum(-1).detach()
+            else:
+                baseline = v_s_baseline
+        else:
+            if self.args.policy_grad_baseline_fn == "coma":
+                baseline = (q_sa.view(-1, self.n_actions) * pi).sum(-1).detach()
+            else:
+                baseline = v_s
+
+        if self.critic.output_type == "q":
+            q_sa = th.gather(q_sa, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
+
+        advantages = (q_sa - baseline).detach()
 
         # Calculate policy grad with mask
-        q_taken = th.gather(q_vals, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
+
         pi_taken = th.gather(pi, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
         pi_taken[mask == 0] = 1.0
         log_pi_taken = th.log(pi_taken)
-
-        # q_taken_reshape = q_taken.reshape(bs, max_t-1, self.n_agents)
-        # next_qs = q_taken_reshape[:, 1:]
-        # one_step_qsa = rewards[:, :-1] + self.args.gamma * next_qs
-        # hacky_thing = q_taken_reshape.clone()
-        # hacky_thing[:, 1:] = hacky_thing[:, 1:] * 1.0
-        # hacky_thing[:, :-1] = hacky_thing[:, :-1] + 0.0 * one_step_qsa
-        # advantages = (hacky_thing.view(-1) - baseline).detach()
-
-        advantages = (q_taken - baseline).detach()
 
         coma_loss = - ((advantages * log_pi_taken) * mask).sum() / mask.sum()
 
@@ -102,16 +132,18 @@ class COMALearner:
             self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum().item(), t_env)
             self.log_stats_t = t_env
 
-    def _train_critic(self, batch, rewards, terminated, actions, avail_actions, mask, bs, max_t):
+    def train_critic_sequential(self, critic, target_critic, batch, rewards, terminated, actions, avail_actions,
+                                mask, bs, max_t):
         # Optimise critic
-        target_q_vals = self.target_critic(batch)
-        target_q_vals = target_q_vals.view(bs, max_t, self.n_agents, self.n_actions)[:, 1:]
-        targets_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
+        target_vals = target_critic(batch)
+        target_vals = target_vals.view(bs, max_t, self.n_agents, -1)[:, 1:]
+        vals = th.zeros_like(target_vals)
+        if critic.output_type == 'q':
+            target_vals = th.gather(target_vals, dim=3, index=actions).squeeze(3)
 
         # Calculate td-lambda targets
-        targets = build_td_lambd_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
-
-        q_vals = th.zeros_like(target_q_vals)
+        targets = build_td_lambd_targets(rewards, terminated, mask, target_vals, self.n_agents,
+                                         self.args.gamma, self.args.td_lambda)
 
         running_log = {
             "critic_loss": [],
@@ -126,12 +158,13 @@ class COMALearner:
             if mask_t.sum() == 0:
                 continue
 
-            q_t = self.critic(batch, t)
-            q_vals[:, t] = q_t.view(bs, self.n_agents, self.n_actions)
-            q_taken = th.gather(q_t, dim=1, index=actions[:, t].reshape(-1, 1)).squeeze(1)
+            vals_t = critic(batch, t)
+            vals[:, t] = vals_t.view(bs, self.n_agents, -1)
+            if critic.output_type == "q":
+                vals_t = th.gather(vals_t, dim=1, index=actions[:, t].reshape(-1, 1)).squeeze(1)
             targets_t = targets[:, t].reshape(-1)
 
-            td_error = (q_taken - targets_t.detach())
+            td_error = (vals_t - targets_t.detach())
 
             # 0-out the targets that came from padded data
             masked_td_error = td_error * mask_t
@@ -148,10 +181,18 @@ class COMALearner:
             running_log["critic_grad_norm"].append(grad_norm)
             mask_elems = mask_t.sum().item()
             running_log["td_error_abs"].append((masked_td_error.abs().sum().item() / mask_elems))
-            running_log["q_taken_mean"].append((q_taken * mask_t).sum().item() / mask_elems)
+            running_log["q_taken_mean"].append((vals_t * mask_t).sum().item() / mask_elems)
             running_log["target_mean"].append((targets_t * mask_t).sum().item() / mask_elems)
 
-        return q_vals.view(-1, self.n_actions), running_log
+        if critic.output_type == 'q':
+            q_vals = vals
+            v_s = None
+        else:
+            # estimate q from lambda returns and V
+            # return V(s) also
+            pass
+
+        return q_vals.view(-1, self.n_actions), None, running_log
 
     def _update_targets(self):
         self.target_critic.load_state_dict(self.critic.state_dict())

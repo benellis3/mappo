@@ -1,10 +1,10 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("gimli", [0,1,2,3,4,5,6,7], 2),
+    ("gimli", [0,1,2,3,4], 2),
 ]
 
-label = "QMIX_Refactor_Test_4"
+label = "qmix_s_vs_z"
 config = "qmix"
 env_config = "sc2"
 
@@ -18,22 +18,22 @@ shared_params = {
     "buffer_size": 2000,
 }
 
-for mixer in [None, "vdn", "qmix"]:
+for mixer in [None, "qmix"]:
     mixer_name = mixer
     if mixer is None:
         mixer_name = "iql"
     extend_param_dicts(param_dicts, shared_params,
         {
-            "name": "{}_sc2_3m".format(mixer_name),
+            "name": "{}_sc2_3s_vs_3z".format(mixer_name),
             "mixer": mixer,
-            "env_args.map_name": "3m_3m"
+            "env_args.map_name": "3s_vs_3z"
         },
         repeats=2)
 
     extend_param_dicts(param_dicts, shared_params,
         {
-            "name": "{}_sc2_5m".format(mixer_name),
+            "name": "{}_sc2_3s_vs_4z".format(mixer_name),
             "mixer": mixer,
-            "env_args.map_name": "5m_5m"
+            "env_args.map_name": "3s_vs_4z"
         },
         repeats=3)
