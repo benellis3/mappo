@@ -247,7 +247,6 @@ class SC2(MultiAgentEnv):
         # Kill and restore all units
         try:
             self.kill_all_units()
-            #self.restore_units()
             self.controller.step(2)
         except protocol.ProtocolError:
             self.full_restart()
@@ -999,56 +998,11 @@ class SC2(MultiAgentEnv):
     def render(self):
         pass
 
-    def save_units(self):
-        # called after initialising the map to remember the locations of units
-        self.agents_orig = {}
-        self.enemies_orig = {}
-
-        self._obs = self.controller.observe()
-
-        for unit in self._obs.observation.raw_data.units:
-            if unit.owner == 1: # agent
-                self.agents_orig[len(self.agents_orig)] = unit
-            else:
-                self.enemies_orig[len(self.enemies_orig)] = unit
-
-        assert len(self.agents_orig) == self.n_agents, "Incorrect number of agents: " + str(len(self.agents_orig))
-        assert len(self.enemies_orig) == self.n_enemies, "Incorrect number of enemies: " + str(len(self.enemies_orig))
-
-    def restore_units(self):
-        # restores the original state of the game
-
-        debug_create_command = []
-        for unit in self.agents_orig.values():
-            pos = unit.pos
-            cmd = d_pb.DebugCommand(create_unit =
-                    d_pb.DebugCreateUnit(
-                        unit_type = unit.unit_type,
-                        owner = 1,
-                        pos = sc_common.Point2D(x = pos.x, y = pos.y),
-                        quantity = 1))
-
-            debug_create_command.append(cmd)
-
-        for unit in self.enemies_orig.values():
-            pos = unit.pos
-            cmd = d_pb.DebugCommand(create_unit =
-                    d_pb.DebugCreateUnit(
-                        unit_type = unit.unit_type,
-                        owner = 2,
-                        pos = sc_common.Point2D(x = pos.x, y = pos.y),
-                        quantity = 1))
-
-            debug_create_command.append(cmd)
-
-        self.controller.debug(debug_create_command)
-
     def kill_all_units(self):
 
         units_alive = [unit.tag for unit in self.agents.values() if unit.health > 0] + [unit.tag for unit in self.enemies.values() if unit.health > 0]
         debug_command = [d_pb.DebugCommand(kill_unit = d_pb.DebugKillUnit(tag = units_alive))]
-        #self.controller.debug(debug_command) # TODO use this when deepmind pull request my changes
-        self.controller._client.send(debug=sc_pb.RequestDebug(debug = debug_command))
+        self.controller.debug(debug_command)
 
     def init_units(self):
 
