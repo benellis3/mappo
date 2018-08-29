@@ -100,25 +100,17 @@ class SC1(MultiAgentEnv):
             self.micro_battles = True
             self._agent_race = "Terran"
             self._bot_race = "Terran"
-            # self.unit_health_max_m = 40
 
-            self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win  # + self.n_enemies * self.unit_health_max_m
+            self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
 
         elif self.map_name == 'dragoons_zealots':
             self.micro_battles = True
-
             self._agent_race = "Protoss"
             self._bot_race = "Protoss"
-
             self.zealot_id = 65
             self.dragoon_id = 66
 
-            self.unit_health_max_d = 100
-            self.unit_health_max_z = 100
-
-            self.max_reward = 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
-                              + self.n_enemies * self.reward_death_value \
-                              + self.reward_win
+            self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
 
         # TODO: Do we need this?
         # elif self.map_name == 'openbw':

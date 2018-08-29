@@ -3,7 +3,7 @@
 env: sc1
 
 env_args:
-  map_name: "m5v5_c_far"  # 5v5 marines by default
+  map_name: "m5v5_c_far"  # 5 marines by default; for 2 dragoons + 3 zealots, change to "dragoons_zealots"
   hostname: localhost
   heuristic: False
   measure_fps: True
