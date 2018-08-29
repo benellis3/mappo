@@ -1,6 +1,6 @@
 import torch as th
 
-def build_td_lambd_targets(rewards, terminated, mask, target_qs, n_agents, gamma, td_lambda):
+def build_td_lambda_targets(rewards, terminated, mask, target_qs, n_agents, gamma, td_lambda):
     bs = rewards.size(0)
     max_t = rewards.size(1)
     targets = rewards.new(target_qs.size()).zero_()

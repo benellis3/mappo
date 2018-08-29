@@ -1,9 +1,9 @@
 from .q_learner import QLearner
 from .coma_learner import COMALearner
-from .policy_grad_learner import PolicyGradLearner
+from .actor_critic_learner import ActorCriticLearner
 
 REGISTRY = {}
 
 REGISTRY["q_learner"] = QLearner
 REGISTRY["coma_learner"] = COMALearner
-REGISTRY["policy_grad_learner"] = PolicyGradLearner
+REGISTRY["actor_critic_learner"] = ActorCriticLearner

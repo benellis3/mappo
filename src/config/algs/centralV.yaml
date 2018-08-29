@@ -1,9 +1,9 @@
 # --- COMA specific parameters ---
 
 action_selector: "multinomial"
-epsilon_start: .5
-epsilon_finish: .01
-epsilon_anneal_time: 100000
+epsilon_start: .0
+epsilon_finish: .0
+epsilon_anneal_time: 50000
 
 runner: "parallel"
 
@@ -15,7 +15,7 @@ env_args:
   state_last_action: False # coma critic adds last action internally
 
 # update the target network every {} training steps
-target_update_interval: 20
+target_update_interval: 500
 
 lr: 0.0005
 critic_lr: 0.0005
@@ -24,7 +24,7 @@ td_lambda: 0.8
 # use COMA
 agent_output_type: "pi_logits"
 learner: "actor_critic_learner"
-critic_q_fn: "coma"
-critic_baseline_fn: "coma"
+critic_q_fn: "centralV"
+critic_baseline_fn: "centralV"
 
 name: "coma"

@@ -123,10 +123,12 @@ if __name__ == '__main__':
     no_mongodb = False
 
     for _i, _v in enumerate(params):
-        if "--no-mongo" == _v:
+        if "no-mongo" in _v:
+        # if "--no-mongo" == _v:
             del params[_i]
             no_mongodb = True
             break
+
 
     # If there is no url set for the mongodb, we cannot use it
     if not no_mongodb and "db_url" not in config_dict:
