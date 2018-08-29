@@ -63,6 +63,14 @@ class ActorCriticLearner:
 
         mask = mask.repeat(1, 1, self.n_agents)
 
+        critic_mask = mask.clone()
+        if self.critic.output_type == "q":
+            critic_mask[:, -1].zero_()
+        if self.separate_baseline_critic:
+            baseline_critic_mask = mask.clone()
+            if self.critic.output_type == "q":
+                baseline_critic_mask[:, -1].zero_()
+
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
         for t in range(batch.max_seq_length - 1):
@@ -77,16 +85,16 @@ class ActorCriticLearner:
 
         pi = mac_out
 
-        q_sa, v_s, critic_train_stats = self.train_critic_batched(self.critic, self.target_critic, self.critic_optimiser, batch,
+        q_sa, v_s, critic_train_stats = self.train_critic_sequential(self.critic, self.target_critic, self.critic_optimiser, batch,
                                                                   rewards, terminated, actions, avail_actions,
-                                                                  mask, bs, max_t)
+                                                                  critic_mask, bs, max_t)
 
         if self.separate_baseline_critic:
             q_sa_baseline, v_s_baseline, critic_train_stats_baseline = \
                 self.train_critic_sequential(self.baseline_critic, self.target_baseline_critic, self.baseline_critic_optimiser,
                                              batch,
                                              rewards, terminated, actions, avail_actions,
-                                             mask, bs, max_t)
+                                             baseline_critic_mask, bs, max_t)
             if self.args.critic_baseline_fn == "coma":
                 baseline = (q_sa_baseline * pi).sum(-1, keepdim=True).detach()
             else:
@@ -99,6 +107,8 @@ class ActorCriticLearner:
 
         if self.critic.output_type == "q":
             q_sa = th.gather(q_sa, dim=3, index=actions)
+
+        q_sa = self.nstep_returns(rewards, mask, q_sa, self.args.coma_nstep)
 
         advantages = (q_sa - baseline).detach().squeeze()
 
@@ -136,22 +146,18 @@ class ActorCriticLearner:
         # Optimise critic
         target_vals = target_critic(batch)
 
-        vals = th.zeros_like(target_vals)
+        all_vals = th.zeros_like(target_vals)
 
-        target_vals = target_vals.view(bs, max_t, self.n_agents, -1)[:, 1:]
+        target_vals = target_vals.view(bs, max_t, self.n_agents, -1)[:, :-1]
 
         if critic.output_type == 'q':
-            # For SARSA, we don't have action at last timestep so we can't train on it, so truncate one more.
-            target_vals = target_vals[:, :-1]
-            rewards = rewards[:, :-1]
-            terminated = terminated[:, :-1]
-            mask = mask[:, :-1]
-            target_vals = th.gather(target_vals, dim=3, index=actions[:, 1:])
+            target_vals = th.gather(target_vals, dim=3, index=actions)
+            target_vals = th.cat([target_vals[:, 1:], th.zeros_like(target_vals[:, 0:1])], dim=1)
         target_vals = target_vals.squeeze(3)
 
         # Calculate td-lambda targets
         targets = build_td_lambda_targets(rewards, terminated, mask, target_vals, self.n_agents,
-                                         self.args.gamma, self.args.td_lambda)
+                                          self.args.gamma, self.args.td_lambda)
 
         running_log = {
             "critic_loss": [],
@@ -161,21 +167,22 @@ class ActorCriticLearner:
             "q_taken_mean": [],
         }
 
-        for t in reversed(range(vals.size(1) - 1)):
+        for t in reversed(range(rewards.size(1) + 1)):
             vals_t = critic(batch, t)
-            vals[:, t] = vals_t.view(bs, self.n_agents, -1)
+            all_vals[:, t] = vals_t.view(bs, self.n_agents, -1)
 
-            if t >= mask.size(1):  # we still want the value on this step but can't train as no action
+            if t == rewards.size(1):
                 continue
-            mask_t = mask[:, t].reshape(-1)
+
+            mask_t = mask[:, t]
             if mask_t.sum() == 0:
                 continue
 
             if critic.output_type == "q":
-                vals_t = th.gather(vals_t, dim=3, index=actions[:, t:t+1]).squeeze(3).reshape(-1)
+                vals_t = th.gather(vals_t, dim=3, index=actions[:, t:t+1]).squeeze(3).squeeze(1)
             else:
-                vals_t = vals_t.reshape(-1)
-            targets_t = targets[:, t].reshape(-1)
+                vals_t = vals_t
+            targets_t = targets[:, t]
 
             td_error = (vals_t - targets_t.detach())
 
@@ -198,15 +205,34 @@ class ActorCriticLearner:
             running_log["target_mean"].append((targets_t * mask_t).sum().item() / mask_elems)
 
         if critic.output_type == 'q':
-            q_vals = vals[:, :-1]
+            q_vals = all_vals[:, :-1]
             v_s = None
         else:
-            q_vals = build_td_lambda_targets(rewards, terminated, mask, vals.squeeze(3)[:, 1:], self.n_agents,
+            q_vals = build_td_lambda_targets(rewards, terminated, mask, all_vals.squeeze(3)[:, 1:], self.n_agents,
                                              self.args.gamma, self.args.td_lambda)
-            v_s = vals[:, :-1]
+            v_s = all_vals[:, :-1]
 
         return q_vals, v_s, running_log
 
+
+    def nstep_returns(self, rewards, mask, values, nsteps):
+        # TODO: make this not dumb
+        nstep_values = th.zeros_like(values)
+        values = values.squeeze(3)
+        for t_start in range(rewards.size(1)):
+            nstep_return_t = th.zeros_like(values[:, 0])
+            for step in range(nsteps):
+                t = t_start + step
+                if t >= rewards.size(1):
+                    break
+                elif step == nsteps - 1:
+                    nstep_return_t += self.args.gamma ** (step) * values[:, t] * mask[:, t]
+                elif t == rewards.size(1) - 1:
+                    nstep_return_t += self.args.gamma ** (step) * values[:, t] * mask[:, t]
+                else:
+                    nstep_return_t += self.args.gamma ** (step) * rewards[:, t] * mask[:, t]
+            nstep_values[:, t_start, :, 0] = nstep_return_t
+        return nstep_values
 
     def train_critic_batched(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
                              avail_actions, mask, bs, max_t):
