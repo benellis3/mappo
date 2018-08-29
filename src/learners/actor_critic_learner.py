@@ -107,8 +107,7 @@ class ActorCriticLearner:
 
         if self.critic.output_type == "q":
             q_sa = th.gather(q_sa, dim=3, index=actions)
-
-        q_sa = self.nstep_returns(rewards, mask, q_sa, self.args.coma_nstep)
+            q_sa = self.nstep_returns(rewards, mask, q_sa, self.args.coma_nstep)
 
         advantages = (q_sa - baseline).detach().squeeze()
 
@@ -236,17 +235,14 @@ class ActorCriticLearner:
 
     def train_critic_batched(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
                              avail_actions, mask, bs, max_t):
+        # Optimise critic
         target_vals = target_critic(batch)
 
-        target_vals = target_vals[:, 1:]
+        target_vals = target_vals.view(bs, max_t, self.n_agents, -1)[:, :-1]
 
         if critic.output_type == 'q':
-            # For SARSA, we don't have action at last timestep so we can't train on it, so truncate one more.
-            target_vals = target_vals[:, :-1]
-            rewards = rewards[:, :-1]
-            terminated = terminated[:, :-1]
-            mask = mask[:, :-1]
-            target_vals = th.gather(target_vals, dim=3, index=actions[:, 1:])
+            target_vals = th.gather(target_vals, dim=3, index=actions)
+            target_vals = th.cat([target_vals[:, 1:], th.zeros_like(target_vals[:, 0:1])], dim=1)
         target_vals = target_vals.squeeze(3)
 
         # Calculate td-lambda targets
@@ -265,7 +261,7 @@ class ActorCriticLearner:
         vals = all_vals.clone()[:, :-1]
 
         if critic.output_type == "q":
-            vals = th.gather(vals, dim=3, index=actions)[:, :-1]
+            vals = th.gather(vals, dim=3, index=actions)
         vals = vals.squeeze(3)
 
         td_error = (vals - targets.detach())
