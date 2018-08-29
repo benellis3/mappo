@@ -1,4 +1,6 @@
 from ..multiagentenv import MultiAgentEnv
+from .map_params import get_map_params, map_present
+
 import torchcraft as tc
 import torchcraft.Constants as tcc
 
@@ -11,8 +13,8 @@ import time
 from operator import attrgetter
 from copy import deepcopy
 import portpicker
-
-import socket, errno
+import socket
+import errno
 
 from utils.dict2namedtuple import convert
 
@@ -20,14 +22,24 @@ from utils.dict2namedtuple import convert
 StarCraft I: Brood War
 '''
 
+
 # map parameter registry
-map_param_registry = {"m5v5_c_far": {"n_agents": 5, "n_enemies": 5},
-                      "dragoons_zealots": {"n_agents": 5, "n_enemies": 5},
-                      "openbw": {"n_agents": 5, "n_enemies": 5}}
+# map_param_registry = {"m5v5_c_far": {"n_agents": 5, "n_enemies": 5},
+#                       "dragoons_zealots": {"n_agents": 5, "n_enemies": 5},
+#                       "openbw": {"n_agents": 5, "n_enemies": 5}}
 
 class SC1(MultiAgentEnv):
 
     def __init__(self, **kwargs):
+
+        self.debug_launcher = False
+        self.port_in_use = False
+        self.debug_inputs = False
+        self.debug_rewards = False
+
+        if self.debug_launcher:
+            print("INIT")
+
         args = kwargs["env_args"]
         if isinstance(args, dict):
             args = convert(args)
@@ -36,10 +48,12 @@ class SC1(MultiAgentEnv):
 
         # Read arguments
         self.map_name = args.map_name
-        self.n_agents = map_param_registry[self.map_name]["n_agents"]
-        self.n_enemies = map_param_registry[self.map_name]["n_enemies"]
-        self.episode_limit = args.episode_limit
-        # self.episode_limit = 1000
+        assert map_present(self.map_name), \
+            "map {} not in map registry! please add.".format(self.map_name)
+        map_params = convert(get_map_params(self.map_name))
+        self.n_agents = map_params.n_agents
+        self.n_enemies = map_params.n_enemies
+        self.episode_limit = map_params.limit
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         self.state_last_action = args.state_last_action
@@ -54,28 +68,32 @@ class SC1(MultiAgentEnv):
 
         # Other
         self.seed = args.seed
-        self.heuristic_function = args.heuristic_function
+        self.heuristic = args.heuristic
         self.measure_fps = args.measure_fps
+        self.continuing_episode = args.continuing_episode
 
-        self.bs_id = kwargs["bs_id"]
         self.hostname = args.hostname
-        # self.port = self.port + self.bs_id
         self.port = portpicker.pick_unused_port()
-        self.port_in_use = False
-        self.debug_inputs = False
-        self.debug_rewards = False
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
-        if sys.platform == 'linux':
-            # self.game_version = "1.4.0"
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI')
-            self.env_file_type = 'so'
+        if 'SC1PATH' not in os.environ:
+            # We are not in Docker
+            for tc_dir in ["/Volumes/Data/Google_Drive/AYA_Google_Drive/Git",
+                           "/home/trudner/git",
+                           "/Users/timrudner/data/code/git"]:
+                if os.path.isdir(tc_dir):
+                    os.environ['SC1PATH'] = tc_dir
+        else:
+            # We are in Docker
+            os.environ['SC1PATH'] = "/install"
 
-        if sys.platform == 'darwin':
-            # self.game_version = "1.4.0"
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), os.pardir, '3rdparty', 'StarCraftI')
+        if sys.platform == 'linux':
+            os.environ['MPQPATH'] = os.path.join(os.getcwd(), '3rdparty', 'broodwar')
+            self.env_file_type = 'so'
+        elif sys.platform == 'darwin':
+            os.environ['MPQPATH'] = os.path.join(os.getcwd(), '3rdparty', 'broodwar')
             self.env_file_type = 'dylib'
 
         if self.map_name == 'm5v5_c_far':
@@ -83,42 +101,29 @@ class SC1(MultiAgentEnv):
             self._agent_race = "Terran"
             self._bot_race = "Terran"
 
-            self.unit_health_max_m = 40
-
-            self.max_reward = 5 * self.unit_health_max_m\
-                              + 5 * self.unit_health_max_m \
-                              + self.n_enemies * self.reward_death_value \
-                              + self.reward_win
+            self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
 
         elif self.map_name == 'dragoons_zealots':
             self.micro_battles = True
-
             self._agent_race = "Protoss"
             self._bot_race = "Protoss"
-
             self.zealot_id = 65
             self.dragoon_id = 66
 
-            self.unit_health_max_d = 100
-            self.unit_health_max_z = 100
+            self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
 
-            self.max_reward = 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
-                              + 2 * self.unit_health_max_d + 3 * self.unit_health_max_z \
-                              + self.n_enemies * self.reward_death_value \
-                              + self.reward_win
-
-        elif self.map_name == 'openbw':
-            self.micro_battles = False
-
-            self._agent_race = "Terran"
-            self._bot_race = "Terran"
-
-            self.unit_health_max_m = 40
-
-            self.max_reward = 5 * self.unit_health_max_m\
-                              + 5 * self.unit_health_max_m \
-                              + self.n_enemies * self.reward_death_value \
-                              + self.reward_win
+        # TODO: Do we need this?
+        # elif self.map_name == 'openbw':
+        #     self.micro_battles = False
+        #
+        #     self._agent_race = "Terran"
+        #     self._bot_race = "Terran"
+        #
+        #     self.unit_health_max_m = 40
+        #
+        #     self.max_reward = self.n_enemies * self.unit_health_max_m \
+        #                       + self.n_enemies * self.reward_death_value \
+        #                       + self.reward_win
 
         # Check if server has already been launched on this port
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -131,16 +136,28 @@ class SC1(MultiAgentEnv):
                 self.port_in_use = True
                 print("Exception error: Port {} already in use. \n".format(self.port, e))
             else:
-                # something else raised the socket.error exception
+                # Something else raised the socket.error exception
                 print(e)
         s.close()
+
+        # For single-batch testing in BWAPILauncher rendering
+        # self.port = 11111  # Needs to be commented out before deployment
+
+        if self.debug_launcher:
+            print("BEFORE LAUNCH SERVER")
 
         # Launch the server
         if not self.port_in_use:
             self._launch_server()
 
+        if self.debug_launcher:
+            print("BEFORE LAUNCH CLIENT")
+
         # Launch the game
         self._launch_client()
+
+        if self.debug_launcher:
+            print("AFTER LAUNCH CLIENT")
 
         self.map_x = self._obs.map_size[0]
         self.map_y = self._obs.map_size[1]
@@ -158,19 +175,23 @@ class SC1(MultiAgentEnv):
         self.force_restarts = 0
 
     def _launch_server(self):
+        os_env = os.environ.copy()
         my_env = {"OPENBW_ENABLE_UI": '0',
                   "BWAPI_CONFIG_AI__RACE": '{}'.format(self._bot_race),
-                  "BWAPI_CONFIG_AI__AI": '{}/bwapi/build/lib/BWEnv.{}'.format(os.environ['SC1PATH'], self.env_file_type),
+                  "BWAPI_CONFIG_AI__AI": '{}/TorchCraft/BWEnv/build/BWEnv.{}'.format(os.environ['SC1PATH'],
+                                                                                     self.env_file_type),
                   "BWAPI_CONFIG_AUTO_MENU__AUTO_MENU": "SINGLE_PLAYER",
-                  "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/envs/starcraft1/maps/{}.scm'.format(os.getcwd(), self.map_name),
-                  "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE MAP SETTINGS",
-                  "LD_LIBRARY_PATH": "{}/bwapi/build/lib/".format(os.environ['SC1PATH']),
+                  "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/src/envs/starcraft1/maps/{}.scm'.format(os.getcwd(),
+                                                                                             self.map_name),
+                  "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE_MAP_SETTINGS",
+                  # "LD_LIBRARY_PATH": "{}/bwapi/build/lib/".format(os.environ['SC1PATH']),
                   "TORCHCRAFT_PORT": '{}'.format(self.port)}
         if sys.platform in ["linux"]:
-            my_env["BWAPI_CONFIG_AUTO_MENU__MAP"] ='{}/src/envs/starcraft1/maps/{}.scm'.format(os.getcwd(), self.map_name)
-        launcher_path = '{}/bwapi/build/bin'.format(os.environ['SC1PATH'])
-        launcher = './BWAPILauncher'
-
+            my_env["BWAPI_CONFIG_AUTO_MENU__MAP"] = '{}/src/envs/starcraft1/maps/{}.scm'.format(os.getcwd(),
+                                                                                                self.map_name)
+        launcher_path = os.environ['MPQPATH']
+        my_env = {**os_env, **my_env}
+        launcher = 'BWAPILauncher'
         subprocess.Popen([launcher], cwd=launcher_path, env=my_env)
 
     def _launch_client(self):
@@ -193,11 +214,12 @@ class SC1(MultiAgentEnv):
 
         self._episode_count += 1
         self._episode_steps = 0
-        if self._episode_count > 0:
-            # No need to restart for the first episode.
+        if self._episode_count > 0:  # no need to restart in the first episode
             self._restart()
 
-        # naive way to measure FPS
+        self._episode_count += 1
+
+        # Naive way to measure FPS
         if self.measure_fps:
             if self._episode_count == 10:
                 self.start_time = time.time()
@@ -210,7 +232,7 @@ class SC1(MultiAgentEnv):
                     (self._total_steps * self._step_mul) / elapsed_time))
                 print('-------------------------------------------------------------')
 
-        # Information kept for counting the reward
+        # Information kept for computing the reward
         self.death_tracker_ally = np.zeros(self.n_agents)
         self.death_tracker_enemy = np.zeros(self.n_enemies)
         self.previous_agent_units = None
@@ -218,34 +240,28 @@ class SC1(MultiAgentEnv):
 
         self.last_action = np.zeros((self.n_agents, self.n_actions))
 
-        try:
-            self._obs = self.controller.recv()
-            self.init_units()
-        except:
-            # self.full_restart()
-            pass
+        self._obs = self.controller.recv()
+        self.init_units()
+
+        # self.full_restart()  # TODO: Implement condition to trigger full restart in case the client has crashed
 
         return self.get_obs(), self.get_state()
 
     def _restart(self):
-        # self.controller.restart() # restarts the game after reloading the map
+        # End episode and start a new one by killing and restoring all units
+        self.kill_all_units()
+        self._obs = self.controller.init(micro_battles=self.micro_battles)
 
-        # Kill and restore all units
-        try:
-            self.kill_all_units()
-
-            # self.restore_units()
-            self._obs = self.controller.init(micro_battles=self.micro_battles)
-        except:
-            # self.full_restart()  # TODO: implement
-            pass
+        # self.full_restart()  # TODO: Implement condition to trigger full restart in case the client has crashed
 
     def full_restart(self):
-        # End episode and restart a new one
+        # Close and relaunch client
         self.controller.close()
-        # self._launch_server()
         self._launch_client()
+
         self.force_restarts += 1
+
+        self.reset()
 
     def one_hot(self, data, nb_classes):
         """Convert an iterable of indices to one-hot encoded labels."""
@@ -258,52 +274,29 @@ class SC1(MultiAgentEnv):
 
         sc_actions = []
         for a_id, action in enumerate(actions):
-            agent_action = self.get_agent_action(a_id, action)
+            if not self.heuristic:
+                agent_action = self.get_agent_action(a_id, action)
+            else:
+                agent_action = self.get_agent_action_heuristic(a_id, action)
             if agent_action:
                 sc_actions.append(agent_action)
-        # TODO: implement
-        # for a_id, action in enumerate(actions):
-        #     if not self.heuristic_function:
-        #         agent_action = self.get_agent_action(a_id, action)
-        #     else:
-        #         agent_action = self.get_agent_action_heuristic(a_id, action)
-        #     if agent_action:
-        #       sc_actions.append(agent_action)
 
         # Send actions
-        sent = self.controller.send(sc_actions)
+        self.controller.send(sc_actions)
+        self._obs = self.controller.recv()
 
-        if sent:
-            self._obs = self.controller.recv()
-        else:
-            self.full_restart()
-            return 0, True, {"episode_limit": True}
-
-        # TODO: implement
-        # try:
-        #     res_actions = self.controller.actions(req_actions)
-        #     # Make step in SC2, i.e. apply actions
-        #     self.controller.step(self._step_mul)
-        #     # Observe here so that we know if the episode is over.
-        #     self._obs = self.controller.observe()
-        # except protocol.ProtocolError:
-        #     self.full_restart()
-        #     return 0, True, {"episode_limit": True}
-        # except protocol.ConnectionError:
-        #     self.full_restart()
-        #     return 0, True, {"episode_limit": True}
+        # self.full_restart()  # TODO: Implement condition to trigger full restart in case the client has crashed
 
         self._total_steps += 1
         self._episode_steps += 1
 
         # Update what we know about units
-        self._obs = self.controller.recv()
         game_ended = self.update_units()
 
         terminated = False
         if game_ended != 0:
             self.reward = self.reward_battle()
-        info = {}
+        info = {"battle_won": False}
 
         if game_ended is not None:
             # Battle is over
@@ -311,13 +304,14 @@ class SC1(MultiAgentEnv):
             self.battles_game += 1
             if game_ended == 1:
                 self.battles_won += 1
+                info["battle_won"] = True
                 self.reward += self.reward_win
 
         elif self.episode_limit > 0 and self._episode_steps >= self.episode_limit:
-            # Episode limit reached
+            # Episode limit has been reached
             terminated = True
-            info["episode_limit"] = True
-            # info["episode_limit"] = False
+            if self.continuing_episode:
+                info["episode_limit"] = True
             self.battles_game += 1
             self.timeouts += 1
 
@@ -327,12 +321,6 @@ class SC1(MultiAgentEnv):
         if self.reward_scale:
             self.reward /= (self.max_reward / self.reward_scale_rate)
 
-        # if reward > 0:
-        #     print(reward)
-        # if terminated:
-        #     print(terminated)
-        #     print(reward)
-
         return self.reward, terminated, info
 
     def get_agent_action(self, a_id, action):
@@ -340,11 +328,19 @@ class SC1(MultiAgentEnv):
         x = unit.x
         y = unit.y
 
+        action = action.item()
+
         if action == 0:
             # no-op (valid only when dead)
             if unit.health > 0:
                 print("break")
-            assert unit.health == 0, "No-op chosen but the agent's unit is not dead"
+            try:
+                assert unit.health == 0, "No-op chosen but the agent's unit is not dead"
+            except Exception as e:
+                print("episode_steps:", self._episode_steps)
+                print("total_steps:", self._total_steps)
+                print("obs:", self._obs)
+                pass
             if self.debug_inputs:
                 print("Agent %d: Dead" % a_id)
             return None
@@ -356,7 +352,7 @@ class SC1(MultiAgentEnv):
                 print("Agent %d: Stop" % a_id)
 
         elif action == 2:
-            # north
+            # Move up
             sc_action = [tcc.command_unit_protected,
                          unit.id,
                          tcc.unitcommandtypes.Move,
@@ -367,7 +363,7 @@ class SC1(MultiAgentEnv):
                 print("Agent %d: North" % a_id)
 
         elif action == 3:
-            # south
+            # Move down
             sc_action = [tcc.command_unit_protected,
                          unit.id,
                          tcc.unitcommandtypes.Move,
@@ -378,7 +374,7 @@ class SC1(MultiAgentEnv):
                 print("Agent %d: South" % a_id)
 
         elif action == 4:
-            # east
+            # Move right
             sc_action = [tcc.command_unit_protected,
                          unit.id,
                          tcc.unitcommandtypes.Move,
@@ -389,7 +385,7 @@ class SC1(MultiAgentEnv):
                 print("Agent %d: East" % a_id)
 
         elif action == 5:
-            # west
+            # Move left
             sc_action = [tcc.command_unit_protected,
                          unit.id,
                          tcc.unitcommandtypes.Move,
@@ -399,7 +395,7 @@ class SC1(MultiAgentEnv):
             if self.debug_inputs:
                 print("Agent %d: West" % a_id)
         else:
-            # attack units that are in range
+            # Attack units that are in shooting range
             enemy_id = action - self.n_actions_no_attack
             enemy_unit = self.enemies[enemy_id]
             sc_action = [tcc.command_unit_protected, unit.id, tcc.unitcommandtypes.Attack_Unit, enemy_unit.id]
@@ -408,33 +404,38 @@ class SC1(MultiAgentEnv):
 
         return sc_action
 
-    # TODO: implement
     def get_agent_action_heuristic(self, a_id, action):
 
-        # unit = self.get_unit_by_id(a_id)
-        # tag = unit.tag
-        #
-        # enemy_tag = 0
-        # for unit in self.enemies.values():
-        #     if unit.health > 0:
-        #         enemy_tag = unit.tag
-        #
-        # # attack units that are in range
-        # cmd = r_pb.ActionRawUnitCommand(ability_id = action_atack_id,
-        #         target_unit_tag = enemy_tag,
-        #         unit_tags = [tag],
-        #         queue_command = False)
-        #
-        # sc_action = sc_pb.Action(action_raw=r_pb.ActionRaw(unit_command=cmd))
-        # return sc_action
-        pass
+        # Heuristic to attack closest enemy unit in shooting range
+        unit = self.get_unit_by_id(a_id)
+        shooting_range = self.unit_shoot_range(a_id)
+        dist = float('inf')
+        enemy_id = None
+
+        # Find the closest enemy unit that's alive and in shooting range
+        for e_id, e_unit in self.enemies.items():
+            d = ((e_unit.x - unit.x) ** 2 + (e_unit.y - unit.y) ** 2) ** 0.5
+            if d < dist and d < shooting_range and e_unit.health > 0:
+                dist = d
+                enemy_id = e_id
+
+        # Attack closest enemy unit or stop if no enemies are in shooting range
+        if enemy_id is not None:
+            sc_action = [tcc.command_unit_protected, a_id, tcc.unitcommandtypes.Attack_Unit, enemy_id]
+            if self.debug_inputs:
+                print("Agent %d attacks enemy # %d" % (a_id, enemy_id))
+        else:
+            sc_action = [tcc.command_unit_protected, a_id, tcc.unitcommandtypes.Stop]
+            if self.debug_inputs:
+                print("Agent %d: Stop" % a_id)
+
+        return sc_action
 
     def reward_battle(self):
         #  delta health - delta enemies + delta deaths where value:
-        #   if enemy unit dies, add reward_death_value per dead unit
-        #   if own unit dies, subtract reward_death_value per dead unit
+        #    If enemy unit dies, add reward_death_value per dead unit
+        #    If own unit dies, subtract reward_death_value per dead unit
 
-        reward = 0
         delta_deaths = 0
         delta_ally = 0
         delta_enemy = 0
@@ -454,19 +455,19 @@ class SC1(MultiAgentEnv):
                                                                       self.previous_enemy_units[al_id].shield \
                                                                       - self.enemies[al_id].shield))
 
-        # update deaths
+        # Update deaths
         for al_id, al_unit in self.agents.items():
             if not self.death_tracker_ally[al_id]:
-                # did not die so far
+                # Has not die so far
                 prev_health = self.previous_agent_units[al_id].health + self.previous_agent_units[al_id].shield
                 if al_unit.health == 0:
-                    # just died
+                    # Just died
                     self.death_tracker_ally[al_id] = 1
                     if not self.reward_only_positive:
                         delta_deaths -= self.reward_death_value * neg_scale
                     delta_ally += prev_health * neg_scale
                 else:
-                    # still alive
+                    # Still alive
                     delta_ally += (prev_health - al_unit.health - al_unit.shield) * neg_scale
 
         for e_id, e_unit in self.enemies.items():
@@ -512,11 +513,14 @@ class SC1(MultiAgentEnv):
         return math.hypot(x2 - x1, y2 - y1)
 
     def unit_shoot_range(self, agent_id):
-        return tcc.orders.AttackFixedRange  # 11
+        unit = self.get_unit_by_id(agent_id)
+        shooting_range = unit.groundRange if unit.type != 65 else 16
+        return shooting_range
 
     def unit_sight_range(self, agent_id):
         unit = self.get_unit_by_id(agent_id)
-        return tcc.staticvalues["sightRange"][unit.type]
+        sight_range = tcc.staticvalues["sightRange"][unit.type] / 8
+        return sight_range
 
     def unit_max_shield(self, unit_id, ally):
         # These are the biggest I've seen, there is no info about this
@@ -561,12 +565,12 @@ class SC1(MultiAgentEnv):
                     enemy_feats[e_id, 2] = (e_x - x) / sight_range  # relative X
                     enemy_feats[e_id, 3] = (e_y - y) / sight_range  # relative Y
 
-                    # TODO: do we need this in SC1?
-                    if self.map_name == 'dragoons_zealots':
-                        type_id = e_unit.unit_type - self.zealot_id
-                        enemy_feats[e_id, 4 + type_id] = 1
+                    # TODO: Do we need this?
+                    # if self.map_name == 'dragoons_zealots':
+                    #     type_id = e_unit.type - self.zealot_id
+                    #     enemy_feats[e_id, 4 + type_id] = 1
 
-            # place the features of the agent himself always at the first place
+            # Place the features of the agent himself always at the first place
             al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
             for i, al_id in enumerate(al_ids):
 
@@ -616,10 +620,9 @@ class SC1(MultiAgentEnv):
             if al_unit.health > 0:
                 x = al_unit.x
                 y = al_unit.y
-                # max_cd = self.unit_max_cooldown(al_id)
 
                 ally_state[al_id, 0] = al_unit.health / al_unit.max_health  # health
-                ally_state[al_id, 1] = al_unit.airCD / al_unit.maxCD  # cooldown for airCD = groundCD
+                ally_state[al_id, 1] = al_unit.groundCD / al_unit.maxCD  # cool-down for ground weapon
                 ally_state[al_id, 2] = (x - center_x) / self.max_distance_x  # relative X
                 ally_state[al_id, 3] = (y - center_y) / self.max_distance_y  # relative Y
 
@@ -672,7 +675,7 @@ class SC1(MultiAgentEnv):
         state = np.concatenate((enemy_feats.flatten(),
                                 ally_feats.flatten()))
         state = state.astype(dtype=np.float32)
-        # Todo: Check that the dimensions are consistent.
+        # TODO: Check if dimensions match
         a_a1 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[0])), [-1, 1])
         a_a2 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[1])), [1, -1])
         avail_actions = a_a1.dot(a_a2)
@@ -690,7 +693,7 @@ class SC1(MultiAgentEnv):
                 coordinates[:, 1:2] - coordinates[:, 1:2].T) ** 2) ** 0.5
         sight_range = self.unit_sight_range(agent_ids[0])
 
-        # Check that max pairwise distance is less than sight_range.
+        # Check that max pairwise distance is less than sight_range
         if np.max(distances) > sight_range:
             return state, avail_all
 
@@ -703,22 +706,22 @@ class SC1(MultiAgentEnv):
             dist = self.distance(x, y, e_x, e_y)
 
             if self.get_intersect(coordinates, e_unit, sight_range) and e_unit.health > 0:  # visible and alive
-                # Sight range > shoot range
+                # sight range > shoot range
                 enemy_feats[e_id, 0] = a_a1[self.n_actions_no_attack + e_id, 0]  # available
                 enemy_feats[e_id, 1] = dist / sight_range  # distance
                 enemy_feats[e_id, 2] = (e_x - x) / sight_range  # relative X
                 enemy_feats[e_id, 3] = (e_y - y) / sight_range  # relative Y
                 enemy_feats[e_id, 4] = a_a2[0, self.n_actions_no_attack + e_id]  # available
 
-                # TODO: do we need this in SC1
-                if self.map_name == 'dragoons_zealots':
-                    type_id = e_unit.unit_type - self.zealot_id
-                    enemy_feats[e_id, 4 + type_id] = 1
+                # TODO: Do we need this?
+                # if self.map_name == 'dragoons_zealots':
+                #     type_id = e_unit.type - self.zealot_id
+                #     enemy_feats[e_id, 4 + type_id] = 1
             else:
                 avail_actions[self.n_actions_no_attack + e_id, :] = 0
                 avail_actions[:, self.n_actions_no_attack + e_id] = 0
 
-        # place the features of the agent himself always at the first place
+        # Place the features of the agent himself always at the first place
         al_ids = range(self.n_agents)
         for i, al_id in enumerate(al_ids):
             al_unit = self.get_unit_by_id(al_id)
@@ -732,10 +735,10 @@ class SC1(MultiAgentEnv):
                 ally_feats[i, 2] = (al_x - x) / sight_range  # relative X
                 ally_feats[i, 3] = (al_y - y) / sight_range  # relative Y
 
-                # TODO: do we need this in SC1?
-                if self.map_name == 'dragoons_zealots':
-                    type_id = al_unit.type - self.dragoon_id
-                    ally_feats[i, 4 + type_id] = 1
+                # TODO: Do we need this?
+                # if self.map_name == 'dragoons_zealots':
+                #     type_id = al_unit.type - self.dragoon_id
+                #     ally_feats[i, 4 + type_id] = 1
 
         state = np.concatenate((enemy_feats.flatten(),
                                 ally_feats.flatten()))
@@ -769,13 +772,12 @@ class SC1(MultiAgentEnv):
         """ Returns the available actions for agent_id """
         unit = self.get_unit_by_id(agent_id)
         if unit.health > 0:
-            # cannot do no-op as alive
+            # Cannot do no-op as alive
             avail_actions = [0] * self.n_actions
 
-            # stop should be allowed
+            # Stopping should be allowed
             avail_actions[1] = 1
 
-            # see if we can move
             if unit.y + self._move_amount < self.map_play_area_max[1]:
                 avail_actions[2] = 1
             if unit.y - self._move_amount > self.map_play_area_min[1]:
@@ -785,21 +787,19 @@ class SC1(MultiAgentEnv):
             if unit.x - self._move_amount > self.map_play_area_min[0]:
                 avail_actions[5] = 1
 
-            # can attack only those who is alive
-            # and in the shooting range
+            shooting_range = self.unit_shoot_range(agent_id)
 
-            shoot_range = self.unit_shoot_range(agent_id)
-
+            # Unit can only attack enemies that are alive and in shooting range
             for e_id, e_unit in self.enemies.items():
                 if e_unit.health > 0:
                     dist = self.distance(unit.x, unit.y, e_unit.x, e_unit.y)
-                    if dist <= shoot_range:
+                    if dist <= shooting_range:
                         avail_actions[e_id + self.n_actions_no_attack] = 1
 
             return avail_actions
 
         else:
-            # only no-op allowed
+            # Only no-op allowed
             return [1] + [0] * (self.n_actions - 1)
 
     def get_avail_actions(self):
@@ -850,12 +850,11 @@ class SC1(MultiAgentEnv):
         pass
 
     def save_units(self):
-        # called after initialising the map to remember the locations of units
+        # Called after initialising the map to remember the locations of units
         self.agents_orig = {}
         self.enemies_orig = {}
 
         self._obs = self.controller.recv()
-        # self._obs = self.controller.observe()
 
         for unit in self._obs.units[0]:
             self.agents_orig[len(self.agents_orig)] = unit
@@ -867,21 +866,8 @@ class SC1(MultiAgentEnv):
 
     # TODO: implement
     def restore_units(self):
-        # restores the original state of the game
+        # Restores the original state of the game
         pass
-
-        # for unit in self.enemies_orig.values():
-        #     pos = unit.pos
-        #     cmd = d_pb.DebugCommand(create_unit =
-        #             d_pb.DebugCreateUnit(
-        #                 unit_type = unit.unit_type,
-        #                 owner = 2,
-        #                 pos = sc_common.Point2D(x = pos.x, y = pos.y),
-        #                 quantity = 1))
-        #
-        #     debug_create_command.append(cmd)
-        #
-        # self.controller.debug(sc_pb.RequestDebug(debug = debug_create_command))
 
     def kill_all_units(self):
         # TODO: updated this for SC1
@@ -900,7 +886,7 @@ class SC1(MultiAgentEnv):
                     ]
                     commands.append(command)
 
-            sent = self.controller.send(commands)
+            self.controller.send(commands)
             self._obs = self.controller.recv()
 
         self.controller.send([
@@ -918,9 +904,7 @@ class SC1(MultiAgentEnv):
             self.enemies = {}
 
             ally_units = [deepcopy(unit) for unit in self._obs.units[0]]
-            # ally_units = [unit for unit in self._obs.observation.raw_data.units if unit.owner == 1]
             ally_units_sorted = sorted(ally_units, key=attrgetter('type', 'x', 'y'), reverse=False)
-            # ally_units_sorted = sorted(ally_units, key=attrgetter('unit_type', 'x', 'y'), reverse=False)
 
             for i in range(len(ally_units_sorted)):
                 self.agents[i] = ally_units_sorted[i]
@@ -937,40 +921,19 @@ class SC1(MultiAgentEnv):
                 counter += 1
 
             if len(self.agents) == self.n_agents and len(self.enemies) == self.n_enemies:
-                # All good
-                # print('Spawned agents after iteration {}'.format(counter))
+                # print('Successfully spawned all {} agents after iteration {}'.format(self.n_agents, counter))
+                for e_id, e_unit in self.enemies.items():
+                    if self._episode_count == 1:
+                        self.max_reward += e_unit.max_health  # + unit.max_shield
                 return
 
-            # Might happen very rarely, just gonna do an additional environmental step
-            # to give time for the units to spawn
-            # as usual in the try brackets
-
             # Send actions
-            sent = self.controller.send([])  # This appears to always be true--need to find alternative
+            self.controller.send([])
 
-            if sent:
-                self._obs = self.controller.recv()
-            else:
-                self.full_restart()
-
-            # TODO: implement
-            # try:
-            #     self.controller.step(1)
-            #     self._obs = self.controller.recv()
-            # except protocol.ProtocolError:
-            #     # iffy way, but would not thraw an error for sure
-            #     self.full_restart()
-            #     self.reset()
-            # except protocol.ConnectionError:
-            #     # iffy way, but would not thraw an error for sure
-            #     self.full_restart()
-            #     self.reset()
-            # assert len(self.agents) == self.n_agents, "Incorrect number of agents: " + str(len(self.agents))
-            # assert len(self.enemies) == self.n_enemies, "Incorrect number of enemies: " + str(len(self.enemies))
+            self._obs = self.controller.recv()
+            # self.full_restart()  # TODO: Implement condition to trigger full restart in case the client has crashed
 
     def update_units(self):
-        # TODO optimise this
-
         # This function assumes that self._obs is up-to-date
         n_ally_alive = 0
         n_enemy_alive = 0
@@ -978,8 +941,6 @@ class SC1(MultiAgentEnv):
         # Store previous state
         self.previous_agent_units = deepcopy(self.agents)
         self.previous_enemy_units = deepcopy(self.enemies)
-        # self.previous_agent_units = CloudpickleWrapper(self.agents).__getstate__()
-        # self.previous_enemy_units = CloudpickleWrapper(self.enemies).__getstate__()
 
         for al_id, al_unit in self.agents.items():
             updated = False
@@ -990,7 +951,7 @@ class SC1(MultiAgentEnv):
                     n_ally_alive += 1
                     break
 
-            if not updated:  # means dead
+            if not updated:  # means agent unit is dead
                 al_unit.health = 0
 
         for e_id, e_unit in self.enemies.items():
@@ -1002,7 +963,7 @@ class SC1(MultiAgentEnv):
                     n_enemy_alive += 1
                     break
 
-            if not updated:  # means dead
+            if not updated:  # means agent unit is dead
                 e_unit.health = 0
 
         if n_ally_alive == 0 and n_enemy_alive > 0:
@@ -1033,6 +994,7 @@ class SC1(MultiAgentEnv):
         tc.replayer.UnitCommand.__deepcopy__ = _deepcopy_unit_command
         tc.replayer.Unit.__deepcopy__ = _deepcopy_unit
 
+
 def _deepcopy_order(self, memo):
     o = tc.replayer.Order()
     o.first_frame = self.first_frame
@@ -1041,6 +1003,7 @@ def _deepcopy_order(self, memo):
     o.targetX = self.targetX
     o.targetY = self.targetY
     return o
+
 
 def _deepcopy_unit_command(self, memo):
     c = tc.replayer.UnitCommand()
@@ -1051,6 +1014,7 @@ def _deepcopy_unit_command(self, memo):
     c.targetY = self.targetY
     c.extra = self.extra
     return c
+
 
 def _deepcopy_unit(self, memo):
     u = tc.replayer.Unit()
@@ -1094,7 +1058,7 @@ def _deepcopy_unit(self, memo):
     return u
 
 
-from components.transforms_old import _seq_mean
+# from components.transforms import _seq_mean
 
 
 class StatsAggregator():
@@ -1127,7 +1091,8 @@ class StatsAggregator():
                                                                      current_stats["battles_game"],
                                                                      [0] * len(current_stats[
                                                                                    "battles_game"]) if self.last_stats is None else
-                                                                     self.last_stats["battles_game"])])
+                                                                     self.last_stats["battles_game"])
+                     if (_c - _d) != 0.0])
             else:
                 aggregate_stats[_k] = np.mean(
                     [_a - _b for _a, _b in zip(_v, [0] * len(_v) if self.last_stats is None else self.last_stats[_k])])
