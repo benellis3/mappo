@@ -12,12 +12,12 @@ map_param_registry = {
     "5m_5m": {
         "n_agents": 5,
         "n_enemies": 5,
-	"limit": 60,
-	"a_race": "T",
-	"b_race": "T",
-	"shield": False,
-	"unit_type_bits": 0,
-	"map_type": 'marines'},
+        "limit": 60,
+        "a_race": "T",
+        "b_race": "T",
+        "shield": False,
+        "unit_type_bits": 0,
+        "map_type": 'marines'},
     "8m_8m": {
         "n_agents": 8,
         "n_enemies": 8,
