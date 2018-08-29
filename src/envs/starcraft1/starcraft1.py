@@ -54,6 +54,7 @@ class SC1(MultiAgentEnv):
         assert map_present(self.map_name), \
             "map {} not in map registry! please add.".format(self.map_name)
         map_params = convert(get_map_params(self.map_name))
+        self.map_type = map_params.map_type
         self.n_agents = map_params.n_agents
         self.n_enemies = map_params.n_enemies
         self.episode_limit = map_params.limit
@@ -81,22 +82,18 @@ class SC1(MultiAgentEnv):
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
-        if 'SC1PATH' not in os.environ:
-            # We are not in Docker
-            for tc_dir in ["/Volumes/Data/Google_Drive/AYA_Google_Drive/Git",
-                           "/home/trudner/git",
-                           "/Users/timrudner/data/code/git"]:
-                if os.path.isdir(tc_dir):
-                    os.environ['SC1PATH'] = tc_dir
-        else:
-            # We are in Docker
-            os.environ['SC1PATH'] = "/install"
+        for tc_dir in ["/install",
+                       "/Volumes/Data/Google_Drive/AYA_Google_Drive/Git",
+                       "/home/trudner/git",
+                       "/Users/timrudner/data/code/git"]:
+            if os.path.isdir(tc_dir):
+                os.environ['TCPATH'] = tc_dir
 
         if sys.platform == 'linux':
-            os.environ['MPQPATH'] = os.path.join(os.getcwd(), '3rdparty', 'broodwar')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI')
             self.env_file_type = 'so'
         elif sys.platform == 'darwin':
-            os.environ['MPQPATH'] = os.path.join(os.getcwd(), '3rdparty', 'broodwar')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI')
             self.env_file_type = 'dylib'
 
         if self.map_name == 'm5v5_c_far':
@@ -118,12 +115,9 @@ class SC1(MultiAgentEnv):
         # TODO: Do we need this?
         # elif self.map_name == 'openbw':
         #     self.micro_battles = False
-        #
         #     self._agent_race = "Terran"
         #     self._bot_race = "Terran"
-        #
-        #     self.unit_health_max_m = 40
-        #
+        #        #
         #     self.max_reward = self.n_enemies * self.unit_health_max_m \
         #                       + self.n_enemies * self.reward_death_value \
         #                       + self.reward_win
@@ -181,18 +175,16 @@ class SC1(MultiAgentEnv):
         os_env = os.environ.copy()
         my_env = {"OPENBW_ENABLE_UI": '0',
                   "BWAPI_CONFIG_AI__RACE": '{}'.format(self._bot_race),
-                  "BWAPI_CONFIG_AI__AI": '{}/TorchCraft/BWEnv/build/BWEnv.{}'.format(os.environ['SC1PATH'],
-                                                                                     self.env_file_type),
+                  "BWAPI_CONFIG_AI__AI": '{}/bots/BWEnv.{}'.format(os.environ['SC1PATH'], self.env_file_type),
                   "BWAPI_CONFIG_AUTO_MENU__AUTO_MENU": "SINGLE_PLAYER",
-                  "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/src/envs/starcraft1/maps/{}.scm'.format(os.getcwd(),
-                                                                                             self.map_name),
+                  "BWAPI_CONFIG_AUTO_MENU__MAP": '{}/src/envs/starcraft1/maps/{}.{}'.format(os.getcwd(),
+                                                                                            self.map_name,
+                                                                                            self.map_type),
                   "BWAPI_CONFIG_AUTO_MENU__GAME_TYPE": "USE_MAP_SETTINGS",
-                  # "LD_LIBRARY_PATH": "{}/bwapi/build/lib/".format(os.environ['SC1PATH']),
+                  # "LD_LIBRARY_PATH": "{}/bwapi/build/lib/".format(os.environ['TCPATH']),
                   "TORCHCRAFT_PORT": '{}'.format(self.port)}
-        if sys.platform in ["linux"]:
-            my_env["BWAPI_CONFIG_AUTO_MENU__MAP"] = '{}/src/envs/starcraft1/maps/{}.scm'.format(os.getcwd(),
-                                                                                                self.map_name)
-        launcher_path = os.environ['MPQPATH']
+
+        launcher_path = os.environ['SC1PATH']
         my_env = {**os_env, **my_env}
         launcher = 'BWAPILauncher'
         subprocess.Popen([launcher], cwd=launcher_path, env=my_env)
