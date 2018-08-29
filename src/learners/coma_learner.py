@@ -109,7 +109,7 @@ class COMALearner:
         targets_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
 
         # Calculate td-lambda targets
-        targets = build_td_lambd_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
+        targets = build_td_lambda_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
 
         q_vals = th.zeros_like(target_q_vals)
 

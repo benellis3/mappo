@@ -61,9 +61,7 @@ class ActorCriticLearner:
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
         avail_actions = batch["avail_actions"][:, :-1]
 
-        critic_mask = mask.clone()
-
-        mask = mask.repeat(1, 1, self.n_agents).view(-1)
+        mask = mask.repeat(1, 1, self.n_agents)
 
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
@@ -77,36 +75,36 @@ class ActorCriticLearner:
         mac_out = mac_out/mac_out.sum(dim=-1, keepdim=True)
         mac_out[avail_actions == 0] = 0
 
-        pi = mac_out.view(-1, self.n_actions)
+        pi = mac_out
 
-        q_sa, v_s, critic_train_stats = self.train_critic_sequential(self.critic, self.target_critic, self.critic_optimiser, batch,
-                                                                     rewards, terminated, actions, avail_actions,
-                                                                     critic_mask, bs, max_t)
+        q_sa, v_s, critic_train_stats = self.train_critic_batched(self.critic, self.target_critic, self.critic_optimiser, batch,
+                                                                  rewards, terminated, actions, avail_actions,
+                                                                  mask, bs, max_t)
 
         if self.separate_baseline_critic:
             q_sa_baseline, v_s_baseline, critic_train_stats_baseline = \
                 self.train_critic_sequential(self.baseline_critic, self.target_baseline_critic, self.baseline_critic_optimiser,
                                              batch,
                                              rewards, terminated, actions, avail_actions,
-                                             critic_mask, bs, max_t)
+                                             mask, bs, max_t)
             if self.args.critic_baseline_fn == "coma":
-                baseline = (q_sa_baseline.view(-1, self.n_actions) * pi).sum(-1, keepdim=True).detach()
+                baseline = (q_sa_baseline * pi).sum(-1, keepdim=True).detach()
             else:
-                baseline = v_s_baseline.squeeze(1)
+                baseline = v_s_baseline
         else:
             if self.args.critic_baseline_fn == "coma":
-                baseline = (q_sa.view(-1, self.n_actions) * pi).sum(-1, keepdim=True).detach()
+                baseline = (q_sa * pi).sum(-1, keepdim=True).detach()
             else:
-                baseline = v_s.squeeze(1)
+                baseline = v_s
 
         if self.critic.output_type == "q":
-            q_sa = th.gather(q_sa, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
+            q_sa = th.gather(q_sa, dim=3, index=actions)
 
         advantages = (q_sa - baseline).detach().squeeze()
 
         # Calculate policy grad with mask
 
-        pi_taken = th.gather(pi, dim=1, index=actions.reshape(-1, 1)).squeeze(1)
+        pi_taken = th.gather(pi, dim=3, index=actions).squeeze(3)
         pi_taken[mask == 0] = 1.0
         log_pi_taken = th.log(pi_taken)
 
@@ -130,7 +128,7 @@ class ActorCriticLearner:
             self.logger.log_stat("advantage_mean", (advantages * mask).sum().item() / mask.sum().item(), t_env)
             self.logger.log_stat("coma_loss", coma_loss.item(), t_env)
             self.logger.log_stat("agent_grad_norm", grad_norm, t_env)
-            self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum().item(), t_env)
+            self.logger.log_stat("pi_max", (pi.max(dim=-1)[0] * mask).sum().item() / mask.sum().item(), t_env)
             self.log_stats_t = t_env
 
     def train_critic_sequential(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
@@ -143,7 +141,12 @@ class ActorCriticLearner:
         target_vals = target_vals.view(bs, max_t, self.n_agents, -1)[:, 1:]
 
         if critic.output_type == 'q':
-            target_vals = th.gather(target_vals, dim=3, index=actions)
+            # For SARSA, we don't have action at last timestep so we can't train on it, so truncate one more.
+            target_vals = target_vals[:, :-1]
+            rewards = rewards[:, :-1]
+            terminated = terminated[:, :-1]
+            mask = mask[:, :-1]
+            target_vals = th.gather(target_vals, dim=3, index=actions[:, 1:])
         target_vals = target_vals.squeeze(3)
 
         # Calculate td-lambda targets
@@ -158,12 +161,13 @@ class ActorCriticLearner:
             "q_taken_mean": [],
         }
 
-        for t in reversed(range(rewards.size(1))):
-            mask_t = mask[:, t].expand(-1, self.n_agents).reshape(-1)
-
+        for t in reversed(range(vals.size(1) - 1)):
             vals_t = critic(batch, t)
             vals[:, t] = vals_t.view(bs, self.n_agents, -1)
 
+            if t >= mask.size(1):  # we still want the value on this step but can't train as no action
+                continue
+            mask_t = mask[:, t].reshape(-1)
             if mask_t.sum() == 0:
                 continue
 
@@ -197,12 +201,76 @@ class ActorCriticLearner:
             q_vals = vals[:, :-1]
             v_s = None
         else:
-            # TODO: timeshift vals to get proper targets here
             q_vals = build_td_lambda_targets(rewards, terminated, mask, vals.squeeze(3)[:, 1:], self.n_agents,
                                              self.args.gamma, self.args.td_lambda)
-            v_s = vals.squeeze(3)[:, :-1].reshape(-1, 1)
+            v_s = vals[:, :-1]
 
-        return q_vals.reshape(-1, 1 if critic.output_type == "v" else self.n_actions), v_s, running_log
+        return q_vals, v_s, running_log
+
+
+    def train_critic_batched(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
+                             avail_actions, mask, bs, max_t):
+        target_vals = target_critic(batch)
+
+        target_vals = target_vals[:, 1:]
+
+        if critic.output_type == 'q':
+            # For SARSA, we don't have action at last timestep so we can't train on it, so truncate one more.
+            target_vals = target_vals[:, :-1]
+            rewards = rewards[:, :-1]
+            terminated = terminated[:, :-1]
+            mask = mask[:, :-1]
+            target_vals = th.gather(target_vals, dim=3, index=actions[:, 1:])
+        target_vals = target_vals.squeeze(3)
+
+        # Calculate td-lambda targets
+        targets = build_td_lambda_targets(rewards, terminated, mask, target_vals, self.n_agents,
+                                         self.args.gamma, self.args.td_lambda)
+
+        running_log = {
+            "critic_loss": [],
+            "critic_grad_norm": [],
+            "td_error_abs": [],
+            "target_mean": [],
+            "q_taken_mean": [],
+        }
+
+        all_vals = critic(batch)
+        vals = all_vals.clone()[:, :-1]
+
+        if critic.output_type == "q":
+            vals = th.gather(vals, dim=3, index=actions)[:, :-1]
+        vals = vals.squeeze(3)
+
+        td_error = (vals - targets.detach())
+
+        # 0-out the targets that came from padded data
+        masked_td_error = td_error * mask
+
+        # Normal L2 loss, take mean over actual data
+        loss = (masked_td_error ** 2).sum() / mask.sum()
+        optimiser.zero_grad()
+        loss.backward()
+        grad_norm = th.nn.utils.clip_grad_norm_(optimiser.param_groups[0]["params"], self.args.grad_norm_clip)
+        optimiser.step()
+        self.critic_training_steps += 1
+
+        running_log["critic_loss"].append(loss.item())
+        running_log["critic_grad_norm"].append(grad_norm)
+        mask_elems = mask.sum().item()
+        running_log["td_error_abs"].append((masked_td_error.abs().sum().item() / mask_elems))
+        running_log["q_taken_mean"].append((vals * mask).sum().item() / mask_elems)
+        running_log["target_mean"].append((targets * mask).sum().item() / mask_elems)
+
+        if critic.output_type == 'q':
+            q_vals = all_vals[:, :-1]
+            v_s = None
+        else:
+            q_vals = build_td_lambda_targets(rewards, terminated, mask, all_vals.squeeze(3)[:, 1:], self.n_agents,
+                                             self.args.gamma, self.args.td_lambda)
+            v_s = vals
+
+        return q_vals, v_s, running_log
 
     def _update_targets(self):
         self.target_critic.load_state_dict(self.critic.state_dict())
