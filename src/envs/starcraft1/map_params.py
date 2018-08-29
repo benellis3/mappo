@@ -5,12 +5,13 @@ map_param_registry = {
         "n_enemies": 5,
         "limit": 200,
         "shield": False,
-        "map_type": 'marines'},
+        "map_type": 'scm'},
     "dragoons_zealots": {
         "n_agents": 5,
         "n_enemies": 5,
         "limit": 200,
-        "shield": False},
+        "shield": False,
+        "map_type": 'scm'},
     }
 
 def get_map_params(map_name):
