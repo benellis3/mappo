@@ -41,6 +41,8 @@ class COMALearner:
         avail_actions = batch["avail_actions"][:, :-1]
 
         critic_mask = mask.clone()
+        # For SARSA: can't bootstrap off 2nd-to-last state as last state has no action computed
+        critic_mask[:, -1].zero_()
 
         mask = mask.repeat(1, 1, self.n_agents).view(-1)
 
@@ -60,6 +62,7 @@ class COMALearner:
         mac_out[avail_actions == 0] = 0
 
         # Calculated baseline
+        q_vals = q_vals.reshape(-1, self.n_actions)
         pi = mac_out.view(-1, self.n_actions)
         baseline = (pi * q_vals).sum(-1).detach()
 
@@ -104,9 +107,9 @@ class COMALearner:
 
     def _train_critic(self, batch, rewards, terminated, actions, avail_actions, mask, bs, max_t):
         # Optimise critic
-        target_q_vals = self.target_critic(batch)
-        target_q_vals = target_q_vals.view(bs, max_t, self.n_agents, self.n_actions)[:, 1:]
+        target_q_vals = self.target_critic(batch)[:, :-1]
         targets_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
+        targets_taken = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, 0:1])], dim=1)
 
         # Calculate td-lambda targets
         targets = build_td_lambda_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
@@ -122,14 +125,14 @@ class COMALearner:
         }
 
         for t in reversed(range(rewards.size(1))):
-            mask_t = mask[:, t].expand(-1, self.n_agents).reshape(-1)
+            mask_t = mask[:, t].expand(-1, self.n_agents)
             if mask_t.sum() == 0:
                 continue
 
             q_t = self.critic(batch, t)
             q_vals[:, t] = q_t.view(bs, self.n_agents, self.n_actions)
-            q_taken = th.gather(q_t, dim=1, index=actions[:, t].reshape(-1, 1)).squeeze(1)
-            targets_t = targets[:, t].reshape(-1)
+            q_taken = th.gather(q_t, dim=3, index=actions[:, t:t+1]).squeeze(3).squeeze(1)
+            targets_t = targets[:, t]
 
             td_error = (q_taken - targets_t.detach())
 
@@ -137,7 +140,7 @@ class COMALearner:
             masked_td_error = td_error * mask_t
 
             # Normal L2 loss, take mean over actual data
-            loss = (masked_td_error ** 2).sum() / mask_t.sum()  # Not dividing by number of agents, only # valid timesteps
+            loss = (masked_td_error ** 2).sum() / mask_t.sum()
             self.critic_optimiser.zero_grad()
             loss.backward()
             grad_norm = th.nn.utils.clip_grad_norm_(self.critic_params, self.args.grad_norm_clip)
@@ -151,7 +154,7 @@ class COMALearner:
             running_log["q_taken_mean"].append((q_taken * mask_t).sum().item() / mask_elems)
             running_log["target_mean"].append((targets_t * mask_t).sum().item() / mask_elems)
 
-        return q_vals.view(-1, self.n_actions), running_log
+        return q_vals, running_log
 
     def _update_targets(self):
         self.target_critic.load_state_dict(self.critic.state_dict())
