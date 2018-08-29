@@ -90,6 +90,24 @@ map_param_registry = {
         "shield": True,
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
+    "3s_vs_5z": {
+        "n_agents": 3,
+        "n_enemies": 5,
+        "limit": 150,
+        "a_race": "P",
+        "b_race": "P",
+        "shield": True,
+        "unit_type_bits": 0,
+        "map_type": 's_v_z'},
+    "3s_vs_6z": {
+        "n_agents": 3,
+        "n_enemies": 6,
+        "limit": 150,
+        "a_race": "P",
+        "b_race": "P",
+        "shield": True,
+        "unit_type_bits": 0,
+        "map_type": 's_v_z'},
     }
 
 def get_map_params(map_name):
