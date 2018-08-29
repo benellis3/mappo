@@ -1,8 +1,11 @@
 from ..multiagentenv import MultiAgentEnv
 from .map_params import get_map_params, map_present
 
-import torchcraft as tc
-import torchcraft.Constants as tcc
+try:
+    import torchcraft as tc
+    import torchcraft.Constants as tcc
+except:
+    pass
 
 import numpy as np
 import sys

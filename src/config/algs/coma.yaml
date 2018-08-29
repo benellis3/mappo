@@ -24,8 +24,9 @@ td_lambda: 0.8
 
 # use COMA
 agent_output_type: "pi_logits"
-learner: "coma_learner"
+learner: "actor_critic_learner"
 critic_q_fn: "coma"
 critic_baseline_fn: "coma"
+coma_nstep: 1  # 1 corresponds to default Q, 2 is r + gamma*Q, etc
 
 name: "coma"
