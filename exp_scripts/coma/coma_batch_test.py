@@ -5,7 +5,7 @@ server_list = [
 ]
 
 label = "coma_nstep"
-config = "coma"
+config = "coma_batch"
 env_config = "sc2"
 
 n_repeat = 4
@@ -19,10 +19,8 @@ shared_params = {
 extend_param_dicts(param_dicts, shared_params,
     {
         "name": "coma_sc2_2s_3z",
-        "lr": 0.0001,
+        "lr": 0.0005,
         "critic_lr": 0.0005,
-        "td_lambda": 0.8,
-        "q_nstep": 3,
         "env_args.map_name": "2s_3z"
     },
     repeats=4)
@@ -30,10 +28,8 @@ extend_param_dicts(param_dicts, shared_params,
 extend_param_dicts(param_dicts, shared_params,
     {
         "name": "coma_sc2_5m",
-        "lr": 0.0001,
+        "lr": 0.0005,
         "critic_lr": 0.0005,
-        "td_lambda": 0.8,
-        "q_nstep": 3,
         "env_args.map_name": "5m_5m"
     },
     repeats=4)
