@@ -4,7 +4,7 @@ server_list = [
     ("brown", [0,1,2,3,4,5,6,7], 1),
 ]
 
-label = "coma_nstep"
+label = "coma_batch_1"
 config = "coma_batch"
 env_config = "sc2"
 
