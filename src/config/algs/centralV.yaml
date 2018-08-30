@@ -26,5 +26,6 @@ agent_output_type: "pi_logits"
 learner: "actor_critic_learner"
 critic_q_fn: "centralV"
 critic_baseline_fn: "centralV"
+q_nstep: 1 # 2 corresponds to normal r + gammaV
 
 name: "coma"
