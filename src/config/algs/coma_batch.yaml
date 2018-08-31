@@ -1,8 +1,8 @@
 # --- COMA specific parameters ---
 
 action_selector: "multinomial"
-epsilon_start: .5
-epsilon_finish: .01
+epsilon_start: .0
+epsilon_finish: .0
 epsilon_anneal_time: 100000
 
 runner: "parallel"
@@ -15,7 +15,7 @@ env_args:
   state_last_action: False # coma critic adds last action internally
 
 # update the target network every {} training steps
-target_update_interval: 15
+target_update_interval: 16
 recurrent_critic: True
 
 lr: 0.0005
