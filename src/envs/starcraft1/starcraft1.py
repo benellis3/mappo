@@ -90,10 +90,10 @@ class SC1(MultiAgentEnv):
                 os.environ['TCPATH'] = tc_dir
 
         if sys.platform == 'linux':
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI', 'linux')
             self.env_file_type = 'so'
         elif sys.platform == 'darwin':
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI', 'mac')
             self.env_file_type = 'dylib'
 
         if self.map_name == 'm5v5_c_far':
