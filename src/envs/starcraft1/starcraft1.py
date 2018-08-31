@@ -57,7 +57,13 @@ class SC1(MultiAgentEnv):
         self.map_type = map_params.map_type
         self.n_agents = map_params.n_agents
         self.n_enemies = map_params.n_enemies
+        self._agent_race = map_params.agent_race
+        self._bot_race = map_params.bot_race
+        self.zealot_id = 65
+        self.dragoon_id = 66
         self.episode_limit = map_params.limit
+        self.micro_battles = map_params.micro_battles
+
         self._move_amount = args.move_amount
         self._step_mul = args.step_mul
         self.state_last_action = args.state_last_action
@@ -81,6 +87,7 @@ class SC1(MultiAgentEnv):
 
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
+        self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
 
         for tc_dir in ["/install",
                        "/Volumes/Data/Google_Drive/AYA_Google_Drive/Git",
@@ -90,37 +97,11 @@ class SC1(MultiAgentEnv):
                 os.environ['TCPATH'] = tc_dir
 
         if sys.platform == 'linux':
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI', 'linux')
             self.env_file_type = 'so'
         elif sys.platform == 'darwin':
-            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI')
+            os.environ['SC1PATH'] = os.path.join(os.getcwd(), '3rdparty', 'StarCraftI', 'mac')
             self.env_file_type = 'dylib'
-
-        if self.map_name == 'm5v5_c_far':
-            self.micro_battles = True
-            self._agent_race = "Terran"
-            self._bot_race = "Terran"
-
-            self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
-
-        elif self.map_name == 'dragoons_zealots':
-            self.micro_battles = True
-            self._agent_race = "Protoss"
-            self._bot_race = "Protoss"
-            self.zealot_id = 65
-            self.dragoon_id = 66
-
-            self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
-
-        # TODO: Do we need this?
-        # elif self.map_name == 'openbw':
-        #     self.micro_battles = False
-        #     self._agent_race = "Terran"
-        #     self._bot_race = "Terran"
-        #        #
-        #     self.max_reward = self.n_enemies * self.unit_health_max_m \
-        #                       + self.n_enemies * self.reward_death_value \
-        #                       + self.reward_win
 
         # Check if server has already been launched on this port
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

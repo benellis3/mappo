@@ -57,21 +57,55 @@ RUN pip3 install setuptools
 RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /install/sacred && python3 setup.py install
 
 #### -------------------------------------------------------------------
-#### install OpenBW (from OxWhirl fork)
+#### install OpenBW and TorchCraft
 #### -------------------------------------------------------------------
 
+## --------- sdl
 RUN apt-get update && apt-get install -y libsdl2-dev libsdl2-2.0
+
+## --------- build OpenBW
+RUN git clone https://github.com/openbw/openbw
+RUN git clone https://github.com/openbw/bwapi
+RUN cd bwapi && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DOPENBW_DIR=../../openbw -DOPENBW_ENABLE_UI=$OBW_GUI \
+    && make && make install
+
+# -------- TorchCraft
+
+RUN git clone https://github.com/torchcraft/torchcraft.git -b develop --recursive
+
+## --------- zmq
 RUN apt-get purge -y libzmq*
+RUN apt-get update && apt-get install -y libtool pkg-config build-essential autoconf automake uuid-dev
 RUN wget https://github.com/zeromq/libzmq/releases/download/v4.2.2/zeromq-4.2.2.tar.gz
 RUN tar xvzf zeromq-4.2.2.tar.gz
 # RUN ulimit -n 1000 && apt-get update
-RUN apt-get install -y libtool pkg-config build-essential autoconf automake uuid-dev
 RUN cd zeromq-4.2.2 && ./configure && make install && ldconfig
 
-RUN apt-get install -y libzstd1-dev zstd
+## --------- zstd
+# This can only be done on 18.04, so commenting out for now
+# RUN apt-get install -y libzstd1-dev zstd
+RUN wget https://github.com/facebook/zstd/archive/v1.1.4.tar.gz
+RUN tar xf v1.1.4.tar.gz
+RUN cd zstd-1.1.4/ && make -j && make install && ldconfig
+
+## --------- build BWEnv
+RUN cd torchcraft/BWEnv && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=relwithdebinfo \
+    && make -j
+
+# Installing the python client just in case
+## --------- python3
+RUN apt-get update
+RUN apt-get -y install python3
+RUN apt-get -y install python3-pip
+RUN pip3 install --upgrade pip
+
+## --------- python client deps
 RUN pip3 install pybind11
-RUN git clone https://github.com/oxwhirl/TorchCraft.git torchcraft
-RUN cd torchcraft && git submodule update --init --recursive && pip3 install .
+
+## --------- python client
+RUN cd torchcraft && pip3 install .
 
 #### -------------------------------------------------------------------
 #### final steps
@@ -91,7 +125,7 @@ RUN pip3 install cloudpickle ruamel.yaml
 
 RUN apt-get install -y libhdf5-serial-dev cmake
 RUN git clone https://github.com/Blosc/c-blosc.git /install/c-blosc && cd /install/c-blosc && cmake -DCMAKE_INSTALL_PREFIX=/usr/local && cmake --build . --target install
-RUN pip3 install tables
+RUN pip3 install tables h5py
 
 #### -------------------------------------------------------------------
 #### install tensorflow
@@ -103,14 +137,14 @@ RUN pip3 install tensorflow-gpu
 #### install pytorch
 #### -------------------------------------------------------------------
 
-# RUN git clone https://github.com/csarofeen/pytorch /install/pytorch && cd /install/pytorch 
+# RUN git clone https://github.com/csarofeen/pytorch /install/pytorch && cd /install/pytorch
 # RUN pip3 install numpy pyyaml mkl setuptools cffi
-# RUN apt-get install -y cmake gcc 
+# RUN apt-get install -y cmake gcc
 # RUN cd /install/pytorch && python3 setup.py install
-#RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl 
+#RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl
 RUN pip3 install torch
 #RUN pip3 install http://download.pytorch.org/whl/cu90/torch-0.3.1-cp35-cp35m-linux_x86_64.whl
-RUN pip3 install torchvision snakeviz
+RUN pip3 install torchvision snakeviz pytest probscale
 RUN apt-get install -y htop iotop
 
 EXPOSE 8888
