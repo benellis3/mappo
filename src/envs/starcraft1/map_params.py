@@ -3,7 +3,7 @@ map_param_registry = {
     "m5v5_c_far": {
         "n_agents": 5,
         "n_enemies": 5,
-        "limit": 200,
+        "limit": 60,
         "shield": False,
         "agent_race": 'Terran',
         "bot_race": 'Terran',
@@ -12,7 +12,7 @@ map_param_registry = {
     "dragoons_zealots": {
         "n_agents": 5,
         "n_enemies": 5,
-        "limit": 200,
+        "limit": 120,
         "shield": False,
         "agent_race": 'Protoss',
         "bot_race": 'Protoss',
