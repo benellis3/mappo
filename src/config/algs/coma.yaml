@@ -18,13 +18,14 @@ env_args:
 target_update_interval: 500
 recurrent_critic: False
 
-lr: 0.0001
+lr: 0.0005
 critic_lr: 0.0005
 td_lambda: 0.8
 
 # use COMA
 agent_output_type: "pi_logits"
-learner: "actor_critic_learner"
+# learner: "actor_critic_learner"
+learner: "coma_learner"
 critic_q_fn: "coma"
 critic_baseline_fn: "coma"
 critic_train_mode: "seq"
