@@ -1,11 +1,11 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("brown", [0,1,2,3,4,5,6,7], 1),
+    ("sauron", [0,1,2,3,4,5,6,7], 1),
 ]
 
-label = "coma_compare_mackrl"
-config = "coma"
+label = "centralv_test_1"
+config = "centralV"
 env_config = "sc2"
 
 n_repeat = 4
@@ -21,7 +21,7 @@ shared_params = {
 
 extend_param_dicts(param_dicts, shared_params,
     {
-        "name": "coma_sc2_2s_3z",
+        "name": "centralv_sc2_2s_3z",
         "lr": 0.0005,
         "critic_lr": 0.0005,
         "td_lambda": 0.8,
