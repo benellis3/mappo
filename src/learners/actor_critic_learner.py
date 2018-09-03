@@ -59,6 +59,7 @@ class ActorCriticLearner:
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         # Get the relevant quantities
+
         rewards = batch["reward"][:, :-1]
         actions = batch["actions"][:, :-1]
         terminated = batch["terminated"][:, :-1].float()
@@ -121,11 +122,11 @@ class ActorCriticLearner:
         pi_taken[mask == 0] = 1.0
         log_pi_taken = th.log(pi_taken)
 
-        coma_loss = - ((advantages * log_pi_taken) * mask).sum() / mask.sum()
+        pg_loss = - ((advantages * log_pi_taken) * mask).sum() / mask.sum()
 
         # Optimise agents
         self.agent_optimiser.zero_grad()
-        coma_loss.backward()
+        pg_loss.backward()
         grad_norm = th.nn.utils.clip_grad_norm_(self.agent_params, self.args.grad_norm_clip)
         self.agent_optimiser.step()
 
@@ -139,7 +140,7 @@ class ActorCriticLearner:
                 self.logger.log_stat(key, sum(critic_train_stats[key])/ts_logged, t_env)
 
             self.logger.log_stat("advantage_mean", (advantages * mask).sum().item() / mask.sum().item(), t_env)
-            self.logger.log_stat("coma_loss", coma_loss.item(), t_env)
+            self.logger.log_stat("pg_loss", pg_loss.item(), t_env)
             self.logger.log_stat("agent_grad_norm", grad_norm, t_env)
             self.logger.log_stat("pi_max", (pi.max(dim=-1)[0] * mask).sum().item() / mask.sum().item(), t_env)
             self.log_stats_t = t_env
@@ -211,9 +212,10 @@ class ActorCriticLearner:
             q_vals = all_vals[:, :-1]
             v_s = None
         else:
-            # USE THIS FOR GAE
+            # USE THIS FOR GAE:
             # q_vals = build_td_lambda_targets(rewards, terminated, mask, all_vals.squeeze(3)[:, 1:], self.n_agents,
             #                                  self.args.gamma, self.args.td_lambda)
+            # OR THIS IF ACCUMULATING N-step RETURN LATER
             q_vals = all_vals[:, :-1].squeeze(3)
             v_s = all_vals[:, :-1].squeeze(3)
 
