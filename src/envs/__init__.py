@@ -6,10 +6,11 @@ from .predator_prey__old import PredatorPreyEnv as PredatorPreyOldEnv
 from .matrix_game import NormalFormMatrixGame
 from .test import IntegrationTestEnv
 from .multiagentenv import MultiAgentEnv
+from .stag_hunt import StagHunt
 
 
 # TODO: Do we need this?
-def env_fn(env, **kwargs) -> MultiAgentEnv:  # TODO: this may be a more complex function
+def env_fn(env, **kwargs) -> MultiAgentEnv: # TODO: this may be a more complex function
     # env_args = kwargs.get("env_args", {})
     return env(**kwargs)
 
@@ -22,14 +23,14 @@ REGISTRY["pred_prey"] = partial(env_fn, env=PredatorPreyCapture)
 REGISTRY["matrix_game"] = partial(env_fn, env=NormalFormMatrixGame)
 REGISTRY["integration_test"] = partial(env_fn, env=IntegrationTestEnv)
 REGISTRY["box_push"] = partial(env_fn, env=CoopBoxPushing)
-
+REGISTRY["stag_hunt"] = partial(env_fn, env=StagHunt)
 
 try:
     from .starcraft1 import StarCraft1Env
     REGISTRY["sc1"] = partial(env_fn,
                               env=StarCraft1Env)
 except Exception as e:
-    print("Failed to import TorchCraft!")
+    print(e)
 
 from .starcraft2 import StarCraft2Env
 REGISTRY["sc2"] = partial(env_fn,
