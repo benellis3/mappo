@@ -90,9 +90,9 @@ RUN tar xf v1.1.4.tar.gz
 RUN cd zstd-1.1.4/ && make -j && make install && ldconfig
 
 ## --------- build BWEnv
-#RUN cd torchcraft/BWEnv && mkdir build && cd build \
-#    && cmake .. -DCMAKE_BUILD_TYPE=relwithdebinfo \
-#    && make -j
+RUN cd torchcraft/BWEnv && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=relwithdebinfo \
+    && make -j
 
 # Installing the python client just in case
 ## --------- python3
