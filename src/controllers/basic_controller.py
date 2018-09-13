@@ -26,7 +26,7 @@ class BasicMAC:
         agent_inputs = self._build_inputs(ep_batch, t)
         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
         if self.agent_output_type == "pi_logits":
-            agent_outs = agent_outs.softmax(dim=-1)
+            agent_outs = th.nn.functional.softmax(agent_outs, dim=-1)
             if not test_mode:
                 agent_outs = ((1 - self.action_selector.epsilon) * agent_outs
                                + th.ones_like(agent_outs) * self.action_selector.epsilon/agent_outs.size(-1))
