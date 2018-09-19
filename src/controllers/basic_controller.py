@@ -30,7 +30,7 @@ class BasicMAC:
             # Make the logits for unavailable actions very negative to minimise their affect on the softmax
             reshaped_avail_actions = avail_actions.reshape(ep_batch.batch_size * self.n_agents, -1)
             agent_outs[reshaped_avail_actions == 0] = -1e30
-            agent_outs = agent_outs.softmax(dim=-1)
+            agent_outs = th.nn.functional.softmax(agent_outs, dim=-1)
             if not test_mode:
                 # Epsilon floor
                 # With probability epsilon, we will pick an available action uniformly

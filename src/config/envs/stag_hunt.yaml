@@ -1,0 +1,26 @@
+# ---- Defaults for 4 agents hunting 1 stag and 1 hare in a 10x10 environment
+
+env: "stag_hunt"
+
+env_args:
+    agent_obs: [2, 2]
+    capture_terminal: True
+    episode_limit: 100
+    intersection_global_view: False
+    intersection_unknown: False
+    n_agents: 4
+    n_hare: 1
+    n_stags: 1
+    observe_walls: False
+    observe_ids: False
+    observe_one_hot: True
+    p_stags_rest: 0.0
+    p_hare_rest: 0.0
+    reward_hare: 5
+    reward_stag: 10
+    reward_collision: 0.0
+    reward_time: -0.1
+    toroidal: False
+    world_shape: [10, 10]
+
+t_max: 1000000

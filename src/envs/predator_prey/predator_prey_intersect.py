@@ -51,6 +51,11 @@ class PredatorPreyCapture(MultiAgentEnv):
         if isinstance(args, dict):
             args = convert(args)
 
+        self.seed = getattr(args, "seed", None)
+        self.rs = np.random.RandomState(self.seed) # initialise numpy random state
+
+        self.flounderl_delegate_if_zero_ck = getattr(kwargs["args"], "flounderl_delegate_if_zero_ck", False)
+
         # Downwards compatibility of batch_mode
         self.batch_mode = batch_size is not None
         self.batch_size = batch_size if self.batch_mode else 1
@@ -99,6 +104,8 @@ class PredatorPreyCapture(MultiAgentEnv):
         self.made_screen = False
         self.scaling = 5
 
+
+
     # ---------- PRIVATE METHODS ---------------------------------------------------------------------------------------
     def _place_actors(self, actors: np.ndarray, type_id: int):
         for b in range(self.batch_size):
@@ -106,8 +113,8 @@ class PredatorPreyCapture(MultiAgentEnv):
                 is_free = False
                 while not is_free:
                     # Draw actors's position randomly
-                    actors[a, b, 0] = np.random.randint(self.env_max[0])
-                    actors[a, b, 1] = np.random.randint(self.env_max[1])
+                    actors[a, b, 0] = self.rs.randint(self.env_max[0])
+                    actors[a, b, 1] = self.rs.randint(self.env_max[1])
                     # Check if position is valid
                     is_free = np.sum(self.grid[b, actors[a, b, 0], actors[a, b, 1], :]) == 0
                 self.grid[b, actors[a, b, 0], actors[a, b, 1], type_id] = 1
@@ -226,7 +233,10 @@ class PredatorPreyCapture(MultiAgentEnv):
         a_a1 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[0])), [-1, 1])
         a_a2 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[1])), [1, -1])
         avail_actions = a_a1.dot(a_a2)
-        avail_all = avail_actions * 0 + 1
+        if self.flounderl_delegate_if_zero_ck:
+            avail_all = avail_actions * 0
+        else:
+            avail_all = avail_actions * 0 + 1
         # Create oversized grid
         ashape = np.array(self.agent_obs)
         ushape = self.grid_shape + 2 * ashape
@@ -292,8 +302,8 @@ class PredatorPreyCapture(MultiAgentEnv):
         # Place n_agents and n_preys on the grid
         if self.random_start:
             if self.cluster_start:
-                px = np.random.randint(0, self.grid_shape[0] - 2)
-                py = np.random.randint(0, self.grid_shape[1] - 2)
+                px = self.rs.randint(0, self.grid_shape[0] - 2)
+                py = self.rs.randint(0, self.grid_shape[1] - 2)
                 if self.n_agents > 0:
                     self.agents[0, :, 0] = px + 0
                     self.agents[0, :, 1] = py + 0
@@ -363,7 +373,7 @@ class PredatorPreyCapture(MultiAgentEnv):
 
         # Move the agents sequentially in random order
         for b in range(self.batch_size):
-            for a in np.random.permutation(self.n_agents):
+            for a in self.rs.permutation(self.n_agents):
                 self.agents[a, b, :], collide = self._move_actor(self.agents[a, b, :], actions[a, b], b,
                                                                  np.asarray([0], dtype=int_type), 0)
                 if collide:
@@ -371,7 +381,7 @@ class PredatorPreyCapture(MultiAgentEnv):
 
         # Move the prey
         for b in range(self.batch_size):
-            for p in np.random.permutation(self.n_prey):
+            for p in self.rs.permutation(self.n_prey):
                 if self.prey_alive[p, b] > 0:
                     # Collect all allowed actions for the prey
                     possible = []
@@ -396,7 +406,7 @@ class PredatorPreyCapture(MultiAgentEnv):
                     # If the prey has escaped the predators...
                     if escaped:
                         # ... the prey chooses one of the allowed actions uniformly...
-                        u = possible[np.random.randint(len(possible))]
+                        u = possible[self.rs.randint(len(possible))]
                         self.prey[p, b, :], _ = self._move_actor(self.prey[p, b, :], u, b,
                                                                  np.asarray([0, 1], dtype=int_type), 1)
                     else:
@@ -458,7 +468,10 @@ class PredatorPreyCapture(MultiAgentEnv):
         a_a1 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[0])), [-1, 1])
         a_a2 = np.reshape(np.array(self.get_avail_agent_actions(agent_ids[1])), [1, -1])
         avail_actions = a_a1.dot(a_a2)
-        avail_all = avail_actions * 0 + 1
+        if self.flounderl_delegate_if_zero_ck:
+            avail_all = avail_actions * 0
+        else:
+            avail_all = avail_actions * 0 + 1
         # Create oversized grid
         ashape = np.array(self.agent_obs)
         ushape = self.grid_shape + 2 * ashape
@@ -532,7 +545,11 @@ class PredatorPreyCapture(MultiAgentEnv):
         a_a1 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[0])),[-1,1])
         a_a2 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[1])),[1,-1])
         avail_actions = a_a1.dot(a_a2)
-        avail_all = avail_actions * 0 + 1
+        # DEGBUG!! TODO: FIX THE IF TRUE BELOW!!!!
+        if self.flounderl_delegate_if_zero_ck:
+            avail_all = avail_actions * 0
+        else:
+            avail_all = avail_actions * 0 + 1
 
         # If all agent_ids can see each other (otherwise the observation is empty)
         for b in range(self.batch_size):
