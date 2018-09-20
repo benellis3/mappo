@@ -1,12 +1,11 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    # ("brown", [0,1,2,3,4,5], 2),
-    ("savitar", [1,2,3,4,6,7], 1),
-    ("savitar", [1,2,4,7], 1),
+    ("sauron", [0,1,2,3,4,5,6,7], 1),
+    ("mulga", [0,1,2,3,4,5,6,7], 2),
 ]
 
-label = "coma_mask_softmax_v1"
+label = "coma_mask_softmax_td_lambda_v1"
 config = "coma"
 env_config = "sc2"
 
@@ -28,10 +27,10 @@ extend_param_dicts(param_dicts, shared_params,
         "critic_lr": 0.0005,
         "td_lambda": 0.8,
         "epsilon_start": 0.5,
-        "epsilon_finish": 0.01,
+        "epsilon_finish": [0.1, 0.05, 0.01, 0],
         "target_update_interval": 200,
         "env_args.map_name": "2s_3z",
         "env_args.move_amount": 2,
         "env_args.obs_own_health": False,
     },
-    repeats=10)
+    repeats=6)
