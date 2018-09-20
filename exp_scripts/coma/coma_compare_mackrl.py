@@ -1,14 +1,16 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("brown", [0,1,2,3,4,5,6,7], 1),
+    # ("brown", [0,1,2,3,4,5], 2),
+    ("savitar", [1,2,3,4,6,7], 1),
+    ("savitar", [1,2,4,7], 1),
 ]
 
-label = "coma_compare_mackrl"
+label = "coma_mask_softmax_v1"
 config = "coma"
 env_config = "sc2"
 
-n_repeat = 4
+n_repeat = 5
 
 param_dicts = []
 
@@ -32,4 +34,4 @@ extend_param_dicts(param_dicts, shared_params,
         "env_args.move_amount": 2,
         "env_args.obs_own_health": False,
     },
-    repeats=8)
+    repeats=10)
