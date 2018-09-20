@@ -3,7 +3,7 @@ import numpy as np
 import torch as th
 #from components.episode_buffer_old import BatchEpisodeBuffer
 #from components.scheme import Scheme
-from utils.rl_utils import build_td_lambda_targets, build_td_lambda_targets__wendelin
+from utils.rl_utils import build_td_lambda_targets__old as build_td_lambda_targets, build_td_lambda_targets as build_td_lambda_targets__wendelin
 
 def G_t_n(R, V, t, n, gamma, truncated):
     """
@@ -186,13 +186,21 @@ def test5():
     mask = rewards.clone().fill_(1.0)
     if not truncated:
         mask[:,-1,:] = 0.0
-    ret = build_td_lambda_targets__wendelin(rewards, terminated, mask, target_qs, None, gamma, td_lambda)
 
+    ret = build_td_lambda_targets__wendelin(rewards, terminated, mask, target_qs, None, gamma, td_lambda)
     print("RET:", ret)
     if truncated:
         tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([1.94525, 5.545, 13.1]), 5)
     else:
         tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([0.305,1.9,5.0]), 5)
+
+    ret = build_td_lambda_targets(rewards, terminated, mask, target_qs, 1, gamma, td_lambda)
+    print("RET:", ret)
+    if truncated:
+        tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([1.94525, 5.545, 13.1]), 5)
+    else:
+        tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([0.305,1.9,5.0]), 5)
+    pass
 
 def test8():
     """
@@ -310,9 +318,9 @@ def test12_new():
     Test G_t_n_lambda_range_rev_batch
     """
     rewards = [[-1, 1, 5, 0.0],
-         [np.nan, np.nan, np.nan, 0.0],
-         [-1, np.nan, np.nan, 0.0],
-         [-1, 1, np.nan, 0.0],
+         [0.0, 0.0, 0.0, 0.0],
+         [-1, 0.0, 0.0, 0.0],
+         [-1, 1, 0.0, 0.0],
          [-1, 1, 5, 0.0]]
 
     seq_lens = [4,1,2,3,4]
@@ -342,25 +350,13 @@ def test12_new():
             mask[b,-1,:] = 0.0
 
     ret = build_td_lambda_targets__wendelin(rewards, terminated, mask, target_qs, None, gamma, td_lambda)
-
-    # truncated = [False, False, False, True, True] # only applicable at end of episode!
-    # truncated_tensor = th.LongTensor(truncated).unsqueeze(0).unsqueeze(2).unsqueeze(3).float()
-    #
-    # gamma = 0.9
-    # td_lambda = 0.5
-    #
-    # R_tensor = th.FloatTensor(R).unsqueeze(0).unsqueeze(3)
-    # V_tensor = th.FloatTensor(V).unsqueeze(0).unsqueeze(3)
-    #
-    # h = R_tensor.shape[2] - 1
-    # ret = G_t_n_lambda_range_rev_batch(R_tensor, V_tensor, seq_lens, gamma, h, td_lambda, truncated_tensor)
-    # ret = ret.numpy()[0,:,:,0]
-    # a = ret[0, :]
-    # b = ret[4, :]
-    # c = R_tensor.numpy()[0,:,:,0]
     tst.assert_array_almost_equal(ret[0].squeeze(), np.array([0.305,1.9,5.0]), 5)
     tst.assert_array_almost_equal(ret[4].squeeze(), np.array([1.94525, 5.545, 13.1]), 5)
 
+    ret = build_td_lambda_targets(rewards, terminated, mask, target_qs, 1, gamma, td_lambda)
+    tst.assert_array_almost_equal(ret[0].squeeze(), np.array([0.305,1.9,5.0, 0.0]), 5)
+    tst.assert_array_almost_equal(ret[4].squeeze(), np.array([1.94525, 5.545, 13.1, 0.0]), 5)
+    pass
 
 def test13():
     """
@@ -513,12 +509,10 @@ def main():
     # For td lambda based on wendelin's refined implementation, run the following tests:
     # test5()
     # test12_new()
-
-    test1()
     test2()
     test3()
     test4()
-    test5()
+    #test5()
     # test6()
     # test8()
     # test9()
