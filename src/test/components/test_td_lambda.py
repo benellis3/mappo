@@ -1,8 +1,9 @@
 import numpy.testing as tst
 import numpy as np
 import torch as th
-from components.episode_buffer_old import BatchEpisodeBuffer
-from components.scheme import Scheme
+#from components.episode_buffer_old import BatchEpisodeBuffer
+#from components.scheme import Scheme
+from utils.rl_utils import build_td_lambda_targets__old as build_td_lambda_targets, build_td_lambda_targets as build_td_lambda_targets__wendelin
 
 def G_t_n(R, V, t, n, gamma, truncated):
     """
@@ -166,106 +167,40 @@ def test4():
     ret = G_t_n_lambda(Gts, t, h, td_lambda)
     tst.assert_almost_equal(ret, 5.545, 10)
 
+
 def test5():
     """
     Test BatchEpisodeBuffer (1)
     """
-    R = [1,-1,1,5]
+    R = [-1,1,5,0] #[1,-1,1,5]
     V = [2,1,-3,9]
-    truncated = True # only applicable at end of episode!
+    truncated = False # False: Last state is terminal
     gamma = 0.9
     td_lambda = 0.5
 
-    R_tensor = th.FloatTensor(R).unsqueeze(0).unsqueeze(2)
-    V_tensor = th.FloatTensor(V).unsqueeze(0).unsqueeze(0).unsqueeze(3)
-    terminated_tensor = th.FloatTensor([0.0]*(len(R)-1) + [1.0]).unsqueeze(0).unsqueeze(2)
-    truncated_tensor = th.FloatTensor([0.0]*(len(R)-1) + [1.0 if truncated else 0.0]).unsqueeze(0).unsqueeze(2)
+    rewards = th.FloatTensor(R).unsqueeze(0).unsqueeze(2)
+    target_qs = th.FloatTensor(V).unsqueeze(0).unsqueeze(2).unsqueeze(3)
+    terminated = rewards.clone().fill_(0)
+    if not truncated:
+        terminated[:,-2,:] = 1.0
+    mask = rewards.clone().fill_(1.0)
+    if not truncated:
+        mask[:,-1,:] = 0.0
 
-    scheme = Scheme([dict(name="reward",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,),
-                     dict(name="terminated",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,),
-                     dict(name="truncated",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,)
-                     ])
+    ret = build_td_lambda_targets__wendelin(rewards, terminated, mask, target_qs, None, gamma, td_lambda)
+    print("RET:", ret)
+    if truncated:
+        tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([1.94525, 5.545, 13.1]), 5)
+    else:
+        tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([0.305,1.9,5.0]), 5)
 
-    b = BatchEpisodeBuffer(data_scheme=scheme,
-                               n_bs=1,
-                               n_t=len(R),
-                               n_agents=1,
-                               is_cuda=False,
-                               is_shared_mem=False)
-    b.set_col(col="reward", data=R_tensor, bs=None)
-    b.set_col(col="terminated", data=terminated_tensor, bs=None)
-    b.set_col(col="truncated", data=truncated_tensor, bs=None)
-
-    p = b.to_pd()
-    ret, _ = b.get_stat("td_lambda_targets",
-                        bs_ids=None,
-                        td_lambda=td_lambda,
-                        gamma=gamma,
-                        value_function_values=V_tensor,
-                        to_variable=False,
-                        to_cuda=False)
-    print(ret)
-    ret = ret[0,:,:,0]
-    tst.assert_array_almost_equal(ret[0,:], np.array([1.94525, 5.545, 13.1, np.nan]), 5)
-
-def test6():
-    """
-    Test BatchEpisodeBuffer (2)
-    """
-    R = [1,-1,1,5]
-    V = [2,1,-3,9]
-    truncated = False # only applicable at end of episode!
-    gamma = 0.9
-    td_lambda = 0.5
-
-    R_tensor = th.FloatTensor(R).unsqueeze(0).unsqueeze(2)
-    V_tensor = th.FloatTensor(V).unsqueeze(0).unsqueeze(0).unsqueeze(3)
-    terminated_tensor = th.FloatTensor([0.0]*(len(R)-1) + [1.0]).unsqueeze(0).unsqueeze(2)
-    truncated_tensor = th.FloatTensor([0.0]*(len(R)-1) + [1.0 if truncated else 0.0]).unsqueeze(0).unsqueeze(2)
-
-    scheme = Scheme([dict(name="reward",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,),
-                     dict(name="terminated",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,),
-                     dict(name="truncated",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,)
-                     ])
-
-    b = BatchEpisodeBuffer(data_scheme=scheme,
-                               n_bs=1,
-                               n_t=len(R),
-                               n_agents=1,
-                               is_cuda=False,
-                               is_shared_mem=False)
-    b.set_col(col="reward", data=R_tensor, bs=None)
-    b.set_col(col="terminated", data=terminated_tensor, bs=None)
-    b.set_col(col="truncated", data=truncated_tensor, bs=None)
-
-    ret, _ = b.get_stat("td_lambda_targets",
-                    bs_ids=None,
-                    td_lambda=td_lambda,
-                    gamma=gamma,
-                    value_function_values=V_tensor,
-                    to_variable=False,
-                    to_cuda=False)
-    print(ret)
-    ret = ret[0,:,:,0]
-    tst.assert_array_almost_equal(ret[0,:], np.array([0.305,1.9,5.0,np.nan]), 5)
+    ret = build_td_lambda_targets(rewards, terminated, mask, target_qs, 1, gamma, td_lambda)
+    print("RET:", ret)
+    if truncated:
+        tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([1.94525, 5.545, 13.1]), 5)
+    else:
+        tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([0.305,1.9,5.0]), 5)
+    pass
 
 def test8():
     """
@@ -378,6 +313,51 @@ def test12():
     tst.assert_array_almost_equal(ret[0,:], np.array([0.305,1.9,5.0, np.nan]), 5)
     tst.assert_array_almost_equal(ret[4,:], np.array([1.94525, 5.545, 13.1, np.nan]), 5)
 
+def test12_new():
+    """
+    Test G_t_n_lambda_range_rev_batch
+    """
+    rewards = [[-1, 1, 5, 0.0],
+         [0.0, 0.0, 0.0, 0.0],
+         [-1, 0.0, 0.0, 0.0],
+         [-1, 1, 0.0, 0.0],
+         [-1, 1, 5, 0.0]]
+
+    seq_lens = [4,1,2,3,4]
+    gamma = 0.9
+    td_lambda = 0.5
+
+    target_qs = [[2, 1, -3, 9],
+         [2, 1, -3, 9],
+         [2, 1, -3, 9],
+         [2, 1, -3, 9],
+         [2, 1, -3, 9]]
+
+    rewards = th.FloatTensor(rewards).unsqueeze(2)
+    target_qs = th.FloatTensor(target_qs).unsqueeze(2) #.unsqueeze(3)
+
+    truncated = [False, False, False, True, True] # only applicable at end of episode!
+    terminated = rewards.clone().fill_(0)
+    for b in range(rewards.shape[0]):
+        truncated_b = truncated[b]
+        if not truncated_b:
+            terminated[b,-2,:] = 1.0
+
+    mask = rewards.clone().fill_(1.0)
+    for b in range(rewards.shape[0]):
+        truncated_b = truncated[b]
+        if not truncated_b:
+            mask[b,-1,:] = 0.0
+
+    ret = build_td_lambda_targets__wendelin(rewards, terminated, mask, target_qs, None, gamma, td_lambda)
+    tst.assert_array_almost_equal(ret[0].squeeze(), np.array([0.305,1.9,5.0]), 5)
+    tst.assert_array_almost_equal(ret[4].squeeze(), np.array([1.94525, 5.545, 13.1]), 5)
+
+    ret = build_td_lambda_targets(rewards, terminated, mask, target_qs, 1, gamma, td_lambda)
+    tst.assert_array_almost_equal(ret[0].squeeze(), np.array([0.305,1.9,5.0, 0.0]), 5)
+    tst.assert_array_almost_equal(ret[4].squeeze(), np.array([1.94525, 5.545, 13.1, 0.0]), 5)
+    pass
+
 def test13():
     """
     Test BatchEpisodeBuffer (2)
@@ -390,48 +370,23 @@ def test13():
     n_agents=4
     n_bs=4
 
-    R_tensor = th.FloatTensor(R).unsqueeze(0).unsqueeze(2)
-    V_tensor = th.FloatTensor(V).unsqueeze(0).unsqueeze(0).unsqueeze(3).repeat(n_agents,n_bs,1,1)
-    terminated_tensor = th.FloatTensor([0.0]*(len(R)-1) + [1.0]).unsqueeze(0).unsqueeze(2)#.repeat(2,1,1,1)
-    truncated_tensor = th.FloatTensor([0.0]*(len(R)-1) + [1.0 if truncated else 0.0]).unsqueeze(0).unsqueeze(2)#.repeat(2,1,1,1)
+    rewards = th.FloatTensor(R).unsqueeze(0).unsqueeze(2)
+    target_qs = th.FloatTensor(V).unsqueeze(0).unsqueeze(2).unsqueeze(3)
+    terminated = rewards.clone().fill_(0)
+    if not truncated:
+        terminated[:,-2,:] = 1.0
+    mask = rewards.clone().fill_(1.0)
+    if not truncated:
+        mask[:,-1,:] = 0.0
+    ret = build_td_lambda_targets__wendelin(rewards, terminated, mask, target_qs, None, gamma, td_lambda)
 
-    scheme = Scheme([dict(name="reward",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,),
-                     dict(name="terminated",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,),
-                     dict(name="truncated",
-                          shape=(1,),
-                          dtype=np.float32,
-                          missing=np.nan,)
-                     ])
+    print("RET:", ret)
+    if truncated:
+        #tst.assert_array_almost_equal(ret.squeeze().numpy(), np.array([1.94525, 5.545, 13.1]), 5)
+        assert False
+    else:
+        tst.assert_array_almost_equal(ret[:,:,0].squeeze().numpy(), np.array([0.305, 1.9, 5.0, np.nan]), 5)
 
-    b = BatchEpisodeBuffer(data_scheme=scheme,
-                               n_bs=n_bs,
-                               n_t=len(R),
-                               n_agents=n_agents,
-                               is_cuda=False,
-                               is_shared_mem=False)
-
-    for hist_id in range(n_bs):
-        b.set_col(col="reward", data=R_tensor, bs=hist_id)
-        b.set_col(col="terminated", data=terminated_tensor, bs=hist_id)
-        b.set_col(col="truncated", data=truncated_tensor, bs=hist_id)
-
-    ret, _ = b.get_stat("td_lambda_targets",
-                    bs_ids=None,
-                    td_lambda=td_lambda,
-                    gamma=gamma,
-                    value_function_values=V_tensor,
-                    to_variable=False,
-                    to_cuda=False)
-    #print(ret)
-    ret1 = ret[0,:,:,0]
-    ret2 = ret[1, :, :, 0]
-    tst.assert_array_almost_equal(ret1[0,:], np.array([0.305,1.9,5.0,np.nan]), 5)
 
 def test14():
     """
@@ -551,20 +506,23 @@ def test15():
     tst.assert_array_almost_equal(ret1[0,:], np.array([0.305,1.9,5.0]+[float("nan")]*(1+n_nan)), 5)
 
 def main():
-    test1()
+    # For td lambda based on wendelin's refined implementation, run the following tests:
+    # test5()
+    # test12_new()
     test2()
     test3()
     test4()
-    test5()
-    test6()
-    test8()
-    test9()
-    test10()
-    test11()
-    test12()
-    test13()
-    test14()
-    test15()
+    #test5()
+    # test6()
+    # test8()
+    # test9()
+    # test10()
+    # test11()
+    # test12()
+    # test13()
+    # test14()
+    # test15()
+    test12_new()
 
 if __name__ == "__main__":
     main()

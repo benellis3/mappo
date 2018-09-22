@@ -16,20 +16,29 @@ class BasicMAC:
         self.hidden_states = None
 
     def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
-        agent_outputs = self.forward(ep_batch, t_ep, test_mode=test_mode)
         # Only select actions for the selected batch elements in bs
-        avail_actions = ep_batch["avail_actions"][bs, t_ep]
-        chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions, t_env, test_mode=test_mode)
+        avail_actions = ep_batch["avail_actions"][:, t_ep]
+        agent_outputs = self.forward(ep_batch, t_ep, test_mode=test_mode)
+        chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions[bs], t_env, test_mode=test_mode)
         return chosen_actions
 
     def forward(self, ep_batch, t, test_mode=False):
         agent_inputs = self._build_inputs(ep_batch, t)
+        avail_actions = ep_batch["avail_actions"][:, t]
         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
         if self.agent_output_type == "pi_logits":
-            agent_outs = agent_outs.softmax(dim=-1)
+            # Make the logits for unavailable actions very negative to minimise their affect on the softmax
+            reshaped_avail_actions = avail_actions.reshape(ep_batch.batch_size * self.n_agents, -1)
+            agent_outs[reshaped_avail_actions == 0] = -1e30
+            agent_outs = th.nn.functional.softmax(agent_outs, dim=-1)
             if not test_mode:
+                # Epsilon floor
+                # With probability epsilon, we will pick an available action uniformly
+                num_avail_actions = reshaped_avail_actions.sum(dim=1, keepdim=True).float()
                 agent_outs = ((1 - self.action_selector.epsilon) * agent_outs
-                               + th.ones_like(agent_outs) * self.action_selector.epsilon/agent_outs.size(-1))
+                               + th.ones_like(agent_outs) * self.action_selector.epsilon/num_avail_actions)
+                # Zero out the unavailable actions
+                agent_outs[reshaped_avail_actions == 0] = 0.0
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
 
     def init_hidden(self, batch_size):

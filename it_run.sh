@@ -20,5 +20,5 @@ NV_GPU="$GPU" ${cmd} run -i \
     -v `pwd`:/pymarl \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -e DISPLAY=unix$DISPLAY \
-    -it pymarl \
+    -it pymarl/refactor \
     ${@:2}
