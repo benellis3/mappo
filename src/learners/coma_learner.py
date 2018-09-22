@@ -111,17 +111,18 @@ class COMALearner:
         # Optimise critic
         target_q_vals = self.target_critic(batch)[:, :]
         targets_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
-        # targets_taken = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, 0:1])], dim=1)
 
         # Calculate td-lambda targets
         targets = build_td_lambda_targets(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
         # --- DEBUGGING CODE ---
         # from utils.rl_utils import build_td_lambda_targets__old
-        # targets_old = build_td_lambda_targets__old(rewards, terminated, mask, targets_taken, self.n_agents, self.args.gamma, self.args.td_lambda)
+        # targets_taken_old = th.cat([targets_taken[:, 1:], th.zeros_like(targets_taken[:, 0:1])], dim=1)
+        # targets_old = build_td_lambda_targets__old(rewards, terminated, mask, targets_taken_old, self.n_agents, self.args.gamma, self.args.td_lambda)
         # diff = (targets - targets_old)
-        #
+        # #
         # import numpy as np
         # allclose = np.allclose(targets.detach(), targets_old.detach(), 1e-3)
+        # print("close", allclose)
         # --- ---
         q_vals = th.zeros_like(target_q_vals)[:,:-1]
 

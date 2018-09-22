@@ -9,11 +9,11 @@ def build_td_lambda_targets__old(rewards, terminated, mask, target_qs, n_agents,
     terminated = terminated.float()
     for t in reversed(range(max_t)):
         if t == max_t - 1:
-            running_target = mask[:, t] * (rewards[:, t] + gamma * (1 - terminated[:, t]) * target_qs[:, t + 1])
+            running_target = mask[:, t] * (rewards[:, t] + gamma * (1 - terminated[:, t]) * target_qs[:, t])
         else:
             running_target = mask[:, t] * (
                     terminated[:, t] * rewards[:, t]  # Just the reward if the env terminates
-                 + (1 - terminated[:, t]) * (rewards[:, t] + gamma * (td_lambda * running_target + (1 - td_lambda) * target_qs[:, t + 1]))
+                 + (1 - terminated[:, t]) * (rewards[:, t] + gamma * (td_lambda * running_target + (1 - td_lambda) * target_qs[:, t]))
             )
         targets[:, t, :] = running_target
     return targets
