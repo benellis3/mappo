@@ -18,7 +18,7 @@ env_args:
   step_mul: 8
   obs_instead_of_state: False
   obs_own_health: True
-  obs_targets: False
+  obs_all_health: True
   continuing_episode: False
   game_version: "3.16.1"
 

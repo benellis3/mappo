@@ -86,9 +86,11 @@ class SC2(MultiAgentEnv):
         self.difficulty = args.difficulty
         # Observations and state
         self.obs_own_health = args.obs_own_health
-        self.obs_targets = args.obs_targets
+        self.obs_all_health = args.obs_all_health
         self.obs_instead_of_state = args.obs_instead_of_state
         self.state_last_action = args.state_last_action
+        if self.obs_all_health:
+            self.obs_own_health = True
         # Rewards args
         self.reward_only_positive = args.reward_only_positive
         self.reward_negative_scale = args.reward_negative_scale
@@ -581,20 +583,30 @@ class SC2(MultiAgentEnv):
         nf_al = 4 + self.unit_type_bits
         nf_en = 4 + self.unit_type_bits
 
+        if self.obs_all_health:
+            nf_al += 1 + self.shield_bits
+            nf_en += 1 + self.shield_bits
+
+        nf_own = self.unit_type_bits
+        if self.obs_own_health:
+            nf_own += 1 + self.shield_bits
+
         move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
         ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
+        own_feats = np.zeros(nf_own, dtype=np.float32)
 
         if unit.health > 0: # otherwise dead, return all zeros
             x = unit.pos.x
             y = unit.pos.y
             sight_range = self.unit_sight_range(agent_id)
 
+            # Movement features
             avail_actions = self.get_avail_agent_actions(agent_id)
-
             for m in range(self.n_actions_no_attack - 2):
                 move_feats[m] = avail_actions[m + 2]
 
+            # Enemy features
             for e_id, e_unit in self.enemies.items():
                 e_x = e_unit.pos.x
                 e_y = e_unit.pos.y
@@ -607,11 +619,20 @@ class SC2(MultiAgentEnv):
                     enemy_feats[e_id, 2] = (e_x - x) / sight_range # relative X
                     enemy_feats[e_id, 3] = (e_y - y) / sight_range # relative Y
 
+                    ind = 4
+                    if self.obs_all_health:
+                        enemy_feats[e_id, ind] = e_unit.health / e_unit.health_max # health
+                        ind += 1
+                        if self.shield_bits > 0:
+                            max_shield = self.unit_max_shield(e_unit)
+                            enemy_feats[e_id, ind] = e_unit.shield / max_shield # shield
+                            ind += 1
+
                     if self.unit_type_bits > 0:
                         type_id = self.get_unit_type_id(e_unit, False)
-                        enemy_feats[e_id, 4 + type_id] = 1
+                        enemy_feats[e_id, ind + type_id] = 1 # unit type
 
-            # place the features of the agent himself always at the first place
+            # Ally features
             al_ids = [al_id for al_id in range(self.n_agents) if al_id != agent_id]
             for i, al_id in enumerate(al_ids):
 
@@ -626,42 +647,46 @@ class SC2(MultiAgentEnv):
                     ally_feats[i, 2] = (al_x - x) / sight_range # relative X
                     ally_feats[i, 3] = (al_y - y) / sight_range # relative Y
 
+                    ind = 4
+                    if self.obs_all_health:
+                        ally_feats[i, ind] = al_unit.health / al_unit.health_max # health
+                        ind += 1
+                        if self.shield_bits > 0:
+                            max_shield = self.unit_max_shield(al_unit)
+                            ally_feats[i, ind] = al_unit.shield / max_shield # shield
+                            ind += 1
+
                     if self.unit_type_bits > 0:
                         type_id = self.get_unit_type_id(al_unit, True)
-                        ally_feats[i, 4 + type_id] = 1
+                        ally_feats[i, ind + type_id] = 1
+
+            # Own features
+            ind = 0
+            if self.obs_own_health:
+                own_feats[ind] = unit.health / unit.health_max
+                ind += 1
+                if self.shield_bits == 1:
+                    max_shield = self.unit_max_shield(unit)
+                    own_feats[ind] = unit.shield / max_shield
+                    ind += 1
+
+            if self.unit_type_bits > 0:
+                type_id = self.get_unit_type_id(unit, True)
+                own_feats[ind + type_id] = 1
 
         agent_obs = np.concatenate((move_feats.flatten(),
                                     enemy_feats.flatten(),
-                                    ally_feats.flatten()))
-
-        if self.obs_own_health:
-            agent_obs = np.append(agent_obs, unit.health / unit.health_max)
-            if self.shield_bits == 1:
-                max_shield = self.unit_max_shield(unit)
-                agent_obs = np.append(agent_obs, unit.shield / max_shield)
-
-        if self.unit_type_bits > 0:
-            unit_type = self.one_hot(self.get_unit_type_id(unit, ally=True), self.unit_type_bits)[0]
-            agent_obs = np.append(agent_obs, unit_type)
-
-        agent_obs = agent_obs.astype(dtype=np.float32)
+                                    ally_feats.flatten(),
+                                    own_feats.flatten()))
 
         if self.debug_inputs:
             print("***************************************")
             print("Agent: ", agent_id)
-            if self.obs_own_health:
-                print("Health: ", unit.health / unit.health_max)
-                if self.shield_bits == 1:
-                    max_shield = self.unit_max_shield(unit)
-                    print("Shield: ", unit.shield / max_shield)
-            if self.unit_type_bits > 0:
-                unit_type = self.one_hot(self.get_unit_type_id(unit, ally=True), self.unit_type_bits)[0]
-                print("Unit type: ", unit_type)
             print("Available Actions\n", self.get_avail_agent_actions(agent_id))
             print("Move feats\n", move_feats)
             print("Enemy feats\n", enemy_feats)
             print("Ally feats\n", ally_feats)
-            print(agent_obs)
+            print("Own feats\n", own_feats)
             print("***************************************")
 
         return agent_obs
@@ -744,7 +769,7 @@ class SC2(MultiAgentEnv):
 
     def get_unit_type_id(self, unit, ally):
 
-        if ally == True: # we use new SC2 unit types
+        if ally: # we use new SC2 unit types
 
             if self.map_type == 'sz':
                 # id(Stalker) + 1 = id(Zealot)
@@ -983,13 +1008,19 @@ class SC2(MultiAgentEnv):
         nf_al = 4 + self.unit_type_bits
         nf_en = 4 + self.unit_type_bits
 
+        if self.obs_all_health:
+            nf_al += 1 + self.shield_bits
+            nf_en += 1 + self.shield_bits
+
+        own_feats = self.unit_type_bits
+        if self.obs_own_health:
+            own_feats += 1 + self.shield_bits
+
         move_feats = self.n_actions_no_attack - 2
         enemy_feats = self.n_enemies * nf_en
         ally_feats = (self.n_agents - 1) * nf_al
 
-        health = 1 + self.shield_bits if self.obs_own_health else 0
-
-        return move_feats + enemy_feats + ally_feats + health + self.unit_type_bits
+        return move_feats + enemy_feats + ally_feats + own_feats
 
     def close(self):
         print("Closing StarCraftII")
