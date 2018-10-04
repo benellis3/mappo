@@ -110,8 +110,11 @@ def main(config_name, run=False):
                     if not run:
                         print(server, "GPU:",str(gpu), "Repeats:",str(n_repeat), params)
                     else:
-                        subprocess.Popen(["exp_scripts/run_on_server.sh", server, str(gpu), str(n_repeat), params])
-                        time.sleep(10)
+                        subprocess.Popen(["exp_scripts/run_on_server.sh", server, str(gpu), str(n_repeat), params], \
+                                         stdout=open("exp_logs/{}.log".format(exp_idx), "w+"))
+                        print("Started exp {}".format(exp_idx + 1))
+                        print("Sleeping 15 seconds...\n")
+                        time.sleep(15)
 
                     exp_idx += 1
 
