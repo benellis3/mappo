@@ -61,7 +61,7 @@ class ActorCriticLearner:
         # Get the relevant quantities
 
         rewards = batch["reward"][:, :-1]
-        actions = batch["actions"][:, :-1]
+        actions = batch["actions"][:, :]
         terminated = batch["terminated"][:, :-1].float()
         mask = batch["filled"][:, :-1].float()
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
@@ -70,12 +70,13 @@ class ActorCriticLearner:
         mask = mask.repeat(1, 1, self.n_agents)
 
         critic_mask = mask.clone()
-        if self.critic.output_type == "q":
-            critic_mask[:, -1].zero_()
-        if self.separate_baseline_critic:
-            baseline_critic_mask = mask.clone()
-            if self.critic.output_type == "q":
-                baseline_critic_mask[:, -1].zero_()
+        baseline_critic_mask = mask.clone()
+        # if self.critic.output_type == "q":
+        #     critic_mask[:, -1].zero_()
+        # if self.separate_baseline_critic:
+        #     baseline_critic_mask = mask.clone()
+        #     if self.critic.output_type == "q":
+        #         baseline_critic_mask[:, -1].zero_()
 
         mac_out = []
         self.mac.init_hidden(batch.batch_size)
@@ -109,6 +110,8 @@ class ActorCriticLearner:
                 baseline = (q_sa * pi).sum(-1).detach()
             else:
                 baseline = v_s
+
+        actions = actions[:,:-1]
 
         if self.critic.output_type == "q":
             q_sa = th.gather(q_sa, dim=3, index=actions).squeeze(3)
@@ -152,11 +155,11 @@ class ActorCriticLearner:
 
         all_vals = th.zeros_like(target_vals)
 
-        target_vals = target_vals[:, :-1]
+        # target_vals = target_vals[:, :-1]
 
         if critic.output_type == 'q':
             target_vals = th.gather(target_vals, dim=3, index=actions)
-            target_vals = th.cat([target_vals[:, 1:], th.zeros_like(target_vals[:, 0:1])], dim=1)
+            # target_vals = th.cat([target_vals[:, 1:], th.zeros_like(target_vals[:, 0:1])], dim=1)
         target_vals = target_vals.squeeze(3)
 
         # Calculate td-lambda targets
