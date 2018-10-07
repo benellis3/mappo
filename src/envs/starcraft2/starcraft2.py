@@ -130,12 +130,15 @@ class SC2(MultiAgentEnv):
 
         self.max_reward = self.n_enemies * self.reward_death_value + self.reward_win
         self._game_info = self.controller.game_info()
-        self.map_x = self._game_info.start_raw.map_size.x
-        self.map_y = self._game_info.start_raw.map_size.y
-        self.map_play_area_min = self._game_info.start_raw.playable_area.p0
-        self.map_play_area_max = self._game_info.start_raw.playable_area.p1
+        self._map_info = self._game_info.start_raw
+        self.map_x = self._map_info.map_size.x
+        self.map_y = self._map_info.map_size.y
+        self.map_play_area_min = self._map_info.playable_area.p0
+        self.map_play_area_max = self._map_info.playable_area.p1
         self.max_distance_x = self.map_play_area_max.x - self.map_play_area_min.x
         self.max_distance_y = self.map_play_area_max.y - self.map_play_area_min.y
+        self.terrain_height = np.array(list(self._map_info.terrain_height.data)).reshape(self.map_x, self.map_y)
+        self.pathing_grid = np.array(list(self._map_info.pathing_grid.data)).reshape(self.map_x, self.map_y)
 
         self._episode_count = 0
         self._total_steps = 0
@@ -811,130 +814,6 @@ class SC2(MultiAgentEnv):
                     type_id = 2
 
         return type_id
-
-    # TODO Mika - not sure if we need these anymore and whether they are correct after my changes
-    def get_intersect(self, coordinates, e_unit, sight_range ):
-        e_x = e_unit.pos.x
-        e_y = e_unit.pos.y
-        distances = np.sum((coordinates - np.array([e_x, e_y] ))**2, 1)**0.5
-        if max( distances ) > sight_range:
-            return False
-        else:
-            return True
-
-    def get_obs_intersection(self, agent_ids):
-        """ Returns the intersection of the all of agent_ids agents' observations. """
-        # Create grid
-        nf_al = 4
-        nf_en = 5
-
-        if self.map_name == '2s_3z' or self.map_name == '3s_5z':
-            # unit types (in onehot)
-            nf_al += 2
-            nf_en += 2
-
-        # move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
-        enemy_feats = -1*np.ones((self.n_enemies, nf_en), dtype=np.float32)
-        ally_feats = -1*np.ones((self.n_agents, nf_al), dtype=np.float32)
-        state = np.concatenate((enemy_feats.flatten(),
-                                    ally_feats.flatten()))
-        state = state.astype(dtype=np.float32)
-        #Todo: Check that the dimensions are consistent.
-        a_a1 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[0])),[-1,1])
-        a_a2 = np.reshape( np.array(self.get_avail_agent_actions(agent_ids[1])),[1,-1])
-        avail_actions = a_a1.dot(a_a2)
-        avail_all = avail_actions * 0 + 1
-
-        coordinates = np.zeros([len(agent_ids), 2])
-        for i, a_id in enumerate(agent_ids):
-            if not (self.agents[a_id].health > 0):
-                return state, avail_all
-            else:
-                coordinates[i] = [self.agents[a_id].pos.x, self.agents[a_id].pos.y]
-        # Calculate pairwise distances
-        distances = ((coordinates[:, 0:1] - coordinates[:, 0:1].T)**2 + (coordinates[:, 1:2] - coordinates[:, 1:2].T)**2)**0.5
-        sight_range = self.unit_sight_range(agent_ids[0])
-        # Check that max pairwise distance is less than sight_range.
-        if np.max(distances) > sight_range:
-            return state, avail_all
-
-        x = np.mean(coordinates, 0)[0]
-        y = np.mean(coordinates, 0)[1]
-
-        for e_id, e_unit in self.enemies.items():
-            e_x = e_unit.pos.x
-            e_y = e_unit.pos.y
-            dist = self.distance(x, y, e_x, e_y)
-
-            if self.get_intersect(coordinates, e_unit, sight_range) and e_unit.health > 0:  # visible and alive
-                # Sight range > shoot range
-                enemy_feats[e_id, 0] = a_a1[self.n_actions_no_attack + e_id,0]   # available
-                enemy_feats[e_id, 1] = dist / sight_range # distance
-                enemy_feats[e_id, 2] = (e_x - x) / sight_range # relative X
-                enemy_feats[e_id, 3] = (e_y - y) / sight_range # relative Y
-                enemy_feats[e_id, 4] = a_a2[0,self.n_actions_no_attack + e_id]  # available
-
-
-                if self.map_name == '2s_3z' or self.map_name == '3s_5z':
-                    type_id = e_unit.unit_type - 73  # id(Stalker) = 74, id(Zealot) = 73
-                    enemy_feats[e_id, 4 + type_id] = 1
-            else:
-                avail_actions[self.n_actions_no_attack + e_id, :] = 0
-                avail_actions[:, self.n_actions_no_attack + e_id] = 0
-
-        # place the features of the agent himself always at the first place
-        al_ids = list(agent_ids)
-        for al in range(self.n_agents):
-            if al not in agent_ids:
-                al_ids.append(al)
-        for i, al_id in enumerate(al_ids):
-            al_unit = self.get_unit_by_id(al_id)
-            al_x = al_unit.pos.x
-            al_y = al_unit.pos.y
-            dist = self.distance(x, y, al_x, al_y)
-
-            if self.get_intersect(coordinates, al_unit, sight_range) and al_unit.health > 0:  # visible and alive
-                ally_feats[i, 0] = 1  # visible
-                ally_feats[i, 1] = dist / sight_range # distance
-                ally_feats[i, 2] = (al_x - x) / sight_range  # relative X
-                ally_feats[i, 3] = (al_y - y) / sight_range  # relative Y
-
-                if self.map_name == '2s_3z' or self.map_name == '3s_5z':
-                    type_id = al_unit.unit_type - self.stalker_id  # id(Stalker) = self.stalker_id, id(Zealot) = self.zealot_id
-                    ally_feats[i, 4 + type_id] = 1
-
-        state = np.concatenate((enemy_feats.flatten(),
-                                    ally_feats.flatten()))
-
-        state = state.astype(dtype=np.float32)
-
-        if self.debug_inputs:
-            print("***************************************")
-            print("Agent_intersections: ", agent_ids)
-            print("Enemy feats\n", enemy_feats)
-            print("Ally feats\n", ally_feats)
-            print("***************************************")
-        return state, avail_actions
-
-    def get_obs_intersect_pair_size(self):
-        return self.get_obs_intersect_size()
-
-    def get_obs_intersect_all_size(self):
-        return self.get_obs_intersect_size()
-
-    def get_obs_intersect_size(self):
-
-        nf_al = 4
-        nf_en = 5
-
-        if self.map_name == '2s_3z' or self.map_name == '3s_5z':
-            nf_al += 2
-            nf_en += 2
-
-        enemy_feats = self.n_enemies *  nf_en
-        ally_feats = (self.n_agents) * nf_al
-
-        return  enemy_feats + ally_feats
 
     def get_state_size(self):
 
