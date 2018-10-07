@@ -6,7 +6,6 @@ map_param_registry = {
         "limit": 60,
         "a_race": "T",
         "b_race": "T",
-        "shield": False,
         "unit_type_bits": 0,
         "map_type": 'marines'},
     "5m_5m": {
@@ -15,7 +14,6 @@ map_param_registry = {
         "limit": 60,
         "a_race": "T",
         "b_race": "T",
-        "shield": False,
         "unit_type_bits": 0,
         "map_type": 'marines'},
     "8m_8m": {
@@ -24,7 +22,6 @@ map_param_registry = {
         "limit": 120,
         "a_race": "T",
         "b_race": "T",
-        "shield": False,
         "unit_type_bits": 0,
         "map_type": 'marines'},
     "MMM": {
@@ -33,7 +30,6 @@ map_param_registry = {
         "limit": 150,
         "a_race": "T",
         "b_race":"T",
-        "shield": False,
         "unit_type_bits": 3,
         "map_type": 'MMM'},
     "2s_3z": {
@@ -42,7 +38,6 @@ map_param_registry = {
         "limit": 120,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 2,
         "map_type": 'sz'},
     "3s_5z": {
@@ -51,7 +46,6 @@ map_param_registry = {
         "limit": 150,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 2,
         "map_type": 'sz'},
     "1c_3s_5z": {
@@ -60,7 +54,6 @@ map_param_registry = {
         "limit": 200,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 3,
         "map_type": 'csz'},
     "2c_3s_5z": {
@@ -69,7 +62,6 @@ map_param_registry = {
         "limit": 200,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 3,
         "map_type": 'csz'},
     "3s_vs_3z": {
@@ -78,7 +70,6 @@ map_param_registry = {
         "limit": 120,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
     "3s_vs_4z": {
@@ -87,7 +78,6 @@ map_param_registry = {
         "limit": 120,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
     "3s_vs_5z": {
@@ -96,7 +86,6 @@ map_param_registry = {
         "limit": 150,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
     "3s_vs_6z": {
@@ -105,7 +94,6 @@ map_param_registry = {
         "limit": 150,
         "a_race": "P",
         "b_race": "P",
-        "shield": True,
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
     }

@@ -115,7 +115,8 @@ class SC2(MultiAgentEnv):
 
         self._agent_race = map_params.a_race
         self._bot_race = map_params.b_race
-        self.shield_bits = 1 if map_params.shield else 0
+        self.shield_bits_ally = 1 if self._agent_race == "P" else 0
+        self.shield_bits_enemy = 1 if self._bot_race == "P" else 0
         self.unit_type_bits = map_params.unit_type_bits
         self.map_type = map_params.map_type
 
@@ -587,12 +588,12 @@ class SC2(MultiAgentEnv):
         nf_en = 4 + self.unit_type_bits
 
         if self.obs_all_health:
-            nf_al += 1 + self.shield_bits
-            nf_en += 1 + self.shield_bits
+            nf_al += 1 + self.shield_bits_ally
+            nf_en += 1 + self.shield_bits_enemy
 
         nf_own = self.unit_type_bits
         if self.obs_own_health:
-            nf_own += 1 + self.shield_bits
+            nf_own += 1 + self.shield_bits_ally
 
         move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
@@ -626,7 +627,7 @@ class SC2(MultiAgentEnv):
                     if self.obs_all_health:
                         enemy_feats[e_id, ind] = e_unit.health / e_unit.health_max # health
                         ind += 1
-                        if self.shield_bits > 0:
+                        if self.shield_bits_enemy > 0:
                             max_shield = self.unit_max_shield(e_unit)
                             enemy_feats[e_id, ind] = e_unit.shield / max_shield # shield
                             ind += 1
@@ -654,7 +655,7 @@ class SC2(MultiAgentEnv):
                     if self.obs_all_health:
                         ally_feats[i, ind] = al_unit.health / al_unit.health_max # health
                         ind += 1
-                        if self.shield_bits > 0:
+                        if self.shield_bits_ally > 0:
                             max_shield = self.unit_max_shield(al_unit)
                             ally_feats[i, ind] = al_unit.shield / max_shield # shield
                             ind += 1
@@ -668,7 +669,7 @@ class SC2(MultiAgentEnv):
             if self.obs_own_health:
                 own_feats[ind] = unit.health / unit.health_max
                 ind += 1
-                if self.shield_bits == 1:
+                if self.shield_bits_ally > 0:
                     max_shield = self.unit_max_shield(unit)
                     own_feats[ind] = unit.shield / max_shield
                     ind += 1
@@ -704,8 +705,8 @@ class SC2(MultiAgentEnv):
             obs_concat = np.concatenate(self.get_obs(), axis=0).astype(np.float32)
             return obs_concat
 
-        nf_al = 4 + self.shield_bits + self.unit_type_bits
-        nf_en = 3 + self.shield_bits + self.unit_type_bits
+        nf_al = 4 + self.shield_bits_ally + self.unit_type_bits
+        nf_en = 3 + self.shield_bits_enemy + self.unit_type_bits
 
         ally_state = np.zeros((self.n_agents, nf_al))
         enemy_state = np.zeros((self.n_enemies, nf_en))
@@ -728,7 +729,7 @@ class SC2(MultiAgentEnv):
                 ally_state[al_id, 3] = (y - center_y) / self.max_distance_y # relative Y
 
                 ind = 4
-                if self.shield_bits > 0:
+                if self.shield_bits_ally > 0:
                     max_shield = self.unit_max_shield(al_unit)
                     ally_state[al_id, ind] = al_unit.shield / max_shield # shield
                     ind += 1
@@ -747,7 +748,7 @@ class SC2(MultiAgentEnv):
                 enemy_state[e_id, 2] = (y - center_y) / self.max_distance_y # relative Y
 
                 ind = 3
-                if self.shield_bits > 0:
+                if self.shield_bits_enemy > 0:
                     max_shield = self.unit_max_shield(e_unit)
                     enemy_state[e_id, ind] = e_unit.shield / max_shield # shield
                     ind += 1
@@ -820,8 +821,8 @@ class SC2(MultiAgentEnv):
         if self.obs_instead_of_state:
             return self.get_obs_size() * self.n_agents
 
-        nf_al = 4 + self.shield_bits + self.unit_type_bits
-        nf_en = 3 + self.shield_bits + self.unit_type_bits
+        nf_al = 4 + self.shield_bits_ally + self.unit_type_bits
+        nf_en = 3 + self.shield_bits_enemy + self.unit_type_bits
 
         enemy_state = self.n_enemies * nf_en
         ally_state = self.n_agents * nf_al
@@ -888,12 +889,12 @@ class SC2(MultiAgentEnv):
         nf_en = 4 + self.unit_type_bits
 
         if self.obs_all_health:
-            nf_al += 1 + self.shield_bits
-            nf_en += 1 + self.shield_bits
+            nf_al += 1 + self.shield_bits_ally
+            nf_en += 1 + self.shield_bits_enemy
 
         own_feats = self.unit_type_bits
         if self.obs_own_health:
-            own_feats += 1 + self.shield_bits
+            own_feats += 1 + self.shield_bits_ally
 
         move_feats = self.n_actions_no_attack - 2
         enemy_feats = self.n_enemies * nf_en
