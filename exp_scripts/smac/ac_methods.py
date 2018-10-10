@@ -30,7 +30,7 @@ shared_params = {
     "epsilon_finish": 0.01,
     "epsilon_anneal_time": 100 * 1000,
     "target_update_interval": 200,
-    "env_args.map_name": ["3m", "5m", "2s_3z"],
+    "env_args.map_name": ["3m_3m", "5m_5m", "2s_3z"],
 }
 
 # CentralV
