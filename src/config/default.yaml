@@ -18,6 +18,9 @@ use_cuda: True # Use gpu by default unless it isn't available
 # --- Logging options ---
 use_tensorboard: False # Log results to tensorboard
 save_model: False # Save the models to disk
+model_save_interval: 5000 # Save models after this many timesteps
+checkpoint_path: None # Load a checkpoint from this path
+local_results_path: "results" # Path for local results
 
 # --- RL hyperparameters ---
 gamma: 0.99

@@ -38,6 +38,7 @@ def run(_run, _config, _log, pymongo_client):
 
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    args.unique_token = unique_token
     if args.use_tensorboard:
         tb_logs_direc = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
         tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
@@ -109,6 +110,10 @@ def run_sequential(args, logger):
     # Learner
     learner = le_REGISTRY[args.learner](mac, buffer.scheme, logger, args)
 
+    if args.checkpoint_path is not None:
+        # should be learner
+        mac.load_models(args.checkpoint_path)
+
     if args.use_cuda:
         learner.cuda()
 
@@ -155,11 +160,14 @@ def run_sequential(args, logger):
         # save model once in a while
         if args.save_model and (runner.t_env - model_save_time >= args.save_model_interval or model_save_time == 0):
             model_save_time = runner.t_env
-            logger.console_logger.info("Saving models")
-
-            save_path = os.path.join(args.local_results_path, "models") #"results/models/{}".format(unique_token)
+            save_path = os.path.join(args.local_results_path, "models", args.unique_token, str(runner.t_env))
+            #"results/models/{}".format(unique_token)
             os.makedirs(save_path, exist_ok=True)
+            logger.console_logger.info("Saving models to {}".format(save_path))
 
+            # learner should handle saving/loading -- delegate actor save/load to mac,
+            # use appropriate file structure to get critics, optimizer states
+            mac.save_models(save_path)
             # learner obj will save all agent and further models used
             # learner.save_models(path=save_path, token=unique_token, T=runner.t_env)
 
