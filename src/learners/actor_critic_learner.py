@@ -314,6 +314,7 @@ class ActorCriticLearner:
     def cuda(self):
         self.mac.cuda()
         self.critic.cuda()
+        self.target_critic.cuda()
         if self.separate_baseline_critic:
             self.baseline_critic.cuda()
-        self.target_critic.cuda()
+            self.target_baseline_critic.cuda()
