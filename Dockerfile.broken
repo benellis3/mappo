@@ -147,6 +147,25 @@ RUN pip3 install torch
 RUN pip3 install torchvision snakeviz pytest probscale
 RUN apt-get install -y htop iotop
 
+#### -------------------------------------------------------------------
+#### install mujoco
+#### -------------------------------------------------------------------
+RUN apt install -y libosmesa6-dev
+# RUN wget http://nixos.org/releases/patchelf/patchelf-0.9/patchelf-0.9.tar.bz2
+# RUN tar xf patchelf-0.9.tar.bz2 && cd patchelf-0.9/ && ./configure --prefix="$HOME/.local" && make install && strip ~/.local/bin/patchelf && gzip -9 ~/.local/share/man/man1/patchelf.1
+RUN add-apt-repository ppa:jamesh/snap-support && apt-get update && apt install -y patchelf
+RUN mkdir -p /root/.mujoco \
+    && wget https://www.roboti.us/download/mjpro150_linux.zip -O mujoco.zip \
+    && unzip mujoco.zip -d /root/.mujoco \
+    && rm mujoco.zip
+RUN export PATH=$PATH:$HOME/.local/bin
+COPY ./mujoco_key.txt /root/.mujoco/mjkey.txt
+ENV LD_LIBRARY_PATH /root/.mujoco/mjpro150/bin:${LD_LIBRARY_PATH}
+
+RUN pip3 install gym[mujoco] --upgrade 
+RUN pip3 install mujoco-py
+RUN echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mjpro150/bin" >> ~/.bashrc
+
 EXPOSE 8888
 
 WORKDIR /pymarl
