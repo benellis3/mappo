@@ -115,6 +115,8 @@ class ActorCriticLearner:
 
         if self.critic.output_type == "q":
             q_sa = th.gather(q_sa, dim=3, index=actions).squeeze(3)
+            if self.args.critic_q_fn == "coma" and self.args.coma_mean_q:
+                q_sa = q_sa.mean(2, keepdim=True).expand(-1, -1, self.n_agents)
         q_sa = self.nstep_returns(rewards, mask, q_sa, self.args.q_nstep)
 
         advantages = (q_sa - baseline).detach().squeeze()
