@@ -96,6 +96,46 @@ RUN pip3 install torch
 RUN pip3 install torchvision snakeviz pytest probscale
 RUN apt-get install -y htop iotop
 
+## --------- sdl
+RUN apt-get update && apt-get install -y libsdl2-dev libsdl2-2.0
+
+## --------- build OpenBW
+RUN git clone https://github.com/openbw/openbw
+RUN git clone https://github.com/openbw/bwapi
+RUN cd bwapi && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DOPENBW_DIR=../../openbw -DOPENBW_ENABLE_UI=$OBW_GUI \
+    && make && make install
+
+# -------- TorchCraft
+
+RUN git clone https://github.com/torchcraft/torchcraft.git -b develop --recursive
+
+## --------- zmq
+RUN apt-get purge -y libzmq*
+RUN apt-get update && apt-get install -y libtool pkg-config build-essential autoconf automake uuid-dev
+RUN wget https://github.com/zeromq/libzmq/releases/download/v4.2.2/zeromq-4.2.2.tar.gz
+RUN tar xvzf zeromq-4.2.2.tar.gz
+RUN ulimit -n 1000 && apt-get update
+RUN cd zeromq-4.2.2 && ./configure && make install && ldconfig
+
+## --------- zstd
+# This can only be done on 18.04, so commenting out for now
+# RUN apt-get install -y libzstd1-dev zstd
+RUN wget https://github.com/facebook/zstd/archive/v1.1.4.tar.gz
+RUN tar xf v1.1.4.tar.gz
+RUN cd zstd-1.1.4/ && make -j && make install && ldconfig
+
+## --------- build BWEnv
+RUN cd torchcraft/BWEnv && mkdir build && cd build && sed -i.bak -e '5d;' ../CMakeLists.txt
+RUN cd torchcraft/BWEnv/build && cmake .. -DCMAKE_BUILD_TYPE=relwithdebinfo -DZMQ_LIBRARIES=/usr/local/lib/libzmq.so  \
+    && make -j
+
+## --------- python client deps
+RUN pip3 install pybind11
+
+## --------- python client
+RUN cd torchcraft && pip3 install .
+
 EXPOSE 8888
 
 WORKDIR /pymarl
