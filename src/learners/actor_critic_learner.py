@@ -67,6 +67,12 @@ class ActorCriticLearner:
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
         avail_actions = batch["avail_actions"][:, :-1]
 
+        # No experiences to train on in this minibatch
+        if mask.sum() == 0:
+            self.logger.log_stat("Mask_Sum_Zero", 1, t_env)
+            self.logger.console_logger.error("Actor Critic Learner: mask.sum() == 0 at t_env {}".format(t_env))
+            return
+
         mask = mask.repeat(1, 1, self.n_agents)
 
         critic_mask = mask.clone()

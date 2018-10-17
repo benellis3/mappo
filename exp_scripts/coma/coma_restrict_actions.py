@@ -6,7 +6,7 @@ server_list = [
     ("brown", [0,1,2,3,4,5], 1),
 ]
 
-label = "coma_unrestricted_actions__17_Oct_2018__v1"
+label = "coma_unrestricted_actions__17_Oct_2018__v2"
 config = "coma"
 env_config = "sc2"
 
