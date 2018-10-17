@@ -113,6 +113,8 @@ class SC2(MultiAgentEnv):
 
         self.continuing_episode = args.continuing_episode
 
+        self.restrict_actions = args.restrict_actions
+
         self._agent_race = map_params.a_race
         self._bot_race = map_params.b_race
         self.shield_bits_ally = 1 if self._agent_race == "P" else 0
@@ -346,6 +348,10 @@ class SC2(MultiAgentEnv):
         tag = unit.tag
         x = unit.pos.x
         y = unit.pos.y
+
+        true_avail_actions = self.get_avail_agent_actions(a_id)
+        if true_avail_actions[action] == 0:
+            action = 1
 
         if action == 0:
             # no-op (valid only when dead)
@@ -875,12 +881,27 @@ class SC2(MultiAgentEnv):
             # only no-op allowed
             return [1] + [0] * (self.n_actions - 1)
 
-    def get_avail_actions(self):
+    def get_unrestricted_actions(self, agent_id):
+        unit = self.get_unit_by_id(agent_id)
+        if unit.health > 0:
+            # cannot do no-op as alife
+            avail_actions = [1] * self.n_actions
+            avail_actions[0] = 0
+        else:
+            avail_actions = [0] * self.n_actions
+            avail_actions[0] = 1
+        return avail_actions
 
+    def get_avail_actions(self):
         avail_actions = []
         for agent_id in range(self.n_agents):
-            avail_agent = self.get_avail_agent_actions(agent_id)
-            avail_actions.append(avail_agent)
+            if self.restrict_actions:
+                avail_agent = self.get_avail_agent_actions(agent_id)
+                avail_actions.append(avail_agent)
+            else:
+                avail_agent = self.get_unrestricted_actions(agent_id)
+                avail_actions.append(avail_agent)
+
         return avail_actions
 
     def get_obs_size(self):

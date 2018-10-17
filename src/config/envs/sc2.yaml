@@ -20,6 +20,7 @@ env_args:
   obs_own_health: True
   obs_all_health: True
   continuing_episode: False
+  restrict_actions: True
   game_version: "3.16.1"
 
 test_nepisode: 32
