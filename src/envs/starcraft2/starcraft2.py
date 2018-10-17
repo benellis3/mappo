@@ -555,7 +555,7 @@ class SC2(MultiAgentEnv):
 
     def unit_max_cooldown(self, agent_id):
 
-        if self.map_type == 'marines':
+        if self.map_type in ['marines', 'm_z']:
             return 15
 
         unit = self.get_unit_by_id(agent_id)
@@ -585,6 +585,22 @@ class SC2(MultiAgentEnv):
             return 40
         if unit.unit_type == 4 or unit.unit_type == self.colossus_id: # Protoss's Colossus
             return 150
+
+    def can_move(self, unit, direction):
+
+        if direction == 0: # north
+            x, y = int(unit.pos.x), int(unit.pos.y + self._move_amount)
+        elif direction == 1: # south
+            x, y = int(unit.pos.x), int(unit.pos.y - self._move_amount)
+        elif direction == 2: # east
+            x, y = int(unit.pos.x + self._move_amount), int(unit.pos.y)
+        else : # west
+            x, y = int(unit.pos.x - self._move_amount), int(unit.pos.y)
+
+        if self.pathing_grid[x, y] == 0:
+            return True
+
+        return False
 
     def get_obs_agent(self, agent_id):
 
@@ -850,13 +866,13 @@ class SC2(MultiAgentEnv):
             avail_actions[1] = 1
 
             # see if we can move
-            if unit.pos.y + self._move_amount < self.map_play_area_max.y:
+            if self.can_move(unit, 0):
                 avail_actions[2] = 1
-            if unit.pos.y - self._move_amount > self.map_play_area_min.y:
+            if self.can_move(unit, 1):
                 avail_actions[3] = 1
-            if unit.pos.x + self._move_amount < self.map_play_area_max.x:
+            if self.can_move(unit, 2):
                 avail_actions[4] = 1
-            if unit.pos.x - self._move_amount > self.map_play_area_min.x:
+            if self.can_move(unit, 3):
                 avail_actions[5] = 1
 
             # can attack only those who is alife

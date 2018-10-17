@@ -96,6 +96,14 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
+    "micro1": {
+        "n_agents": 2,
+        "n_enemies": 1,
+        "limit": 150,
+        "a_race": "T",
+        "b_race": "P",
+        "unit_type_bits": 0,
+        "map_type": 'm_z'},
     }
 
 def get_map_params(map_name):
