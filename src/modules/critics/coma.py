@@ -15,27 +15,31 @@ class COMACritic(nn.Module):
         self.output_type = "q"
 
         # Set up network layers
-        self.fc1 = nn.Linear(input_shape, 64)
+        self.fc1 = nn.Linear(input_shape, 128)
 
         if args.recurrent_critic:
-            self.rnn = nn.GRU(64, 64, batch_first=True)
+            self.rnn = nn.GRU(128, 128, batch_first=True)
         else:
             self.rnn = None
 
-        # self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, self.n_actions)
+        self.fc2 = nn.Linear(128, 128)
+        self.v_head = nn.Linear(128, 1)
+        self.fc3 = nn.Linear(128, self.n_actions)
 
     def forward(self, batch, t=None):
         inputs = self._build_inputs(batch, t=t)
         bs, max_t, n_agents, vdim = inputs.shape
         x = F.relu(self.fc1(inputs))
+        x = F.relu(self.fc2(x))
 
         if self.rnn is not None:
             x = x.permute(0, 2, 1, 3).reshape(bs * n_agents, max_t, -1)
             x, h_out = self.rnn(x)  # h0 defaults to 0 if not provided, TODO: make explicit
             x = x.reshape(bs, n_agents, max_t, -1).permute(0, 2, 1, 3)
 
-        q = self.fc3(x)
+        adv = self.fc3(x)
+        v = self.v_head(x)
+        q = adv - adv.mean(-1, keepdim=True).expand_as(adv) + v.expand_as(adv)
         return q
 
     def _build_inputs(self, batch, t=None):
