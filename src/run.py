@@ -113,7 +113,7 @@ def run_sequential(args, logger):
     if args.checkpoint_path != "":
         logger.console_logger.info("Loading model from {}".format(args.checkpoint_path))
         learner.load_models(args.checkpoint_path)
-        runner.t_env = int(os.path.split(args.checkpoint_path)[-1])
+        runner.t_env = int(os.path.basename(os.path.normpath(args.checkpoint_path)))
 
     if args.use_cuda:
         learner.cuda()
