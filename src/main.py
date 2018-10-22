@@ -100,8 +100,6 @@ if __name__ == '__main__':
     from copy import deepcopy
     params = deepcopy(sys.argv)
 
-    # Run stuff using python main.py --config=iql --env-config=sc2 with ...
-
     # Get the defaults from default.yaml
     with open(os.path.join(os.path.dirname(__file__), "config", "default.yaml"), "r") as f:
         try:
