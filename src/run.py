@@ -71,6 +71,18 @@ def run(_run, _config, _log, pymongo_client):
     os._exit(os.EX_OK)
 
 
+def evaluate_sequential(args, runner):
+
+    # Execute test runs once in a while
+    n_test_runs = args.test_nepisode
+
+    replay_name = os.path.basename(os.path.dirname(os.path.normpath(args.checkpoint_path))) + str(runner.t_env)
+
+    for _ in range(n_test_runs):
+        runner.run(test_mode=True)
+
+    runner.save_replay(replay_name)
+
 def run_sequential(args, logger):
 
     # Init runner so we can get env info
@@ -110,13 +122,18 @@ def run_sequential(args, logger):
     # Learner
     learner = le_REGISTRY[args.learner](mac, buffer.scheme, logger, args)
 
+    if args.use_cuda:
+        learner.cuda()
+
     if args.checkpoint_path != "":
         logger.console_logger.info("Loading model from {}".format(args.checkpoint_path))
         learner.load_models(args.checkpoint_path)
         runner.t_env = int(os.path.basename(os.path.normpath(args.checkpoint_path)))
 
-    if args.use_cuda:
-        learner.cuda()
+        if args.evaluate_mode:
+            evaluate_sequential(args, runner)
+            logger.console_logger.info("Finished Training")
+            return
 
     # start training
     episode = 0

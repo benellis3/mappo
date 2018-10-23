@@ -6,7 +6,6 @@ env_args:
   map_name: "3m_3m" # 3 marines by default
   difficulty: "3"
   heuristic: False
-  measure_fps: True
   move_amount: 2
   reward_death_value: 10
   reward_negative_scale: 0.5

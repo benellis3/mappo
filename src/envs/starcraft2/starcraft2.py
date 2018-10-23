@@ -101,7 +101,6 @@ class SC2(MultiAgentEnv):
         # Other
         self.seed = args.seed
         self.heuristic = args.heuristic
-        self.measure_fps = args.measure_fps
         self.window_size = (1920, 1200)
 
         self.debug_inputs = False
@@ -126,7 +125,7 @@ class SC2(MultiAgentEnv):
             os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
             self.game_version = args.game_version
         else:
-            self.game_version = "4.3.2"
+            self.game_version = "4.6.0"
 
         # Launch the game
         self._launch()
@@ -195,10 +194,9 @@ class SC2(MultiAgentEnv):
         join = sc_pb.RequestJoinGame(race=races[self._agent_race], options=self.interface)
         self.controller.join_game(join)
 
-    def save_replay(self, replay_dir):
-
-       replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir, self.map_name)
-       print("Wrote replay to: %s", replay_path)
+    def save_replay(self, name):
+        replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir='', prefix=name)
+        print("Replay saved at: %s" % replay_path)
 
     def reset(self):
         """Start a new episode."""
@@ -215,18 +213,6 @@ class SC2(MultiAgentEnv):
 
         if self.heuristic:
             self.heuristic_targets = [0] * self.n_agents
-
-        # naive way to measure FPS
-        if self.measure_fps:
-            if self._episode_count == 10:
-                self.start_time = time.time()
-
-            if self._episode_count == 20:
-                elapsed_time = time.time() - self.start_time
-                print('-------------------------------------------------------------')
-                print("Took %.3f seconds for %s steps with step_mul=%d: %.3f fps" % (
-                    elapsed_time, self._total_steps, self._step_mul, (self._total_steps * self._step_mul) / elapsed_time))
-                print('-------------------------------------------------------------')
 
         # Information kept for counting the reward
         self.death_tracker_ally = np.zeros(self.n_agents)

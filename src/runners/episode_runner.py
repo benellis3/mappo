@@ -34,6 +34,9 @@ class EpisodeRunner:
     def get_env_info(self):
         return self.env.get_env_info()
 
+    def save_replay(self, name):
+        self.env.save_replay(name)
+
     def reset(self):
         self.batch = self.new_batch()
         self.env.reset()

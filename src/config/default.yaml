@@ -20,6 +20,7 @@ use_tensorboard: False # Log results to tensorboard
 save_model: False # Save the models to disk
 save_model_interval: 5000 # Save models after this many timesteps
 checkpoint_path: "" # Load a checkpoint from this path
+evaluate_mode: False # No training, just model evaluation (from checkpoint_path)
 local_results_path: "results" # Path for local results
 
 # --- RL hyperparameters ---
