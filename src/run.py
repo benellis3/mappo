@@ -73,12 +73,9 @@ def run(_run, _config, _log, pymongo_client):
 
 def evaluate_sequential(args, runner):
 
-    # Execute test runs once in a while
-    n_test_runs = args.test_nepisode
-
     replay_name = os.path.basename(os.path.dirname(os.path.normpath(args.checkpoint_path))) + str(runner.t_env)
 
-    for _ in range(n_test_runs):
+    for _ in range(args.test_nepisode):
         runner.run(test_mode=True)
 
     runner.save_replay(replay_name)
@@ -130,9 +127,8 @@ def run_sequential(args, logger):
         learner.load_models(args.checkpoint_path)
         runner.t_env = int(os.path.basename(os.path.normpath(args.checkpoint_path)))
 
-        if args.evaluate_mode:
+        if args.save_replay:
             evaluate_sequential(args, runner)
-            logger.console_logger.info("Finished Training")
             return
 
     # start training

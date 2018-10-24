@@ -196,7 +196,8 @@ class SC2(MultiAgentEnv):
         self.controller.join_game(join)
 
     def save_replay(self, name):
-        replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir='', prefix=name)
+        #replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir='', prefix=name)
+        replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir='', prefix=self.map_name)
         print("Replay saved at: %s" % replay_path)
 
     def reset(self):
