@@ -125,7 +125,8 @@ class SC2(MultiAgentEnv):
             os.environ['SC2PATH'] = os.path.join(os.getcwd(), "3rdparty", 'StarCraftII')
             self.game_version = args.game_version
         else:
-            self.game_version = "4.6.0"
+            # Can be derived automatically
+            self.game_version = None
 
         # Launch the game
         self._launch()
