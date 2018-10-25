@@ -73,12 +73,10 @@ def run(_run, _config, _log, pymongo_client):
 
 def evaluate_sequential(args, runner):
 
-    replay_name = os.path.basename(os.path.dirname(os.path.normpath(args.checkpoint_path))) + str(runner.t_env)
-
     for _ in range(args.test_nepisode):
         runner.run(test_mode=True)
 
-    runner.save_replay(replay_name)
+    runner.save_replay()
 
 def run_sequential(args, logger):
 

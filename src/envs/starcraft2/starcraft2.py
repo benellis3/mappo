@@ -102,6 +102,7 @@ class SC2(MultiAgentEnv):
         self.seed = args.seed
         self.heuristic = args.heuristic
         self.window_size = (1920, 1200)
+        self.save_replay_prefix = args.save_replay_prefix
 
         self.debug_inputs = False
         self.debug_rewards = False
@@ -195,9 +196,9 @@ class SC2(MultiAgentEnv):
         join = sc_pb.RequestJoinGame(race=races[self._agent_race], options=self.interface)
         self.controller.join_game(join)
 
-    def save_replay(self, name):
-        #replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir='', prefix=name)
-        replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir='', prefix=self.map_name)
+    def save_replay(self):
+        prefix = self.save_replay_prefix or self.map_name
+        replay_path = self._run_config.save_replay(self.controller.save_replay(), replay_dir='', prefix=prefix)
         print("Replay saved at: %s" % replay_path)
 
     def reset(self):

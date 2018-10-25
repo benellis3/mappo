@@ -56,7 +56,7 @@ class ParallelRunner:
     def get_env_info(self):
         return self.env_info
 
-    def save_replay(self, name):
+    def save_replay(self):
         pass
 
     def reset(self):

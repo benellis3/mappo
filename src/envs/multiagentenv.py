@@ -55,7 +55,7 @@ class MultiAgentEnv(object):
     def seed(self):
         raise NotImplementedError
 
-    def save_replay(self, name):
+    def save_replay(self):
         raise NotImplementedError
 
     def get_env_info(self):
