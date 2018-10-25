@@ -17,9 +17,9 @@ echo 'SC2PATH is set to '$SC2PATH
 
 if [ ! -d $SC2PATH ]; then
         echo 'StarCraftII is not installed. Installing now ...';
-        wget http://blzdistsc2-a.akamaihd.net/Linux/SC2.3.16.1.zip
-        unzip -P iagreetotheeula SC2.3.16.1.zip
-        rm -rf SC2.3.16.1.zip
+        wget http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.1.2.60604_2018_05_16.zip
+        unzip -P iagreetotheeula SC2.4.1.2.60604_2018_05_16.zip
+        rm -rf SC2.4.1.2.60604_2018_05_16.zip
 else
         echo 'StarCraftII is already installed.'
 fi
