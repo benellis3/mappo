@@ -23,7 +23,7 @@ class COMACritic(nn.Module):
             self.rnn = None
 
         self.fc2 = nn.Linear(128, 128)
-        self.v_head = nn.Linear(128, 1)
+        # self.v_head = nn.Linear(128, 1)
         self.fc3 = nn.Linear(128, self.n_actions)
 
     def forward(self, batch, t=None):
@@ -37,9 +37,9 @@ class COMACritic(nn.Module):
             x, h_out = self.rnn(x)  # h0 defaults to 0 if not provided, TODO: make explicit
             x = x.reshape(bs, n_agents, max_t, -1).permute(0, 2, 1, 3)
 
-        adv = self.fc3(x)
-        v = self.v_head(x)
-        q = adv - adv.mean(-1, keepdim=True).expand_as(adv) + v.expand_as(adv)
+        q = self.fc3(x)
+        # v = self.v_head(x)
+        # q = adv - adv.mean(-1, keepdim=True).expand_as(adv) + v.expand_as(adv)
         return q
 
     def _build_inputs(self, batch, t=None):
