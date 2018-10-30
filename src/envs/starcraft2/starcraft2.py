@@ -1,13 +1,14 @@
 from ..multiagentenv import MultiAgentEnv
 from .map_params import get_map_params, map_present
+from utils.dict2namedtuple import convert
+from operator import attrgetter
+from copy import deepcopy
+from absl import flags
 import numpy as np
 import pygame
 import sys
 import os
 import math
-import time
-from operator import attrgetter
-from copy import deepcopy
 
 from pysc2 import maps
 from pysc2 import run_configs
@@ -16,12 +17,7 @@ from pysc2.lib import protocol
 from s2clientprotocol import common_pb2 as sc_common
 from s2clientprotocol import sc2api_pb2 as sc_pb
 from s2clientprotocol import raw_pb2 as r_pb
-from s2clientprotocol import query_pb2 as q_pb
 from s2clientprotocol import debug_pb2 as d_pb
-
-from utils.dict2namedtuple import convert
-
-from absl import flags
 
 FLAGS = flags.FLAGS
 FLAGS(['main.py'])
@@ -52,10 +48,6 @@ difficulties = {
     "9": sc_pb.CheatMoney,
     "A": sc_pb.CheatInsane,
 }
-
-sz_maps = ['2s_3z', '3s_5z', '5s_7z' ]
-csz_maps = [ '1c_3s_5z', '2c_3s_5z' ]
-s_v_z_maps = ['3s_v_3z', '3s_v_4z']
 
 action_move_id = 16     #    target: PointOrUnit
 action_attack_id = 23   #    target: PointOrUnit
@@ -92,29 +84,31 @@ class SC2(MultiAgentEnv):
         if self.obs_all_health:
             self.obs_own_health = True
         # Rewards args
+        self.reward_sparse = args.reward_sparse
         self.reward_only_positive = args.reward_only_positive
         self.reward_negative_scale = args.reward_negative_scale
         self.reward_death_value = args.reward_death_value
         self.reward_win = args.reward_win
+        self.reward_defeat = args.reward_defeat
         self.reward_scale = args.reward_scale
         self.reward_scale_rate = args.reward_scale_rate
         # Other
+        self.continuing_episode = args.continuing_episode
         self.seed = args.seed
         self.heuristic = args.heuristic
         self.window_size = (1920, 1200)
         self.save_replay_prefix = args.save_replay_prefix
+        self.restrict_actions = args.restrict_actions
 
+        # For sanity check
         self.debug_inputs = False
         self.debug_rewards = False
-        self.debug_action_result = False
 
+        # Actions
         self.n_actions_no_attack = 6
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
-        self.continuing_episode = args.continuing_episode
-
-        self.restrict_actions = args.restrict_actions
-
+        # Map info
         self._agent_race = map_params.a_race
         self._bot_race = map_params.b_race
         self.shield_bits_ally = 1 if self._agent_race == "P" else 0
@@ -156,6 +150,7 @@ class SC2(MultiAgentEnv):
 
     def init_ally_unit_types(self, min_unit_type):
         # This should be called once from the init_units function
+
         self.stalker_id = self.sentry_id = self.zealot_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
 
@@ -239,7 +234,6 @@ class SC2(MultiAgentEnv):
         return self.get_obs(), self.get_state()
 
     def _restart(self):
-        #self.controller.restart() # restarts the game after reloading the map
 
         # Kill and restore all units
         try:
@@ -263,8 +257,6 @@ class SC2(MultiAgentEnv):
 
     def step(self, actions):
 
-        # TODO: Check this, maybe we want to be able to handle tensors here
-        # Make actions a list of ints
         actions = [int(a) for a in actions]
 
         self.last_action = self.one_hot(actions, self.n_actions)
@@ -283,8 +275,6 @@ class SC2(MultiAgentEnv):
 
         try:
             res_actions = self.controller.actions(req_actions)
-            if self.debug_action_result:
-                print(res_actions)
             # Make step in SC2, i.e. apply actions
             self.controller.step(self._step_mul)
             # Observe here so that we know if the episode is over.
@@ -313,7 +303,16 @@ class SC2(MultiAgentEnv):
             if end_game == 1:
                 self.battles_won += 1
                 info["battle_won"] = True
-                reward += self.reward_win
+                if not self.reward_sparse:
+                    reward += self.reward_win
+                else:
+                    reward = 1
+
+            elif end_game == -1:
+                if not self.reward_sparse:
+                    reward += self.reward_defeat
+                else:
+                    reward = -1
 
         elif self.episode_limit > 0 and self._episode_steps >= self.episode_limit:
             # Episode limit reached
@@ -421,30 +420,6 @@ class SC2(MultiAgentEnv):
         unit = self.get_unit_by_id(a_id)
         tag = unit.tag
 
-        #if self.map_type == 'MMM':
-        #    if unit.unit_type == self.medivac_id:
-        #        units = [t_unit for t_unit in self.agents.values() if
-        #                 (t_unit.unit_type == self.marine_id and t_unit.health < t_unit.health_max and t_unit.health > 0)]
-        #        if len(units) == 0:
-        #            units = [t_unit for t_unit in self.agents.values() if
-        #                     (t_unit.unit_type == self.marauder_id and t_unit.health > 0)]
-        #        action_id = action_heal_id
-        #    elif unit.unit_type == self.marauder_id:
-        #        units = [t_unit for t_unit in self.enemies.values() if (t_unit.unit_type == 48 or t_unit.unit_type == 51)]
-        #        action_id = action_attack_id
-        #    else:
-        #        units = self.enemies.values()
-        #        action_id = action_attack_id
-        #else:
-        #    units = self.enemies.items()
-        #    action_id = action_attack_id
-        #
-        # for t_id, t_unit in units:
-        #     if t_unit.health > 0:
-        #         target_tag = t_unit.tag
-        #         target_id = t_id
-        #         break
-
         target_tag = self.enemies[self.heuristic_targets[a_id]].tag
         action_id = action_attack_id
 
@@ -456,13 +431,11 @@ class SC2(MultiAgentEnv):
         sc_action = sc_pb.Action(action_raw=r_pb.ActionRaw(unit_command=cmd))
         return sc_action
 
-    def reward_sparse(self):
-        # win +1, loss -1, tie 0
-        if self._obs.player_result:  # Episode's over.
-            return _possible_results.get(self._obs.player_result[0].result, 0)
-        return 0
-
     def reward_battle(self):
+
+        if self.reward_sparse:
+            return 0
+
         #  delta health - delta enemies + delta deaths where value:
         #   if enemy unit dies, add reward_death_value per dead unit
         #   if own unit dies, subtract reward_death_value per dead unit
@@ -866,7 +839,6 @@ class SC2(MultiAgentEnv):
 
             # can attack only those who is alife
             # and in the shooting range
-
             shoot_range = self.unit_shoot_range(agent_id)
 
             target_items = self.enemies.items()
@@ -898,6 +870,7 @@ class SC2(MultiAgentEnv):
         return avail_actions
 
     def get_avail_actions(self):
+
         avail_actions = []
         for agent_id in range(self.n_agents):
             if self.restrict_actions:
@@ -929,7 +902,6 @@ class SC2(MultiAgentEnv):
         return move_feats + enemy_feats + ally_feats + own_feats
 
     def close(self):
-        print("Closing StarCraftII")
         self._sc2_proc.close()
 
     def render(self):
@@ -943,6 +915,7 @@ class SC2(MultiAgentEnv):
 
     def init_units(self):
 
+        # In case controller step fails
         while True:
 
             self.agents = {}
@@ -966,30 +939,21 @@ class SC2(MultiAgentEnv):
                 min_unit_type = min(unit.unit_type for unit in self.agents.values())
                 self.init_ally_unit_types(min_unit_type)
 
-            # print("Agent types", [unit.unit_type for unit in self.agents.values()])
-            # print("Enemy types", [unit.unit_type for unit in self.enemies.values()])
-
             if len(self.agents) == self.n_agents and len(self.enemies) == self.n_enemies:
                 # All good
                 return
 
-            # Might happen very rarely, just gonna do an additional environmental step
-            # to give time for the units to spawn
-            # as usual in the try brackets
             try:
                 self.controller.step(1)
                 self._obs = self.controller.observe()
             except protocol.ProtocolError:
-                # iffy way, but would not thraw an error for sure
                 self.full_restart()
                 self.reset()
             except protocol.ConnectionError:
-                # iffy way, but would not thraw an error for sure
                 self.full_restart()
                 self.reset()
 
     def update_units(self):
-        # TODO optimise this
 
         # This function assumes that self._obs is up-to-date
         n_ally_alive = 0
