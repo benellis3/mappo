@@ -64,6 +64,14 @@ map_param_registry = {
         "b_race":"T",
         "unit_type_bits": 3,
         "map_type": 'MMM'},
+    "MMM2": {
+        "n_agents": 10,
+        "n_enemies": 12,
+        "limit": 180,
+        "a_race": "T",
+        "b_race":"T",
+        "unit_type_bits": 3,
+        "map_type": 'MMM'},
     "2s_3z": {
         "n_agents": 5,
         "n_enemies": 5,
