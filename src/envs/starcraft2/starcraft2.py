@@ -151,7 +151,7 @@ class SC2(MultiAgentEnv):
     def init_ally_unit_types(self, min_unit_type):
         # This should be called once from the init_units function
 
-        self.stalker_id = self.sentry_id = self.zealot_id = 0
+        self.stalker_id = self.sentry_id = self.zealot_id = self.colossus_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
 
         if self.map_type == 'sz' or self.map_type == 's_v_z':
@@ -165,6 +165,8 @@ class SC2(MultiAgentEnv):
             self.marauder_id = min_unit_type
             self.marine_id = min_unit_type + 1
             self.medivac_id = min_unit_type + 2
+        elif self.map_type == 'zealot_choke':
+            self.zealot_id = min_unit_type
 
     def _launch(self):
 
