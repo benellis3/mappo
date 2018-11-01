@@ -80,6 +80,9 @@ class SC2(MultiAgentEnv):
         self.obs_own_health = args.obs_own_health
         self.obs_all_health = args.obs_all_health
         self.obs_instead_of_state = args.obs_instead_of_state
+        self.obs_last_action = args.obs_last_action
+        self.obs_pathing_grid = args.obs_pathing_grid
+        self.obs_terrain_height = args.obs_terrain_height
         self.state_last_action = args.state_last_action
         if self.obs_all_health:
             self.obs_own_health = True
@@ -577,6 +580,9 @@ class SC2(MultiAgentEnv):
             nf_al += 1 + self.shield_bits_ally
             nf_en += 1 + self.shield_bits_enemy
 
+        if self.obs_last_action:
+            nf_al += self.n_actions
+
         nf_own = self.unit_type_bits
         if self.obs_own_health:
             nf_own += 1 + self.shield_bits_ally
@@ -649,6 +655,10 @@ class SC2(MultiAgentEnv):
                     if self.unit_type_bits > 0:
                         type_id = self.get_unit_type_id(al_unit, True)
                         ally_feats[i, ind + type_id] = 1
+                        ind += self.unit_type_bits
+
+                    if self.obs_last_action:
+                        ally_feats[i, ind:] = self.last_action[al_id]
 
             # Own features
             ind = 0
@@ -896,6 +906,9 @@ class SC2(MultiAgentEnv):
         own_feats = self.unit_type_bits
         if self.obs_own_health:
             own_feats += 1 + self.shield_bits_ally
+
+        if self.obs_last_action:
+            nf_al += self.n_actions
 
         move_feats = self.n_actions_no_attack - 2
         enemy_feats = self.n_enemies * nf_en
