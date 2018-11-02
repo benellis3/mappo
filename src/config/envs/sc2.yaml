@@ -22,9 +22,9 @@ env_args:
   save_replay_prefix: ""        # Prefix of the replay to be saved
   heuristic: False              # Whether or not use a simple nonlearning hearistic as a controller
   restrict_actions: True
-  obs_pathing_grid: False       # Whether observations include pathing grid centered around agent
-  obs_terrain_height: False     # Whether observations include terrain height centered around agent
-  obs_last_action: False        # Whether the last action of all agents (in the sight range) are included in the obs
+  obs_pathing_grid: False       # Whether observations include pathing grid centered around agent (8 points)
+  obs_terrain_height: False     # Whether observations include terrain height centered around agent (8 + 1 points)
+  obs_last_action: False        # Whether the last action of all agents (in the sight range) are included in the obs 
 
 test_nepisode: 32
 test_interval: 10000

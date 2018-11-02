@@ -86,6 +86,8 @@ class SC2(MultiAgentEnv):
         self.state_last_action = args.state_last_action
         if self.obs_all_health:
             self.obs_own_health = True
+        self.n_obs_pathing = 8
+        self.n_obs_height = 9
         # Rewards args
         self.reward_sparse = args.reward_sparse
         self.reward_only_positive = args.reward_only_positive
@@ -109,6 +111,7 @@ class SC2(MultiAgentEnv):
 
         # Actions
         self.n_actions_no_attack = 6
+        self.n_actions_move = 4
         self.n_actions = self.n_actions_no_attack + self.n_enemies
 
         # Map info
@@ -569,6 +572,54 @@ class SC2(MultiAgentEnv):
 
         return False
 
+    def circle_grid_coords(self, unit, radius):
+        # Generates coordinates in grid that lie within a circle
+
+        r = radius
+        x_floor = int(unit.pos.x)
+        y_floor = int(unit.pos.y)
+
+        points = []
+        for x in range(-r, r + 1):
+            Y = int(math.sqrt(abs(r*r-x*x))) # bound for y given x
+            for y in range(- Y, + Y + 1):
+                points.append((x_floor + x, y_floor + y))
+        return points
+
+    def get_surrounding_points(self, unit, include_self=False):
+
+        x = int(unit.pos.x)
+        y = int(unit.pos.y)
+
+        ma = self._move_amount
+
+        points = [
+            (x, y + 2 * ma), (x, y - 2 * ma),
+            (x + 2 * ma, y), (x - 2 * ma, y),
+            (x + ma, y + ma), (x - ma, y - ma),
+            (x + ma, y - ma), (x - ma, y + ma)
+        ]
+
+        if include_self:
+            points.append((x, y))
+
+        return points
+
+    def check_bounds(self, x, y):
+        return x >= 0 and y >=0 and x < self.map_x and y < self.map_y
+
+    def get_surrounding_pathing(self, unit):
+
+        points = self.get_surrounding_points(unit, include_self=False)
+        vals = [self.pathing_grid[x, y] / 255 if self.check_bounds(x, y) else 1 for x, y in points]
+        return vals
+
+    def get_surrounding_height(self, unit):
+
+        points = self.get_surrounding_points(unit, include_self=True)
+        vals = [self.terrain_height[x, y] / 255 if self.check_bounds(x, y) else 1 for x, y in points]
+        return vals
+
     def get_obs_agent(self, agent_id):
 
         unit = self.get_unit_by_id(agent_id)
@@ -587,7 +638,13 @@ class SC2(MultiAgentEnv):
         if self.obs_own_health:
             nf_own += 1 + self.shield_bits_ally
 
-        move_feats = np.zeros(self.n_actions_no_attack - 2, dtype=np.float32) # exclude no-op & stop
+        move_feats_len = self.n_actions_move
+        if self.obs_pathing_grid:
+            move_feats_len += self.n_obs_pathing
+        if self.obs_terrain_height:
+            move_feats_len += self.n_obs_height
+
+        move_feats = np.zeros(move_feats_len, dtype=np.float32) # exclude no-op & stop
         enemy_feats = np.zeros((self.n_enemies, nf_en), dtype=np.float32)
         ally_feats = np.zeros((self.n_agents - 1, nf_al), dtype=np.float32)
         own_feats = np.zeros(nf_own, dtype=np.float32)
@@ -599,8 +656,17 @@ class SC2(MultiAgentEnv):
 
             # Movement features
             avail_actions = self.get_avail_agent_actions(agent_id)
-            for m in range(self.n_actions_no_attack - 2):
+            for m in range(self.n_actions_move):
                 move_feats[m] = avail_actions[m + 2]
+
+            ind = self.n_actions_move
+
+            if self.obs_pathing_grid:
+                move_feats[ind: ind + self.n_obs_pathing] = self.get_surrounding_pathing(unit)
+                ind += self.n_obs_pathing
+
+            if self.obs_terrain_height:
+                move_feats[ind:] = self.get_surrounding_height(unit)
 
             # Enemy features
             for e_id, e_unit in self.enemies.items():
@@ -910,7 +976,12 @@ class SC2(MultiAgentEnv):
         if self.obs_last_action:
             nf_al += self.n_actions
 
-        move_feats = self.n_actions_no_attack - 2
+        move_feats = self.n_actions_move
+        if self.obs_pathing_grid:
+            move_feats += self.n_obs_pathing
+        if self.obs_terrain_height:
+            move_feats += self.n_obs_height
+
         enemy_feats = self.n_enemies * nf_en
         ally_feats = (self.n_agents - 1) * nf_al
 
