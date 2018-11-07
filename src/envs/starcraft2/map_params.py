@@ -144,7 +144,7 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 0,
         "map_type": 's_v_z'},
-    "micro1": {
+    "micro_2M_Z": {
         "n_agents": 2,
         "n_enemies": 1,
         "limit": 150,
@@ -152,7 +152,7 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 0,
         "map_type": 'm_z'},
-    "micro3": {
+    "micro_corridor": {
         "n_agents": 6,
         "n_enemies": 24,
         "limit": 300,
@@ -160,7 +160,7 @@ map_param_registry = {
         "b_race": "Z",
         "unit_type_bits": 0,
         "map_type": 'zealots'},
-    "micro4": {
+    "micro_focus": {
         "n_agents": 6,
         "n_enemies": 6,
         "limit": 150,
@@ -168,7 +168,7 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 0,
         "map_type": 'focus_fire'},
-    "micro5": {
+    "micro_retarget": {
         "n_agents": 2,
         "n_enemies": 1,
         "limit": 150,
