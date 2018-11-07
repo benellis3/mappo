@@ -159,7 +159,7 @@ map_param_registry = {
         "a_race": "P",
         "b_race": "Z",
         "unit_type_bits": 0,
-        "map_type": 'zealot_choke'},
+        "map_type": 'zealots'},
     "micro4": {
         "n_agents": 6,
         "n_enemies": 6,
@@ -176,6 +176,14 @@ map_param_registry = {
         "b_race": "Z",
         "unit_type_bits": 0,
         "map_type": 'retarget'},
+    "micro_baneling": {
+        "n_agents": 7,
+        "n_enemies": 32,
+        "limit": 300,
+        "a_race": "P",
+        "b_race": "Z",
+        "unit_type_bits": 0,
+        "map_type": 'zealots'},
     }
 
 def get_map_params(map_name):

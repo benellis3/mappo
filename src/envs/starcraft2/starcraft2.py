@@ -172,7 +172,7 @@ class SC2(MultiAgentEnv):
             self.marauder_id = min_unit_type
             self.marine_id = min_unit_type + 1
             self.medivac_id = min_unit_type + 2
-        elif self.map_type == 'zealot_choke':
+        elif self.map_type == 'zealots':
             self.zealot_id = min_unit_type
         elif self.map_type == 'focus_fire':
             self.hydralisk_id = min_unit_type
