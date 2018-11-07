@@ -171,7 +171,7 @@ map_param_registry = {
     "micro_retarget": {
         "n_agents": 2,
         "n_enemies": 1,
-        "limit": 150,
+        "limit": 300,
         "a_race": "P",
         "b_race": "Z",
         "unit_type_bits": 0,
