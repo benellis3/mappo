@@ -160,6 +160,14 @@ map_param_registry = {
         "b_race": "Z",
         "unit_type_bits": 0,
         "map_type": 'zealot_choke'},
+    "micro4": {
+        "n_agents": 6,
+        "n_enemies": 6,
+        "limit": 150,
+        "a_race": "Z",
+        "b_race": "P",
+        "unit_type_bits": 0,
+        "map_type": 'focus_fire'},
     }
 
 def get_map_params(map_name):

@@ -159,6 +159,7 @@ class SC2(MultiAgentEnv):
 
         self.stalker_id = self.sentry_id = self.zealot_id = self.colossus_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
+        self.hydralisk_id = 0
 
         if self.map_type == 'sz' or self.map_type == 's_v_z':
             self.stalker_id = min_unit_type
@@ -173,6 +174,8 @@ class SC2(MultiAgentEnv):
             self.medivac_id = min_unit_type + 2
         elif self.map_type == 'zealot_choke':
             self.zealot_id = min_unit_type
+        elif self.map_type == 'focus_fire':
+            self.hydralisk_id = min_unit_type
 
     def _launch(self):
 
@@ -544,6 +547,8 @@ class SC2(MultiAgentEnv):
             return 24
         if unit.unit_type == self.sentry_id:
             return 13
+        if unit.unit_type == self.hydralisk_id:
+            return 10
 
     def unit_max_shield(self, unit):
 
