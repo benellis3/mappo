@@ -176,6 +176,8 @@ class SC2(MultiAgentEnv):
             self.zealot_id = min_unit_type
         elif self.map_type == 'focus_fire':
             self.hydralisk_id = min_unit_type
+        elif self.map_type == 'retarget':
+            self.stalker_id = min_unit_type
 
     def _launch(self):
 

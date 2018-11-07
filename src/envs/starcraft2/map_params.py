@@ -168,6 +168,14 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 0,
         "map_type": 'focus_fire'},
+    "micro5": {
+        "n_agents": 2,
+        "n_enemies": 1,
+        "limit": 150,
+        "a_race": "P",
+        "b_race": "Z",
+        "unit_type_bits": 0,
+        "map_type": 'retarget'},
     }
 
 def get_map_params(map_name):
