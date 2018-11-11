@@ -2,16 +2,18 @@ from run_experiment import extend_param_dicts
 
 server_list = [
     ("sauron", [0,1,2,3,4,5,6,7], 2),
-    ("gollum", [0,1,2,3,4,5,6,7], 2),
+    ("gollum", [0,1,2,3,4,5,6,7], 1),
+    ("gollum", [1,2,3,5,6,7], 1),
+    ("savitar", [1,2,3,5,6,7], 1),
 ]
 
-label = "asymmetric_test__3_Nov_2018__v3"
+label = "map_picks__8_Nov_2018"
 config = "qmix_parallel"
 env_config = "sc2"
 
-n_repeat = 3
+n_repeat = 5
 
-parallel_repeat = 8
+parallel_repeat = 3
 
 param_dicts = []
 
@@ -25,7 +27,7 @@ shared_params = {
     "epsilon_finish": 0.05,
     "epsilon_anneal_time": [20 * 1000],
     "target_update_interval": 200,
-    "env_args.map_name": ["5m_6m", "10m_11m", "3s5z_3s6z", "3s_5z"],
+    # "env_args.map_name": ["3s_vs_3z", "3s_vs_4z", "3s_vs_5z", "3s_vs_6z",],
     "save_model": True,
     "save_model_interval": 5000 * 1000,
     "test_interval": 20000,
@@ -34,10 +36,18 @@ shared_params = {
     "learner_log_interval": 25000,
 }
 
-# QMIX
-extend_param_dicts(param_dicts, shared_params,
-    {
-        "name": "qmix_parallel",
-    },
-    repeats=parallel_repeat)
+for map in ["3s_vs_3z", "3s_vs_4z", "3s_vs_5z", "8m_8m", "MMM", "micro_baneling"]:
+    for algo in [None, "qmix"]:
+
+        name = algo
+        if name is None:
+            name = "iql"
+        name += "__{}".format(map)
+        extend_param_dicts(param_dicts, shared_params,
+            {
+                "name": name,
+                "mixer": algo,
+                "env_args.map_name": map
+            },
+            repeats=parallel_repeat)
 
