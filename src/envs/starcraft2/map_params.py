@@ -155,7 +155,7 @@ map_param_registry = {
     "micro_corridor": {
         "n_agents": 6,
         "n_enemies": 24,
-        "limit": 300,
+        "limit": 400,
         "a_race": "P",
         "b_race": "Z",
         "unit_type_bits": 0,
@@ -184,6 +184,14 @@ map_param_registry = {
         "b_race": "Z",
         "unit_type_bits": 0,
         "map_type": 'zealots'},
+    "micro_colossus2": {
+        "n_agents": 2,
+        "n_enemies": 50,
+        "limit": 400,
+        "a_race": "P",
+        "b_race": "Z",
+        "unit_type_bits": 0,
+        "map_type": 'colossus'},
     }
 
 def get_map_params(map_name):

@@ -178,6 +178,8 @@ class SC2(MultiAgentEnv):
             self.hydralisk_id = min_unit_type
         elif self.map_type == 'retarget':
             self.stalker_id = min_unit_type
+        elif self.map_type == 'colossus':
+            self.colossus_id = min_unit_type
 
     def _launch(self):
 
