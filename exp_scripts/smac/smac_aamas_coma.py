@@ -19,7 +19,7 @@ label = "smac_aamas__12_Nov_2018"
 config = "coma"
 env_config = "sc2"
 
-n_repeat = 5
+n_repeat = 6
 
 parallel_repeat = 3
 
