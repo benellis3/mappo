@@ -59,6 +59,9 @@ class ParallelRunner:
     def save_replay(self):
         pass
 
+    def close_env(self):
+        self.env.close()
+
     def reset(self):
         self.batch = self.new_batch()
 

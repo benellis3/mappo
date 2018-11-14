@@ -76,7 +76,10 @@ def evaluate_sequential(args, runner):
     for _ in range(args.test_nepisode):
         runner.run(test_mode=True)
 
-    runner.save_replay()
+    if args.save_replay:
+        runner.save_replay()
+
+    runner.close_env()
 
 def run_sequential(args, logger):
 
@@ -121,11 +124,35 @@ def run_sequential(args, logger):
         learner.cuda()
 
     if args.checkpoint_path != "":
-        logger.console_logger.info("Loading model from {}".format(args.checkpoint_path))
-        learner.load_models(args.checkpoint_path)
-        runner.t_env = int(os.path.basename(os.path.normpath(args.checkpoint_path)))
 
-        if args.save_replay:
+        timesteps = []
+        timestep_to_load = 0
+
+        if not os.path.isdir(args.checkpoint_path):
+            logger.console_logger.info("Checkpoint directiory {} doesn't exist".format(args.checkpoint_path))
+            return
+
+        # Go through all files in args.checkpoint_path
+        for name in os.listdir(args.checkpoint_path):
+            full_name = os.path.join(args.checkpoint_path, name)
+            # Check if they are dirs the names of which are numbers
+            if os.path.isdir(full_name) and name.isdigit():
+                timesteps.append(int(name))
+
+        if args.load_step == 0:
+            # choose the max timestep
+            timestep_to_load = max(timesteps)
+        else:
+            # choose the timestep closest to load_step
+            timestep_to_load = min(timesteps, key=lambda x: abs(x - args.load_step))
+
+        model_path = os.path.join(args.checkpoint_path, str(timestep_to_load))
+
+        logger.console_logger.info("Loading model from {}".format(model_path))
+        learner.load_models(model_path)
+        runner.t_env = timestep_to_load
+
+        if args.evaluate or args.save_replay:
             evaluate_sequential(args, runner)
             return
 
@@ -186,6 +213,7 @@ def run_sequential(args, logger):
             logger.print_recent_stats()
             last_log_T = runner.t_env
 
+    runner.close_env()
     logger.console_logger.info("Finished Training")
 
 
