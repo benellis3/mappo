@@ -4,7 +4,7 @@ import pprint
 
 maps = {
     "micro_corridor" : {"qmix" : "qmix__micro_corridor__2018-11-11_14-14-18",
-                        "iql": "iql__micro_corridor__2018-11-12_12-42-10"},
+                        "iql": "iql__micro_corridor__2018-11-10_02-24-14"},
     "3s5z_3s6z": {"qmix": "qmix_parallel__2018-11-08_01-26-50"},
     "MMM2": {"qmix": "qmix__MMM2__2018-11-14_13-53-07"},
     "3s_5z": {"coma": "coma__3s_5z__2018-11-11_17-16-49",
@@ -37,14 +37,13 @@ maps = {
     "micro_2M_Z": {"iql": "iql__micro_2M_Z__2018-11-14_11-09-31",
                    "coma": "coma__micro_2M_Z__2018-11-14_12-52-08"},
                    #"qmix": "qmix_parallel_micro1__2018-10-19_10-39-33"}, we have this already
-    "micro_baneling": {#"iql": "iql__micro_baneling__2018-11-11_00-45-09",
-                       "coma": "coma__micro_baneling__2018-11-12_16-55-00",
+    "micro_baneling": {"coma": "coma__micro_baneling__2018-11-10_02-37-10",
                        "qmix": "qmix__micro_baneling__2018-11-14_06-21-39"},
     "micro_colossus2" : {"qmix": "qmix__micro_colossus2__2018-11-13_22-01-06"},
     "micro_focus" : {"qmix": "qmix__micro_focus__2018-11-14_07-47-00"},
     "micro_retarget" : {"qmix": "qmix__micro_retarget__2018-11-11_02-36-11",
-                        "iql": "iql__micro_retarget__2018-11-12_17-46-16",
-                        "coma": "coma__micro_retarget__2018-11-12_14-43-52"}
+                        "iql": "iql__micro_retarget__2018-11-10_02-22-13",
+                        "coma": "coma__micro_retarget__2018-11-10_02-34-17"}
 }
 
 pprint.pprint(maps)
@@ -53,11 +52,14 @@ dir_prefix = "/Users/mika/Downloads/models2"
 
 for i, map_name in enumerate(maps.keys()):
 
-    #print("\n", " Map {} - {}/{} ".format(map_name, i, len(maps)).center(60, "*"), "\n")
+    print("\n", " Map {} - {}/{} ".format(map_name, i, len(maps)).center(60, "*"), "\n")
 
     experiment = maps[map_name]
 
     for method, path in experiment.items():
+
+        #if method == "qmix" or method == "iql":
+        #    continue
 
         checkpoint_path = os.path.join(dir_prefix, path)
 
