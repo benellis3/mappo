@@ -60,7 +60,8 @@ class ParallelRunner:
         pass
 
     def close_env(self):
-        self.env.close()
+        for parent_conn in self.parent_conns:
+            parent_conn.send(("close", None))
 
     def reset(self):
         self.batch = self.new_batch()
@@ -247,6 +248,7 @@ def env_worker(remote, env_fn):
                 "obs": env.get_obs()
             })
         elif cmd == "close":
+            env.close()
             remote.close()
             break
         elif cmd == "get_env_info":
