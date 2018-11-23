@@ -16,6 +16,14 @@ map_param_registry = {
         "b_race": "T",
         "unit_type_bits": 0,
         "map_type": 'marines'},
+    "5m_5m_new": {
+        "n_agents": 5,
+        "n_enemies": 5,
+        "limit": 60,
+        "a_race": "T",
+        "b_race": "T",
+        "unit_type_bits": 0,
+        "map_type": 'marines'},
     "8m_8m": {
         "n_agents": 8,
         "n_enemies": 8,
@@ -97,6 +105,14 @@ map_param_registry = {
         "unit_type_bits": 3,
         "map_type": 'MMM'},
     "2s_3z": {
+        "n_agents": 5,
+        "n_enemies": 5,
+        "limit": 120,
+        "a_race": "P",
+        "b_race": "P",
+        "unit_type_bits": 2,
+        "map_type": 'sz'},
+    "2s_3z_new": {
         "n_agents": 5,
         "n_enemies": 5,
         "limit": 120,
