@@ -17,7 +17,7 @@ label = "smac_arxiv__qmix_runs__27_Nov_2018"
 config = "qmix_smac"
 env_config = "sc2"
 
-n_repeat = 4
+n_repeat = 5 # Just incase some die
 
 parallel_repeat = 3
 
