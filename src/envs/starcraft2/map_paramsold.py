@@ -1,6 +1,6 @@
 # map parameter registry
 map_param_registry = {
-    "3m": {
+    "3m_3m": {
         "n_agents": 3,
         "n_enemies": 3,
         "limit": 60,
@@ -8,7 +8,7 @@ map_param_registry = {
         "b_race": "T",
         "unit_type_bits": 0,
         "map_type": 'marines'},
-    "5m": {
+    "5m_5m": {
         "n_agents": 5,
         "n_enemies": 5,
         "limit": 60,
@@ -16,7 +16,15 @@ map_param_registry = {
         "b_race": "T",
         "unit_type_bits": 0,
         "map_type": 'marines'},
-    "8m": {
+    "5m_5m_new": {
+        "n_agents": 5,
+        "n_enemies": 5,
+        "limit": 60,
+        "a_race": "T",
+        "b_race": "T",
+        "unit_type_bits": 0,
+        "map_type": 'marines'},
+    "8m_8m": {
         "n_agents": 8,
         "n_enemies": 8,
         "limit": 120,
@@ -24,9 +32,25 @@ map_param_registry = {
         "b_race": "T",
         "unit_type_bits": 0,
         "map_type": 'marines'},
-    "25m": {
-        "n_agents": 25,
-        "n_enemies": 25,
+    "10m_10m": {
+        "n_agents": 10,
+        "n_enemies": 10,
+        "limit": 150,
+        "a_race": "T",
+        "b_race": "T",
+        "unit_type_bits": 0,
+        "map_type": 'marines'},
+    "12m_12m": {
+        "n_agents": 12,
+        "n_enemies": 12,
+        "limit": 150,
+        "a_race": "T",
+        "b_race": "T",
+        "unit_type_bits": 0,
+        "map_type": 'marines'},
+    "15m_15m": {
+        "n_agents": 15,
+        "n_enemies": 15,
         "limit": 150,
         "a_race": "T",
         "b_race": "T",
@@ -48,18 +72,18 @@ map_param_registry = {
         "b_race": "T",
         "unit_type_bits": 0,
         "map_type": 'marines'},
-    "10m_11m": {
-        "n_agents": 10,
-        "n_enemies": 11,
-        "limit": 150,
+    "8m_10m": {
+        "n_agents": 8,
+        "n_enemies": 10,
+        "limit": 120,
         "a_race": "T",
         "b_race": "T",
         "unit_type_bits": 0,
         "map_type": 'marines'},
-    "27m_30m": {
-        "n_agents": 27,
-        "n_enemies": 30,
-        "limit": 180,
+    "10m_11m": {
+        "n_agents": 10,
+        "n_enemies": 11,
+        "limit": 150,
         "a_race": "T",
         "b_race": "T",
         "unit_type_bits": 0,
