@@ -1,7 +1,8 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("savitar", [0,1,2,3,4,5,6,7], 2),
+    ("savitar", [0,1,2,3,5,6,7], 2),
+    ("savitar", [6,7], 1),
     ("gandalf", [0,1,2,3,4,5,6,7], 1),
 ]
 
@@ -11,7 +12,7 @@ env_config = "sc2"
 
 n_repeat = 3
 
-parallel_repeat = 8
+parallel_repeat = 6
 
 param_dicts = []
 
@@ -43,8 +44,10 @@ maps += ["2s_3z"]
 # Asym
 
 # Micro
-maps += ["micro_baneling"]
+maps += ["micro_retarget"]
 maps += ["3s_vs_3z"]
+
+maps += ["micro_baneling"]
 
 
 for map_name in maps:
