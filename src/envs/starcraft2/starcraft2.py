@@ -141,8 +141,8 @@ class SC2(MultiAgentEnv):
         self.map_play_area_max = self._map_info.playable_area.p1
         self.max_distance_x = self.map_play_area_max.x - self.map_play_area_min.x
         self.max_distance_y = self.map_play_area_max.y - self.map_play_area_min.y
-        self.terrain_height = np.transpose(np.array(list(self._map_info.terrain_height.data)).reshape(self.map_x, self.map_y))
-        self.pathing_grid = np.transpose(np.array(list(self._map_info.pathing_grid.data)).reshape(self.map_x, self.map_y))
+        self.terrain_height = np.flip(np.transpose(np.array(list(self._map_info.terrain_height.data)).reshape(self.map_x, self.map_y)), 1)
+        self.pathing_grid = np.flip(np.transpose(np.array(list(self._map_info.pathing_grid.data)).reshape(self.map_x, self.map_y)), 1)
 
         self._episode_count = 0
         self._total_steps = 0
