@@ -141,8 +141,8 @@ class SC2(MultiAgentEnv):
         self.map_play_area_max = self._map_info.playable_area.p1
         self.max_distance_x = self.map_play_area_max.x - self.map_play_area_min.x
         self.max_distance_y = self.map_play_area_max.y - self.map_play_area_min.y
-        self.terrain_height = np.array(list(self._map_info.terrain_height.data)).reshape(self.map_x, self.map_y)
-        self.pathing_grid = np.array(list(self._map_info.pathing_grid.data)).reshape(self.map_x, self.map_y)
+        self.terrain_height = np.transpose(np.array(list(self._map_info.terrain_height.data)).reshape(self.map_x, self.map_y))
+        self.pathing_grid = np.transpose(np.array(list(self._map_info.pathing_grid.data)).reshape(self.map_x, self.map_y))
 
         self._episode_count = 0
         self._total_steps = 0
@@ -567,14 +567,16 @@ class SC2(MultiAgentEnv):
 
     def can_move(self, unit, direction):
 
+        m = self._move_amount / 2
+
         if direction == 0: # north
-            x, y = int(unit.pos.x), int(unit.pos.y + self._move_amount)
+            x, y = int(unit.pos.x), int(unit.pos.y + m)
         elif direction == 1: # south
-            x, y = int(unit.pos.x), int(unit.pos.y - self._move_amount)
+            x, y = int(unit.pos.x), int(unit.pos.y - m)
         elif direction == 2: # east
-            x, y = int(unit.pos.x + self._move_amount), int(unit.pos.y)
+            x, y = int(unit.pos.x + m), int(unit.pos.y)
         else : # west
-            x, y = int(unit.pos.x - self._move_amount), int(unit.pos.y)
+            x, y = int(unit.pos.x - m), int(unit.pos.y)
 
         if self.pathing_grid[x, y] == 0:
             return True
