@@ -146,7 +146,7 @@ map_param_registry = {
         "map_type": 'zealots'},
     "micro_focus": {
         "n_agents": 6,
-        "n_enemies": 6,
+        "n_enemies": 8,
         "limit": 150,
         "a_race": "Z",
         "b_race": "P",
