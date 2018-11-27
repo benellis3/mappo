@@ -164,10 +164,6 @@ class SC2(MultiAgentEnv):
         if self.map_type == 'sz' or self.map_type == 's_v_z':
             self.stalker_id = min_unit_type
             self.zealot_id = min_unit_type + 1
-        elif self.map_type == 'csz':
-            self.colossus_id = min_unit_type
-            self.stalker_id = min_unit_type + 1
-            self.zealot_id = min_unit_type + 2
         elif self.map_type == 'MMM':
             self.marauder_id = min_unit_type
             self.marine_id = min_unit_type + 1
@@ -849,15 +845,7 @@ class SC2(MultiAgentEnv):
         if ally: # we use new SC2 unit types
 
             if self.map_type == 'sz':
-                # id(Stalker) + 1 = id(Zealot)
                 type_id = unit.unit_type - self.stalker_id
-            elif self.map_type == 'csz':
-                if unit.unit_type == self.colossus_id:
-                    type_id = 0
-                elif unit.unit_type == self.zealot_id:
-                    type_id = 1
-                else:
-                    type_id = 2
             elif self.map_type == 'MMM':
                 if unit.unit_type == self.marauder_id:
                     type_id = 0
@@ -871,14 +859,6 @@ class SC2(MultiAgentEnv):
             if self.map_type == 'sz':
                 # id(Stalker) = 74, id(Zealot) = 73
                 type_id = unit.unit_type - 73
-            elif self.map_type == 'csz':
-                # id(Stalker) = 74, id(Zealot) = 73, id(Colossus) = 4
-                if unit.unit_type == 4:
-                    type_id = 0
-                elif unit.unit_type == 73:
-                    type_id = 1
-                else:
-                    type_id = 2
             elif self.map_type == 'MMM':
                 if unit.unit_type == 51:
                     type_id = 0

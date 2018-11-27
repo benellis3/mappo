@@ -80,7 +80,7 @@ map_param_registry = {
         "b_race":"T",
         "unit_type_bits": 3,
         "map_type": 'MMM'},
-    "2s_3z": {
+    "2s3z": {
         "n_agents": 5,
         "n_enemies": 5,
         "limit": 120,
@@ -88,15 +88,7 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 2,
         "map_type": 'sz'},
-    "2s_3z_new": {
-        "n_agents": 5,
-        "n_enemies": 5,
-        "limit": 120,
-        "a_race": "P",
-        "b_race": "P",
-        "unit_type_bits": 2,
-        "map_type": 'sz'},
-    "3s_5z": {
+    "3s5z": {
         "n_agents": 8,
         "n_enemies": 8,
         "limit": 150,
@@ -112,22 +104,6 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 2,
         "map_type": 'sz'},
-    "1c_3s_5z": {
-        "n_agents": 9,
-        "n_enemies": 9,
-        "limit": 200,
-        "a_race": "P",
-        "b_race": "P",
-        "unit_type_bits": 3,
-        "map_type": 'csz'},
-    "2c_3s_5z": {
-        "n_agents": 10,
-        "n_enemies": 10,
-        "limit": 200,
-        "a_race": "P",
-        "b_race": "P",
-        "unit_type_bits": 3,
-        "map_type": 'csz'},
     "3s_vs_3z": {
         "n_agents": 3,
         "n_enemies": 3,
