@@ -13,7 +13,7 @@ server_list = [
     # ("saruman", [0,1,2,3,4,5,6], 2),
 ]
 
-label = "smac_arxiv__qmix_runs__27_Nov_2018"
+label = "smac_arxiv__qmix_runs__27_Nov_2018__v2"
 config = "qmix_smac"
 env_config = "sc2"
 
