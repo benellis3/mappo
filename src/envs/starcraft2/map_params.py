@@ -107,7 +107,7 @@ map_param_registry = {
     "3s_vs_3z": {
         "n_agents": 3,
         "n_enemies": 3,
-        "limit": 120,
+        "limit": 150,
         "a_race": "P",
         "b_race": "P",
         "unit_type_bits": 0,
@@ -115,7 +115,7 @@ map_param_registry = {
     "3s_vs_4z": {
         "n_agents": 3,
         "n_enemies": 4,
-        "limit": 120,
+        "limit": 200,
         "a_race": "P",
         "b_race": "P",
         "unit_type_bits": 0,
@@ -123,15 +123,7 @@ map_param_registry = {
     "3s_vs_5z": {
         "n_agents": 3,
         "n_enemies": 5,
-        "limit": 150,
-        "a_race": "P",
-        "b_race": "P",
-        "unit_type_bits": 0,
-        "map_type": 's_v_z'},
-    "3s_vs_6z": {
-        "n_agents": 3,
-        "n_enemies": 6,
-        "limit": 150,
+        "limit": 250,
         "a_race": "P",
         "b_race": "P",
         "unit_type_bits": 0,
