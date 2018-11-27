@@ -1,19 +1,22 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("brown", [0,1,2,3,4,5], 2),
+    ("brown", [0,1,2,3,4,5], 1),
+    ("dgx1", [6,7], 3),
+    ("gandalf", [0,1,2,3,4,5,6], 1),
     ("woma", [1,2,3,5], 1),
     # ("dgx1", [0,1,2,3,4,5], 1),
-    ("dgx1", [6,7], 3),
     ("savitar", [0,1,2,3,4,5,6,7], 2),
-    ("gandalf", [0,1,2,3,4,5,6,7], 2),
+    ("gandalf", [7,0,1], 1),
+    ("brown", [0,1,2,3,4,5], 1),
+    ("gandalf", [2,3,4,5,6,7], 1),
     ("gollum", [0,1,2,3,4,5,6,7], 1),
     ("gollum", [0], 1),
     # ("gollum", [0,1,2,3,4,5,6,7], 1),
     # ("saruman", [0,1,2,3,4,5,6], 2),
 ]
 
-label = "smac_arxiv__qmix_runs__27_Nov_2018__v2"
+label = "smac_arxiv__qmix_runs__27_Nov_2018__v3"
 config = "qmix_smac"
 env_config = "sc2"
 
@@ -35,6 +38,7 @@ shared_params = {
     "log_interval": 20000,
     "runner_log_interval": 20000,
     "learner_log_interval": 20000,
+    "buffer_cpu_only": True, # 5k buffer is too big for VRAM!
 }
 
 maps = []
