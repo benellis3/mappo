@@ -163,14 +163,14 @@ map_param_registry = {
     "micro_baneling": {
         "n_agents": 7,
         "n_enemies": 32,
-        "limit": 300,
+        "limit": 100,
         "a_race": "P",
         "b_race": "Z",
         "unit_type_bits": 0,
         "map_type": 'zealots'},
-    "micro_colossus2": {
+    "micro_colossus": {
         "n_agents": 2,
-        "n_enemies": 50,
+        "n_enemies": 64,
         "limit": 400,
         "a_race": "P",
         "b_race": "Z",
