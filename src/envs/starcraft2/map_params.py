@@ -88,6 +88,14 @@ map_param_registry = {
         "b_race": "P",
         "unit_type_bits": 2,
         "map_type": 'sz'},
+    "2s3z_exp": {
+        "n_agents": 5,
+        "n_enemies": 5,
+        "limit": 120,
+        "a_race": "P",
+        "b_race": "P",
+        "unit_type_bits": 2,
+        "map_type": 'sz'},
     "3s5z": {
         "n_agents": 8,
         "n_enemies": 8,
