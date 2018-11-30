@@ -159,7 +159,9 @@ class SC2(MultiAgentEnv):
 
         self.stalker_id = self.sentry_id = self.zealot_id = self.colossus_id = 0
         self.marine_id = self.marauder_id= self.medivac_id = 0
-        self.hydralisk_id = 0
+        self.hydralisk_id = self.zergling_id = self.baneling_id = 0
+
+        self.min_unit_type = min_unit_type
 
         if self.map_type == 'sz' or self.map_type == 's_v_z':
             self.stalker_id = min_unit_type
@@ -176,6 +178,9 @@ class SC2(MultiAgentEnv):
             self.stalker_id = min_unit_type
         elif self.map_type == 'colossus':
             self.colossus_id = min_unit_type
+        elif self.map_type == 'ze_ba':
+            self.baneling_id = min_unit_type
+            self.zergling_id = min_unit_type + 1
 
     def _launch(self):
 
@@ -528,7 +533,7 @@ class SC2(MultiAgentEnv):
 
     def unit_max_cooldown(self, agent_id):
 
-        if self.map_type in ['marines', 'm_z']:
+        if self.map_type == 'marines':
             return 15
 
         unit = self.get_unit_by_id(agent_id)
@@ -549,6 +554,10 @@ class SC2(MultiAgentEnv):
             return 13
         if unit.unit_type == self.hydralisk_id:
             return 10
+        if unit.unit_type == self.zergling_id:
+            return 11
+        if unit.unit_type == self.baneling_id:
+            return 1
 
     def unit_max_shield(self, unit):
 
@@ -843,22 +852,18 @@ class SC2(MultiAgentEnv):
     def get_unit_type_id(self, unit, ally):
 
         if ally: # we use new SC2 unit types
-
-            if self.map_type == 'sz':
-                type_id = unit.unit_type - self.stalker_id
-            elif self.map_type == 'MMM':
-                if unit.unit_type == self.marauder_id:
-                    type_id = 0
-                elif unit.unit_type == self.marine_id:
-                    type_id = 1
-                else:
-                    type_id = 2
+            type_id = unit.unit_type - self.min_unit_type
 
         else: # 'We use default SC2 unit types'
 
             if self.map_type == 'sz':
                 # id(Stalker) = 74, id(Zealot) = 73
                 type_id = unit.unit_type - 73
+            if self.map_type == 'ze_ba':
+                if unit.unit_type == 9:
+                    type_id = 0
+                else:
+                    type_id = 1
             elif self.map_type == 'MMM':
                 if unit.unit_type == 51:
                     type_id = 0

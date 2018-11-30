@@ -135,7 +135,7 @@ map_param_registry = {
         "a_race": "T",
         "b_race": "P",
         "unit_type_bits": 0,
-        "map_type": 'm_z'},
+        "map_type": 'marines'},
     "micro_corridor": {
         "n_agents": 6,
         "n_enemies": 24,
@@ -168,6 +168,14 @@ map_param_registry = {
         "b_race": "Z",
         "unit_type_bits": 0,
         "map_type": 'zealots'},
+    "micro_bane": {
+        "n_agents": 24,
+        "n_enemies": 24,
+        "limit": 200,
+        "a_race": "Z",
+        "b_race": "Z",
+        "unit_type_bits": 2,
+        "map_type": 'ze_ba'},
     "micro_colossus": {
         "n_agents": 2,
         "n_enemies": 64,
