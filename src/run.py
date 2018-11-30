@@ -109,7 +109,8 @@ def run_sequential(args, logger):
     }
 
     buffer = ReplayBuffer(scheme, groups, args.buffer_size, env_info["episode_limit"] + 1,
-                          preprocess=preprocess, device=args.device)
+                          preprocess=preprocess,
+                          device="cpu" if args.buffer_cpu_only else args.device)
 
     # Setup multiagent controller here
     mac = mac_REGISTRY[args.mac](buffer.scheme, groups, args)
@@ -179,6 +180,9 @@ def run_sequential(args, logger):
             # Truncate batch to only filled timesteps
             max_ep_t = episode_sample.max_t_filled()
             episode_sample = episode_sample[:, :max_ep_t]
+
+            if episode_sample.device != args.device:
+                episode_sample.to(args.device)
 
             learner.train(episode_sample, runner.t_env, episode)
 
