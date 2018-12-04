@@ -16,8 +16,8 @@ server_list = [
     # ("saruman", [0,1,2,3,4,5,6], 2),
 ]
 
-label = "smac_arxiv__qmix_runs__27_Nov_2018__v3"
-config = "qmix_smac"
+label = "smac_arxiv__coma_runs__4_Dec_2018__v1"
+config = "coma_smac"
 env_config = "sc2"
 
 n_repeat = 5 # Just incase some die
@@ -38,7 +38,7 @@ shared_params = {
     "log_interval": 20000,
     "runner_log_interval": 20000,
     "learner_log_interval": 20000,
-    "buffer_cpu_only": True, # 5k buffer is too big for VRAM!
+    # "buffer_cpu_only": True, # 5k buffer is too big for VRAM!
 }
 
 maps = []
@@ -58,11 +58,11 @@ maps += ["micro_colossus"]
 maps += ["micro_corridor"]
 maps += ["micro_focus"]
 maps += ["micro_retarget"]
-# maps += ["micro_bane"]
+maps += ["micro_bane"]
 
 for map_name in maps:
 
-    name = "qmix__{}".format(map_name)
+    name = "coma__{}".format(map_name)
     extend_param_dicts(param_dicts, shared_params,
         {
             "name": name,
