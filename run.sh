@@ -14,11 +14,7 @@ fi
 
 NV_GPU="$GPU" ${cmd} run \
     --name $name \
-    --cap-add=SYS_PTRACE \
-    --net host \
     --user $(id -u) \
     -v `pwd`:/pymarl \
-    -v /tmp/.X11-unix:/tmp/.X11-unix \
-    -e DISPLAY=unix$DISPLAY \
     -t pymarl/refactor \
     ${@:2}
