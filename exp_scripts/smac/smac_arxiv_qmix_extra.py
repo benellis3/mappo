@@ -1,17 +1,14 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("oc_gpu_1", [0,1], 3),
-    ("oc_gpu_2", [0,1], 3),
-    ("oc_gpu_3", [0,1], 3),
-    ("oc_gpu_4", [0,1], 3),
+    ("gollum", [2], 1),
 ]
 
-label = "smac_arxiv__iql_runs__oracle__28_Dec_2018__v4"
+label = "smac_arxiv__qmix_runs__7_Jan_2018__v1_extra"
 config = "qmix_smac"
 env_config = "sc2"
 
-n_repeat = 12 # Just incase some die
+n_repeat = 2 # Just incase some die
 
 parallel_repeat = 1
 
@@ -35,30 +32,28 @@ shared_params = {
 maps = []
 
 # Symmetric (6)
-maps += ["3m", "8m", "25m", "2s3z", "3s5z", "MMM"]
-
-# Asymmetric (6)
-maps += ["5m_6m", "8m_9m", "10m_11m", "27m_30m"]
-maps += ["MMM2", "3s5z_3s6z"]
-
-# Micro (10)
-maps += ["3s_vs_3z", "3s_vs_4z", "3s_vs_5z"]
-maps += ["micro_2M_Z"]
-maps += ["micro_baneling"]
-maps += ["micro_colossus"]
-maps += ["micro_corridor"]
-maps += ["micro_focus"]
-maps += ["micro_retarget"]
+# maps += ["3m", "8m", "25m", "2s3z", "3s5z", "MMM"]
+#
+# # Asymmetric (6)
+# maps += ["5m_6m", "8m_9m", "10m_11m", "27m_30m"]
+# maps += ["MMM2", "3s5z_3s6z"]
+#
+# # Micro (10)
+# maps += ["3s_vs_3z", "3s_vs_4z", "3s_vs_5z"]
+# maps += ["micro_2M_Z"]
+# maps += ["micro_baneling"]
+# maps += ["micro_colossus"]
+# maps += ["micro_corridor"]
+# maps += ["micro_focus"]
+# maps += ["micro_retarget"]
 maps += ["micro_bane"]
-
 
 for map_name in maps:
 
-    name = "iql__{}".format(map_name)
+    name = "qmix__{}".format(map_name)
     extend_param_dicts(param_dicts, shared_params,
         {
             "name": name,
-            "mixer": None,
             "env_args.map_name": map_name
         },
         repeats=parallel_repeat)
