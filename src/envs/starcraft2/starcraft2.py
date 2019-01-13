@@ -359,10 +359,7 @@ class SC2(MultiAgentEnv):
 
         if action == 0:
             # no-op (valid only when dead)
-            try:
-                assert unit.health == 0, "No-op chosen but the agent's unit is not dead"
-            except Exception as e:
-                pass
+            assert unit.health == 0, "No-op chosen but the agent's unit is not dead"
             if self.debug_inputs:
                 print("Agent %d: Dead"% a_id)
             return None

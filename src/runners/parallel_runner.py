@@ -120,8 +120,9 @@ class ParallelRunner:
             # Send actions to each env
             action_idx = 0
             for idx, parent_conn in enumerate(self.parent_conns):
-                if not terminated[idx]:
-                    parent_conn.send(("step", cpu_actions[action_idx]))
+                if idx in envs_not_terminated: # We produced actions for this env
+                    if not terminated[idx]: # Only send the actions to the env if it hasn't terminated
+                        parent_conn.send(("step", cpu_actions[action_idx]))
                     action_idx += 1 # actions is not a list over every env
 
             # Post step data we will insert for the current timestep
