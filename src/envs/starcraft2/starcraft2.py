@@ -101,7 +101,7 @@ class SC2(MultiAgentEnv):
         self.continuing_episode = args.continuing_episode
         self.seed = args.seed
         self.heuristic = args.heuristic
-        self.window_size = (1920, 1200)
+        self.window_size = (2560, 1600)
         self.save_replay_prefix = args.save_replay_prefix
         self.restrict_actions = args.restrict_actions
 
