@@ -5,91 +5,91 @@ import pprint
 maps = {
     "3m":
     {
-        "qmix": "brown/qmix__3m__2018-11-28_13-08-08",
+        "qmix": "brown/qmix__3m__2018-11-27_21-44-12"
     },
     "8m":
     {
-        "qmix": "brown/qmix__8m__2018-12-01_04-16-28",
+        "qmix": "brown/qmix__8m__2018-12-01_01-13-10"
     },
     "25m":
     {
-        "qmix": "dgx1/qmix__25m__2018-12-02_03-59-59",
+        "qmix": "dgx1/qmix__25m__2018-11-30_13-19-59"
     },
     "5m_6m":
     {
-        "qmix": "gandalf/qmix__5m_6m__2018-11-30_00-51-25",
+        "qmix": "woma/qmix__5m_6m__2018-11-28_17-09-20"
     },
     "8m_9m":
     {
-        "qmix": "woma/qmix__8m_9m__2018-11-30_08-06-54",
+        "qmix": "savitar/qmix__8m_9m__2018-11-29_23-54-30"
     },
     "10m_11m":
     {
-        "qmix": "savitar/qmix__10m_11m__2018-11-30_06-50-09",
+        "qmix": "savitar/qmix__10m_11m__2018-11-28_16-30-44"
     },
     "27m_30m":
     {
-        "qmix": "savitar/qmix__27m_30m__2018-11-30_14-08-47",
+        "qmix": "savitar/qmix__27m_30m__2018-11-30_14-08-47"
     },
     "MMM":
     {
-        "qmix": "gandalf/qmix__MMM__2018-12-01_13-12-55",
+        "qmix": "gandalf/qmix__MMM__2018-11-27_21-48-03"
     },
     "MMM2":
     {
-        "qmix": "savitar/qmix__MMM2__2018-11-29_12-45-12",
+        "qmix": "savitar/qmix__MMM2__2018-11-28_17-21-45"
     },
     "2s3z":
     {
-        "qmix": "dgx1/qmix__2s3z__2018-11-30_02-44-28",
+        "qmix": "dgx1/qmix__2s3z__2018-11-27_21-46-40"
     },
     "3s5z":
     {
-        "qmix": "gandalf/qmix__3s5z__2018-11-30_05-42-52",
+        "qmix": "gandalf/qmix__3s5z__2018-11-27_21-47-22"
     },
     "3s5z_3s6z":
     {
-        "qmix": "savitar/qmix__3s5z_3s6z__2018-11-27_21-53-00",
+        "qmix": "savitar/qmix__3s5z_3s6z__2018-11-28_14-48-35"
     },
     "3s_vs_3z":
     {
-        "qmix": "savitar/qmix__3s_vs_3z__2018-11-28_11-21-17",
+        "qmix": "savitar/qmix__3s_vs_3z__2018-11-27_21-53-29"
     },
     "3s_vs_4z":
     {
-        "qmix": "gandalf/qmix__3s_vs_4z__2018-11-29_23-16-18",
+        "qmix": "gandalf/qmix__3s_vs_4z__2018-11-30_19-33-35"
     },
     "3s_vs_5z":
     {
-        "qmix": "brown/qmix__3s_vs_5z__2018-11-30_02-13-17",
+        "qmix": "brown/qmix__3s_vs_5z__2018-11-29_07-10-51"
     },
     "micro_2M_Z":
     {
-        "qmix": "brown/qmix__micro_2M_Z__2018-11-30_07-10-04",
+        "qmix": "brown/qmix__micro_2M_Z__2018-11-27_21-55-29"
     },
     "micro_corridor":
     {
-        "qmix": "gollum/qmix__micro_corridor__2018-11-29_18-43-15",
+        "qmix": "gollum/qmix__micro_corridor__2018-11-29_18-43-15"
     },
     "micro_focus":
     {
-        "qmix": "gollum/qmix__micro_focus__2018-11-30_03-30-34",
+        "qmix": "gollum/qmix__micro_focus__2018-11-30_16-49-48"
     },
     "micro_retarget":
     {
-        "qmix": "gollum/qmix__micro_retarget__2018-11-29_02-27-19",
+        "qmix": "gollum/qmix__micro_retarget__2018-11-29_06-51-21"
     },
     "micro_baneling":
     {
-        "qmix": "gandalf/qmix__micro_baneling__2018-11-30_12-37-24",
+        "qmix": "gandalf/qmix__micro_baneling__2018-11-27_21-56-16"
     },
     "micro_bane":
     {
-        "qmix": "dgx1/qmix__micro_bane__2018-12-05_01-23-13r",
+        "qmix": "dgx1/qmix__micro_bane__2018-12-03_17-23-20"
     },
     "micro_colossus":
     {
-        "qmix": "gandalf/qmix__micro_colossus__2018-11-27_21-57-32",
+        "qmix": "gandalf/qmix__micro_colossus__2018-11-29_13-08-00"
     },
 }
 
