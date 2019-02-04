@@ -110,9 +110,6 @@ for i, map_name in enumerate(maps.keys()):
         load_step = 0  # max
         test_nepisode = 2
 
-        if map_name != "micro_2M_Z":
-            continue
-
         command = "python3 src/main.py --config={} --env-config=sc2 with env_args.map_name={} checkpoint_path={} load_step={} evaluate=True save_replay=True test_nepisode={} env_args.save_replay_prefix={} no-mongo=True runner=episode env_args.debug=True".format(
             method,
             map_name,
