@@ -5,91 +5,135 @@ import pprint
 maps = {
     "3m":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "brown/qmix__3m__2018-11-27_21-44-12"
     },
     "8m":
     {
-        "qmix": "brown/qmix__8m__2018-12-01_01-13-10"
+        "coma": "",
+        "iql": "",
+        "qmix": "brown/qmix__8m__2018-12-01_08-00-51"
     },
     "25m":
     {
-        "qmix": "dgx1/qmix__25m__2018-11-30_13-19-59"
+        "coma": "",
+        "iql": "",
+        "qmix": "dgx1/qmix__25m__2018-12-02_06-00-59"
     },
     "5m_6m":
     {
-        "qmix": "woma/qmix__5m_6m__2018-11-28_17-09-20"
+        "coma": "",
+        "iql": "",
+        "qmix": "woma/qmix__5m_6m__2018-11-30_14-11-07"
     },
     "8m_9m":
     {
-        "qmix": "savitar/qmix__8m_9m__2018-11-29_23-54-30"
+        "coma": "",
+        "iql": "",
+        "qmix": "woma/qmix__8m_9m__2018-11-28_22-04-57"
     },
     "10m_11m":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "savitar/qmix__10m_11m__2018-11-28_16-30-44"
     },
     "27m_30m":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "savitar/qmix__27m_30m__2018-11-30_14-08-47"
     },
     "MMM":
     {
-        "qmix": "gandalf/qmix__MMM__2018-11-27_21-48-03"
+        "coma": "",
+        "iql": "",
+        "qmix": "gandalf/qmix__MMM__2018-12-03_12-22-52"
     },
     "MMM2":
     {
-        "qmix": "savitar/qmix__MMM2__2018-11-28_17-21-45"
+        "coma": "",
+        "iql": "",
+        "qmix": "savitar/qmix__MMM2__2018-11-29_08-30-08"
     },
     "2s3z":
     {
-        "qmix": "dgx1/qmix__2s3z__2018-11-27_21-46-40"
+        "coma": "",
+        "iql": "",
+        "qmix": "dgx1/qmix__2s3z__2018-11-30_19-54-29"
     },
     "3s5z":
     {
-        "qmix": "gandalf/qmix__3s5z__2018-11-27_21-47-22"
+        "coma": "",
+        "iql": "",
+        "qmix": "gandalf/qmix__3s5z__2018-12-02_08-11-59"
     },
     "3s5z_3s6z":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "savitar/qmix__3s5z_3s6z__2018-11-28_14-48-35"
     },
     "3s_vs_3z":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "savitar/qmix__3s_vs_3z__2018-11-27_21-53-29"
     },
     "3s_vs_4z":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "gandalf/qmix__3s_vs_4z__2018-11-30_19-33-35"
     },
     "3s_vs_5z":
     {
-        "qmix": "brown/qmix__3s_vs_5z__2018-11-29_07-10-51"
+        "coma": "",
+        "iql": "",
+        "qmix": "brown/qmix__3s_vs_5z__2018-11-30_21-39-27"
     },
     "micro_2M_Z":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "brown/qmix__micro_2M_Z__2018-11-27_21-55-29"
     },
     "micro_corridor":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "gollum/qmix__micro_corridor__2018-11-29_18-43-15"
     },
     "micro_focus":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "gollum/qmix__micro_focus__2018-11-30_16-49-48"
     },
     "micro_retarget":
     {
-        "qmix": "gollum/qmix__micro_retarget__2018-11-29_06-51-21"
+        "coma": "",
+        "iql": "",
+        "qmix": "gollum/qmix__micro_retarget__2018-11-28_13-55-48"
     },
     "micro_baneling":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "gandalf/qmix__micro_baneling__2018-11-27_21-56-16"
     },
     "micro_bane":
     {
+        "coma": "",
+        "iql": "",
         "qmix": "dgx1/qmix__micro_bane__2018-12-03_17-23-20"
     },
     "micro_colossus":
     {
-        "qmix": "gandalf/qmix__micro_colossus__2018-11-29_13-08-00"
+        "coma": "",
+        "iql": "",
+        "qmix": "gandalf/qmix__micro_colossus__2018-12-04_18-21-13"
     },
 }
 
@@ -103,7 +147,13 @@ for i, map_name in enumerate(maps.keys()):
 
     experiment = maps[map_name]
 
+    if map_name != "25m":
+        continue
+
     for method, path in experiment.items():
+
+        if not path:
+            continue
 
         checkpoint_path = os.path.join(dir_prefix, path)
 
