@@ -1,10 +1,14 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    # ("saruman", [0,1,2,3,4,5,6], 2),
+    ("smac1", [0,1], 3),
+    ("smac2", [0,1], 3),
+    ("smac3", [0,1], 3),
+    ("smac4", [0,1], 3),
 ]
 
 label = "journal_vdn_runs__5_Mar_2019__v1"
+# label = "testing"
 config = "vdn_smac"
 env_config = "sc2"
 
@@ -35,18 +39,18 @@ maps = []
 maps += ["3m", "8m", "25m", "2s3z", "3s5z", "MMM"]
 
 # Asymmetric (6)
-maps += ["5m_vs_6m", "8m_vs_9m", "10m_vs_11m", "27m_vs_30m"]
-maps += ["MMM2", "3s5z_vs_3s6z"]
+maps += ["5m_6m", "8m_9m", "10m_11m", "27m_30m"]
+maps += ["MMM2", "3s5z_3s6z"]
 
 # Micro (10)
 maps += ["3s_vs_3z", "3s_vs_4z", "3s_vs_5z"]
-maps += ["2m_vs_1z"]
-maps += ["2s_vs_1sc"]
-maps += ["6h_vs_8z"]
-maps += ["corridor"]
-maps += ["bane_vs_bane"]
-maps += ["so_many_banelings"]
-maps += ["2c_vs_64zg"]
+maps += ["micro_2M_Z"]
+maps += ["micro_baneling"]
+maps += ["micro_colossus"]
+maps += ["micro_corridor"]
+maps += ["micro_focus"]
+maps += ["micro_retarget"]
+maps += ["micro_bane"]
 
 for map_name in maps:
 
