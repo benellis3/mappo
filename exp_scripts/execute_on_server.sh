@@ -17,7 +17,7 @@ echo "EXP_DIR: $EXP_DIR"
 # Update the git repo
 echo "Updating git repo"
 #mkdir -p $EXP_DIR/deepmarl
-cd $EXP_DIR/pymarl
+cd $EXP_DIR/pymarl-dev
 # echo "REMEMBER TO ALLOW UPDATING OF THE REPO IN execute_on_server.sh AFTER TESTING!"
 git fetch -q origin
 git reset --hard origin/refactor -q

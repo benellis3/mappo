@@ -26,72 +26,28 @@ RUN apt-get -y install python3
 RUN apt-get -y install python3-pip
 RUN pip3 install --upgrade pip
 RUN pip3 install numpy scipy pyyaml matplotlib
-RUN pip3 install imageio
+RUN pip3 install imageio pygame
 RUN pip3 install tensorboard-logger
 RUN pip3 install ruamel.base ryd
 
 RUN mkdir /install
 WORKDIR /install
 
-#### -------------------------------------------------------------------
-#### install pytorch
-#### -------------------------------------------------------------------
-
-# RUN git clone https://github.com/csarofeen/pytorch /install/pytorch && cd /install/pytorch 
-# RUN pip3 install numpy pyyaml mkl setuptools cffi
-# RUN apt-get install -y cmake gcc 
-# RUN cd /install/pytorch && python3 setup.py install
-#RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl 
-RUN pip3 install http://download.pytorch.org/whl/cu80/torch-0.3.0.post4-cp35-cp35m-linux_x86_64.whl 
-RUN pip3 install torchvision snakeviz
-
-#### -------------------------------------------------------------------
-#### install MongoDB (for Sacred)
-#### -------------------------------------------------------------------
+# install Sacred (from OxWhirl fork)
+RUN pip3 install setuptools
+RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /install/sacred && python3 setup.py install
 
 # Install pymongo
 RUN pip3 install pymongo
 
 #### -------------------------------------------------------------------
-#### install pysc2 (from Mika fork)
+#### install pytorch
 #### -------------------------------------------------------------------
+RUN pip3 install torch
+RUN pip3 install torchvision snakeviz pytest probscale
 
-RUN git clone https://github.com/samvelyan/pysc2.git /install/pysc2
-RUN pip3 install /install/pysc2/
-
-#### -------------------------------------------------------------------
-#### install Sacred (from OxWhirl fork)
-#### -------------------------------------------------------------------
-
-RUN pip3 install setuptools
-RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /install/sacred && python3 setup.py install
-
-#### -------------------------------------------------------------------
-#### final steps
-#### -------------------------------------------------------------------
-RUN pip3 install pygame
-
-#### -------------------------------------------------------------------
-#### Plotting tools
-#### -------------------------------------------------------------------
-
-# RUN apt-get -y install ipython ipython-notebook
-RUN pip3 install statsmodels pandas seaborn
-RUN mkdir /pool && echo "export PATH=$PATH:'/pool/pool'" >> ~/.bashrc
-# RUN cd /pool && git clone https://github.com/oxwhirl/pool.git pool-repo &&  ln -s pool-repo/pool && git submodule update --init --recursive
-
-RUN pip3 install cloudpickle
-
-RUN pip3 install tensorboard
-
-EXPOSE 8888
-
+## -- SMAC
+RUN pip3 install git+https://github.com/oxwhirl/smac.git
+ENV SC2PATH /pymarl/3rdparty/StarCraftII
 
 WORKDIR /pymarl
-# RUN echo "mongod --fork --logpath /var/log/mongod.log" >> ~/.bashrc
-#CMD ["mongod", "--fork", "--logpath", "/var/log/mongod.log"]
-# EXPOSE 27017
-# EXPOSE 28017
-
-# CMD service mongod start && tail -F /dev/null
-

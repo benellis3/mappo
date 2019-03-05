@@ -14,10 +14,10 @@ cd $EXP_DIR
 if [ ! -d "pymarl" ]; then
     echo "Cloning pymarl repo"
     # If this doesn't work on a server you might have to manually connect and clone the repo for the first time
-    git clone git@github.com:oxwhirl/pymarl.git
+    git clone git@github.com:oxwhirl/pymarl-dev.git
 fi
 
-cd $EXP_DIR/pymarl
+cd $EXP_DIR/pymarl-dev
 
 git fetch -q origin
 git reset --hard origin/refactor -q

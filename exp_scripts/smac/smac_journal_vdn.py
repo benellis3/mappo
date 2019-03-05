@@ -8,9 +8,9 @@ label = "journal_vdn_runs__5_Mar_2019__v1"
 config = "vdn_smac"
 env_config = "sc2"
 
-n_repeat = 5 # Just incase some die
+n_repeat = 12 # Just incase some die
 
-parallel_repeat = 3
+parallel_repeat = 1
 
 param_dicts = []
 
