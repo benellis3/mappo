@@ -16,5 +16,5 @@ NV_GPU="$GPU" ${cmd} run \
     --name $name \
     --user $(id -u) \
     -v `pwd`:/pymarl \
-    -t pymarl/refactor \
+    -t pymarl \
     ${@:2}
