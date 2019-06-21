@@ -9,6 +9,7 @@ class QMixer(nn.Module):
         super(QMixer, self).__init__()
 
         self.args = args
+
         self.n_agents = args.n_agents
         self.state_dim = int(np.prod(args.state_shape))
 
@@ -38,6 +39,9 @@ class QMixer(nn.Module):
                                nn.ReLU(),
                                nn.Linear(self.embed_dim, 1))
 
+        if self.args.gated:
+            self.gate = nn.Parameter(th.ones(size=(1,)) * 0.5)
+
     def forward(self, agent_qs, states):
         bs = agent_qs.size(0)
         states = states.reshape(-1, self.state_dim)
@@ -57,8 +61,12 @@ class QMixer(nn.Module):
         s = 0
         if self.args.skip_connections:
             s = agent_qs.sum(dim=2, keepdim=True)
-        # Compute final output
-        y = th.bmm(hidden, w_final) + v + s
+
+        if self.args.gated:
+            y = th.bmm(hidden, w_final) * self.gate + v + s
+        else:
+            # Compute final output
+            y = th.bmm(hidden, w_final) + v + s
         # Reshape and return
         q_tot = y.view(bs, -1, 1)
         return q_tot

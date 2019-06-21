@@ -21,6 +21,7 @@ double_q: True
 mixer: "qmix"
 mixing_embed_dim: 32
 skip_connections: False
+gated: False
 hyper_initialization_nonzeros: 0
 
 name: "qmix_smac_parallel"
