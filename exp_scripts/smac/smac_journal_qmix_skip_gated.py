@@ -1,10 +1,10 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("gollum", [2,3], 3),
+    ("gollum", [6,7], 3),
 ]
 
-label = "journal_skip_gated_connections_test__21_June_2019_v1"
+label = "journal_skip_gated_connections_test__24_June_2019_v1"
 config = "qmix_smac"
 env_config = "sc2"
 
