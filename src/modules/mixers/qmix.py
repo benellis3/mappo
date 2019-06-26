@@ -18,6 +18,16 @@ class QMixer(nn.Module):
         self.hyper_w_1 = nn.Linear(self.state_dim, self.embed_dim * self.n_agents)
         self.hyper_w_final = nn.Linear(self.state_dim, self.embed_dim)
 
+        if getattr(self.args, "hypernet_layers", 1) > 1:
+            assert self.args.hypernet_layers == 2, "Only 1 or 2 hypernet_layers is supported atm!"
+            hypernet_embed = self.args.hypernet_embed
+            self.hyper_w_1 = nn.Sequential(nn.Linear(self.state_dim, hypernet_embed),
+                                           nn.ReLU(),
+                                           nn.Linear(hypernet_embed, self.embed_dim * self.n_agents))
+            self.hyper_w_final = nn.Sequential(nn.Linear(self.state_dim, hypernet_embed),
+                                           nn.ReLU(),
+                                           nn.Linear(hypernet_embed, self.embed_dim))
+
         # Initialise the hyper networks with a fixed variance, if specified
         if self.args.hyper_initialization_nonzeros > 0:
             std = self.args.hyper_initialization_nonzeros ** -0.5
