@@ -18,7 +18,7 @@ env_args:
   obs_own_health: True          # Whether agents receive their own health as a part of observation
   obs_all_health: True          # Whether agents receive the health of all units (in the sight range) as a part of observataion
   continuing_episode: False     # Stop/continue episode after its termination
-  game_version: "4.1.2"         # Ignored for Mac/Windows
+  game_version: "4.8.2"
   save_replay_prefix: ""        # Prefix of the replay to be saved
   heuristic: False              # Whether or not use a simple nonlearning hearistic as a controller
   restrict_actions: True
