@@ -7,6 +7,8 @@ from .matrix_game import NormalFormMatrixGame
 from .test import IntegrationTestEnv
 from .multiagentenv import MultiAgentEnv
 from .stag_hunt import StagHunt
+#from .starcraft2 import StarCraft2Env
+from smac.env import MultiAgentEnv, StarCraft2Env
 
 
 # TODO: Do we need this?
@@ -24,6 +26,7 @@ REGISTRY["matrix_game"] = partial(env_fn, env=NormalFormMatrixGame)
 REGISTRY["integration_test"] = partial(env_fn, env=IntegrationTestEnv)
 REGISTRY["box_push"] = partial(env_fn, env=CoopBoxPushing)
 REGISTRY["stag_hunt"] = partial(env_fn, env=StagHunt)
+REGISTRY["sc2"] = partial(env_fn, env=StarCraft2Env)
 
 try:
     from .starcraft1 import StarCraft1Env
@@ -31,8 +34,3 @@ try:
                               env=StarCraft1Env)
 except Exception as e:
     print(e)
-
-from .starcraft2 import StarCraft2Env
-REGISTRY["sc2"] = partial(env_fn,
-                          env=StarCraft2Env)
-
