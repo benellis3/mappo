@@ -9,6 +9,7 @@ class QMixer(nn.Module):
         super(QMixer, self).__init__()
 
         self.args = args
+
         self.n_agents = args.n_agents
         self.state_dim = int(np.prod(args.state_shape))
 
@@ -16,6 +17,16 @@ class QMixer(nn.Module):
 
         self.hyper_w_1 = nn.Linear(self.state_dim, self.embed_dim * self.n_agents)
         self.hyper_w_final = nn.Linear(self.state_dim, self.embed_dim)
+
+        if getattr(self.args, "hypernet_layers", 1) > 1:
+            assert self.args.hypernet_layers == 2, "Only 1 or 2 hypernet_layers is supported atm!"
+            hypernet_embed = self.args.hypernet_embed
+            self.hyper_w_1 = nn.Sequential(nn.Linear(self.state_dim, hypernet_embed),
+                                           nn.ReLU(),
+                                           nn.Linear(hypernet_embed, self.embed_dim * self.n_agents))
+            self.hyper_w_final = nn.Sequential(nn.Linear(self.state_dim, hypernet_embed),
+                                           nn.ReLU(),
+                                           nn.Linear(hypernet_embed, self.embed_dim))
 
         # Initialise the hyper networks with a fixed variance, if specified
         if self.args.hyper_initialization_nonzeros > 0:
@@ -26,9 +37,9 @@ class QMixer(nn.Module):
             self.hyper_w_final.bias.data.normal_(std=std)
 
         # Initialise the hyper-network of the skip-connections, such that the result is close to VDN
-        if self.args.skip_connections:
-            self.skip_connections = nn.Linear(self.state_dim, self.args.n_agents, bias=True)
-            self.skip_connections.bias.data.fill_(1.0)  # bias produces initial VDN weights
+        # if self.args.skip_connections:
+        #     self.skip_connections = nn.Linear(self.state_dim, self.args.n_agents, bias=True)
+        #     self.skip_connections.bias.data.fill_(1.0)  # bias produces initial VDN weights
 
         # State dependent bias for hidden layer
         self.hyper_b_1 = nn.Linear(self.state_dim, self.embed_dim)
@@ -37,6 +48,9 @@ class QMixer(nn.Module):
         self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),
                                nn.ReLU(),
                                nn.Linear(self.embed_dim, 1))
+
+        if self.args.gated:
+            self.gate = nn.Parameter(th.ones(size=(1,)) * 0.5)
 
     def forward(self, agent_qs, states):
         bs = agent_qs.size(0)
@@ -56,10 +70,13 @@ class QMixer(nn.Module):
         # Skip connections
         s = 0
         if self.args.skip_connections:
-            ws = th.abs(self.skip_connections(states)).view(-1, self.n_agents, 1)
-            s = th.bmm(agent_qs, ws)
-        # Compute final output
-        y = th.bmm(hidden, w_final) + v + s
+            s = agent_qs.sum(dim=2, keepdim=True)
+
+        if self.args.gated:
+            y = th.bmm(hidden, w_final) * self.gate + v + s
+        else:
+            # Compute final output
+            y = th.bmm(hidden, w_final) + v + s
         # Reshape and return
         q_tot = y.view(bs, -1, 1)
         return q_tot

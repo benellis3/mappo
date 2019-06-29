@@ -17,10 +17,10 @@ echo "EXP_DIR: $EXP_DIR"
 # Update the git repo
 echo "Updating git repo"
 #mkdir -p $EXP_DIR/deepmarl
-cd $EXP_DIR/pymarl
+cd $EXP_DIR/pymarl-dev
 # echo "REMEMBER TO ALLOW UPDATING OF THE REPO IN execute_on_server.sh AFTER TESTING!"
 git fetch -q origin
 git reset --hard origin/refactor -q
 
 # Run the experiment $N_REPEAT times on GPU $GPU
-bash ./run.sh $GPU_ID "bash exp_scripts/repeat_exp.sh $N_REPEAT $PARAMS" &
+bash ./run.sh $GPU_ID "bash exp_scripts/repeat_exp.sh $N_REPEAT $PARAMS"
