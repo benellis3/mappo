@@ -1,10 +1,10 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("gollum", [5,7], 1),
+    ("gollum", [4,5,6,7], 1),
 ]
 
-label = "2s3z_qmix_test__11_July_2019"
+label = "2s3z_qmix_test__11_July_2019__v2"
 config = "qmix_smac"
 env_config = "sc2"
 
@@ -38,3 +38,12 @@ extend_param_dicts(param_dicts, shared_params,
     },
     repeats=parallel_repeat)
 
+
+map_name = "2m_vs_1z"
+name = "qmix__{}".format(map_name)
+extend_param_dicts(param_dicts, shared_params,
+                   {
+                       "name": name,
+                       "env_args.map_name": map_name,
+                   },
+                   repeats=parallel_repeat)
