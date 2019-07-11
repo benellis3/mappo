@@ -115,12 +115,6 @@ class ParallelRunner:
             }
             self.batch.update(actions_chosen, bs=envs_not_terminated, ts=self.t, mark_filled=False)
 
-            # Update terminated envs after adding post_transition_data
-            envs_not_terminated = [b_idx for b_idx, termed in enumerate(terminated) if not termed]
-            all_terminated = all(terminated)
-            if all_terminated:
-                break
-
             # Send actions to each env
             action_idx = 0
             for idx, parent_conn in enumerate(self.parent_conns):
@@ -141,6 +135,12 @@ class ParallelRunner:
                 "avail_actions": [],
                 "obs": []
             }
+
+            # Update terminated envs after adding post_transition_data
+            envs_not_terminated = [b_idx for b_idx, termed in enumerate(terminated) if not termed]
+            all_terminated = all(terminated)
+            if all_terminated:
+                break
 
             # Receive data back for each unterminated env
             for idx, parent_conn in enumerate(self.parent_conns):
