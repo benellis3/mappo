@@ -4,7 +4,7 @@ server_list = [
     ("gandalf", [0,1,2,3,4,5,6], 3),
 ]
 
-label = "hypernet_test__17_July_2019_v1"
+label = "hypernet_test__17_July_2019_v2"
 config = "qmix_journal"
 env_config = "sc2"
 
