@@ -87,7 +87,7 @@ class QLearner:
 
         # Td loss
         td_target_qs = target_counter_qs.gather(1, cur_max_actions.view(-1, 1))
-        td_chosen_qs = counter_qs.gather(1, actions.view(-1, 1))
+        td_chosen_qs = counter_qs.gather(1, actions.contiguous().view(-1, 1))
         td_targets = rewards.repeat(1,1,self.args.n_agents).view(-1, 1) + self.args.gamma * (1 - terminated.repeat(1,1,self.args.n_agents).view(-1, 1)) * td_target_qs
         td_error = (td_chosen_qs - td_targets.detach())
 
@@ -137,7 +137,7 @@ class QLearner:
             mask_elems = mask.sum().item()
             self.logger.log_stat("td_error_abs", (masked_td_error.abs().sum().item()/mask_elems), t_env)
             self.logger.log_stat("q_taken_mean", (chosen_action_qvals * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
-            self.logger.log_stat("target_mean", (td_targets * td_mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
+            self.logger.log_stat("target_mean", (masked_td_error).sum().item()/td_mask.sum().item(), t_env)
             if self.args.gated:
                 self.logger.log_stat("gate", self.mixer.gate.cpu().item(), t_env)
             self.log_stats_t = t_env
