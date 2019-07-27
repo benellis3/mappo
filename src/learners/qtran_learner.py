@@ -19,23 +19,11 @@ class QLearner:
         self.last_target_update_episode = 0
 
         self.mixer = None
-        if args.mixer is not None:
-            if args.mixer == "vdn":
-                self.mixer = VDNMixer()
-            elif args.mixer == "qmix":
-                self.mixer = QMixer(args)
-            elif args.mixer == "qmix_ns":
-                self.mixer = QMixerNS(args)
-            elif args.mixer == "qmix_lin":
-                self.mixer = QMixerLin(args)
-            elif args.mixer == "vdn_state":
-                self.mixer = VDNState(args)
-            elif args.mixer == "qtran_alt":
-                self.mixer = QTranAlt(args)
-            else:
-                raise ValueError("Mixer {} not recognised.".format(args.mixer))
-            self.params += list(self.mixer.parameters())
-            self.target_mixer = copy.deepcopy(self.mixer)
+        assert args.mixer == "qtran_alt"
+        self.mixer = QTranAlt(args)
+
+        self.params += list(self.mixer.parameters())
+        self.target_mixer = copy.deepcopy(self.mixer)
 
         self.optimiser = RMSprop(params=self.params, lr=args.lr, alpha=args.optim_alpha, eps=args.optim_eps)
 
@@ -76,41 +64,62 @@ class QLearner:
 
         # Mask out unavailable actions
         target_mac_out[avail_actions[:, 1:] == 0] = -9999999  # From OG deepmarl
+        mac_out_maxs = mac_out.clone().detach()
+        mac_out_maxs[avail_actions == 0] = -9999999
 
-        # Max over target Q-Values
-        if self.args.double_q:
-            # Get actions that maximise live Q (for double q-learning)
-            mac_out_detach = mac_out.clone().detach()
-            mac_out_detach[avail_actions == 0] = -9999999
-            cur_max_actions = mac_out_detach[:, 1:].max(dim=3, keepdim=True)[1]
-            target_max_qvals = th.gather(target_mac_out, 3, cur_max_actions).squeeze(3)
-        else:
-            target_max_qvals = target_mac_out.max(dim=3)[0]
+        # Best joint action computed by target agents
+        cur_max_actions = target_mac_out.max(dim=3, keepdim=True)[1]
+        # Best joint-action computed by regular agents
+        max_actions_qvals, max_actions_current = mac_out_maxs[:, :-1].max(dim=3, keepdim=True)
 
-        if self.args.mixer == "qtran_alt":
-            counter_qs, vs = self.mixer(batch[:, :-1])
-            target_counter_qs, target_vs = self.target_mixer(batch[:, 1:])
+        counter_qs, vs = self.mixer(batch[:, :-1])
 
-            pass
-        else:
-            # Mix
-            if self.mixer is not None:
-                chosen_action_qvals = self.mixer(chosen_action_qvals, batch["state"][:, :-1])
-                target_max_qvals = self.target_mixer(target_max_qvals, batch["state"][:, 1:])
+        # Need to argmax across the target agents' actions
+        # Convert cur_max_actions to one hot
+        max_actions = th.zeros(size=(batch.batch_size, batch.max_seq_length - 1, self.args.n_agents, self.args.n_actions), device=batch.device)
+        max_actions_onehot = max_actions.scatter(3, cur_max_actions, 1)
+        max_actions_onehot_repeat = max_actions_onehot.repeat(1,1,self.args.n_agents,1)
+        agent_mask = (1 - th.eye(self.args.n_agents, device=batch.device))
+        agent_mask = agent_mask.view(-1, 1).repeat(1, self.args.n_actions)#.view(self.n_agents, -1)
+        masked_actions = max_actions_onehot_repeat * agent_mask.unsqueeze(0).unsqueeze(0)
+        masked_actions = masked_actions.view(-1, self.args.n_agents * self.args.n_actions)
+        target_counter_qs, target_vs = self.target_mixer(batch[:, 1:], masked_actions)
 
-            # Calculate 1-step Q-Learning targets
-            targets = rewards + self.args.gamma * (1 - terminated) * target_max_qvals
+        # Td loss
+        td_target_qs = target_counter_qs.gather(1, cur_max_actions.view(-1, 1))
+        td_chosen_qs = counter_qs.gather(1, actions.view(-1, 1))
+        td_targets = rewards.repeat(1,1,self.args.n_agents).view(-1, 1) + self.args.gamma * (1 - terminated.repeat(1,1,self.args.n_agents).view(-1, 1)) * td_target_qs
+        td_error = (td_chosen_qs - td_targets.detach())
 
-            # Td-error
-            td_error = (chosen_action_qvals - targets.detach())
+        td_mask = mask.repeat(1,1,self.args.n_agents).view(-1, 1)
+        masked_td_error = td_error * td_mask
 
-            mask = mask.expand_as(td_error)
+        td_loss = (masked_td_error ** 2).sum() / td_mask.sum()
 
-            # 0-out the targets that came from padded data
-            masked_td_error = td_error * mask
+        # Opt loss
+        # Computing the targets
+        opt_max_actions = th.zeros(size=(batch.batch_size, batch.max_seq_length - 1, self.args.n_agents, self.args.n_actions), device=batch.device)
+        opt_max_actions_onehot = opt_max_actions.scatter(3, max_actions_current, 1)
+        opt_max_actions_onehot_repeat = opt_max_actions_onehot.repeat(1,1,self.args.n_agents,1)
+        agent_mask = (1 - th.eye(self.args.n_agents, device=batch.device))
+        agent_mask = agent_mask.view(-1, 1).repeat(1, self.args.n_actions)#.view(self.n_agents, -1)
+        opt_masked_actions = opt_max_actions_onehot_repeat * agent_mask.unsqueeze(0).unsqueeze(0)
+        opt_masked_actions = opt_masked_actions.view(-1, self.args.n_agents * self.args.n_actions)
 
-            # Normal L2 loss, take mean over actual data
-            loss = (masked_td_error ** 2).sum() / mask.sum()
+        opt_target_qs, opt_vs = self.mixer(batch[:,:-1], opt_masked_actions)
+
+        opt_error = max_actions_qvals.squeeze(3).sum(dim=2, keepdim=True).repeat(1,1,self.args.n_agents).view(-1, 1) - opt_target_qs.gather(1, max_actions_current.view(-1, 1)).detach() + opt_vs
+        opt_loss = ((opt_error * td_mask) ** 2).sum() / td_mask.sum()
+
+        # NOpt loss
+        qsums = chosen_action_qvals.clone().unsqueeze(2).repeat(1,1,self.args.n_agents,1).view(-1, self.args.n_agents)
+        ids_to_zero = th.tensor([i for i in range(self.args.n_agents)], device=batch.device).repeat(batch.batch_size * (batch.max_seq_length - 1))
+        qsums.scatter(1, ids_to_zero.unsqueeze(1), 0)
+        nopt_error = mac_out[:, :-1].view(-1, self.args.n_actions) + qsums.sum(dim=1, keepdim=True) - counter_qs.detach() + vs
+        min_nopt_error = th.min(nopt_error, dim=1, keepdim=True)[0]
+        nopt_loss = ((min_nopt_error * td_mask) ** 2).sum() / td_mask.sum()
+
+        loss = td_loss + self.args.opt_loss * opt_loss + self.args.nopt_min_loss * nopt_loss
 
         # Optimise
         self.optimiser.zero_grad()
@@ -128,7 +137,7 @@ class QLearner:
             mask_elems = mask.sum().item()
             self.logger.log_stat("td_error_abs", (masked_td_error.abs().sum().item()/mask_elems), t_env)
             self.logger.log_stat("q_taken_mean", (chosen_action_qvals * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
-            self.logger.log_stat("target_mean", (targets * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
+            self.logger.log_stat("target_mean", (td_targets * td_mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
             if self.args.gated:
                 self.logger.log_stat("gate", self.mixer.gate.cpu().item(), t_env)
             self.log_stats_t = t_env
