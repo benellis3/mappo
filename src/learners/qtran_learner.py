@@ -115,7 +115,7 @@ class QLearner:
         qsums = chosen_action_qvals.clone().unsqueeze(2).repeat(1,1,self.args.n_agents,1).view(-1, self.args.n_agents)
         ids_to_zero = th.tensor([i for i in range(self.args.n_agents)], device=batch.device).repeat(batch.batch_size * (batch.max_seq_length - 1))
         qsums.scatter(1, ids_to_zero.unsqueeze(1), 0)
-        nopt_error = mac_out[:, :-1].view(-1, self.args.n_actions) + qsums.sum(dim=1, keepdim=True) - counter_qs.detach() + vs
+        nopt_error = mac_out[:, :-1].contiguous().view(-1, self.args.n_actions) + qsums.sum(dim=1, keepdim=True) - counter_qs.detach() + vs
         min_nopt_error = th.min(nopt_error, dim=1, keepdim=True)[0]
         nopt_loss = ((min_nopt_error * td_mask) ** 2).sum() / td_mask.sum()
 
