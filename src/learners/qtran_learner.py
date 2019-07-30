@@ -137,7 +137,7 @@ class QLearner:
             mask_elems = mask.sum().item()
             self.logger.log_stat("td_error_abs", (masked_td_error.abs().sum().item()/mask_elems), t_env)
             self.logger.log_stat("q_taken_mean", (chosen_action_qvals * mask).sum().item()/(mask_elems * self.args.n_agents), t_env)
-            self.logger.log_stat("target_mean", (masked_td_error).sum().item()/td_mask.sum().item(), t_env)
+            self.logger.log_stat("target_mean", (td_targets * td_mask).sum().item()/td_mask.sum().item(), t_env)
             if self.args.gated:
                 self.logger.log_stat("gate", self.mixer.gate.cpu().item(), t_env)
             self.log_stats_t = t_env
