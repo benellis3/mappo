@@ -19,16 +19,35 @@ class QTran(nn.Module):
         # Q(s,-,u-i)
         # Q takes [state, u-i, i] as input
         q_input_size = self.state_dim + (self.n_agents * self.n_actions) + self.n_agents
-        self.Q = nn.Sequential(nn.Linear(q_input_size, self.embed_dim),
-                               nn.ReLU(),
-                               nn.Linear(self.embed_dim, self.embed_dim),
-                               nn.ReLU(),
-                               nn.Linear(self.embed_dim, self.n_actions))
 
-        # V(s)
-        self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),
-                               nn.ReLU(),
-                               nn.Linear(self.embed_dim, 1))
+        if self.args.network_size == "small":
+            self.Q = nn.Sequential(nn.Linear(q_input_size, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.n_actions))
+
+            # V(s)
+            self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, 1))
+        elif self.args.network_size == "big":
+             # Adding another layer
+             self.Q = nn.Sequential(nn.Linear(q_input_size, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.n_actions))
+            # V(s)
+             self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, 1))
+        else:
+            assert False
 
     def forward(self, batch, masked_actions=None):
         bs = batch.batch_size
