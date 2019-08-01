@@ -5,7 +5,7 @@ server_list = [
     ("gandalf", [0,1,2,3,4], 1),
 ]
 
-label = "qtran_test_2__1_Aug_2019_v1"
+label = "qtran_test_2__1_Aug_2019_v2"
 config = "qtran"
 env_config = "sc2"
 
@@ -43,6 +43,7 @@ for map_name in maps:
             "name": name,
             "env_args.map_name": map_name,
             "network_size": "big",
+            "mixing_embed_dim": 128,
             "opt_loss": [1], # td_error and these 2 optimise disjoint parameters, so only their relative scaling is important
             "nopt_min_loss": [0.1, 1, 10],
         },
