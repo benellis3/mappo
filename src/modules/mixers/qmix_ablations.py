@@ -13,7 +13,13 @@ class QMixerLin(nn.Module):
         self.state_dim = int(np.prod(args.state_shape))
         self.embed_dim = args.mixing_embed_dim
 
-        self.hyper_w = nn.Linear(self.state_dim, self.n_agents)
+        self.hyper_w = nn.Linear(self.state_dim, self.n_agents)        
+        if getattr(self.args, "hypernet_layers", 1) > 1:
+            assert self.args.hypernet_layers == 2, "Only 1 or 2 hypernet_layers is supported atm!"
+            hypernet_embed = self.args.hypernet_embed
+            self.hyper_w = nn.Sequential(nn.Linear(self.state_dim, hypernet_embed),
+                                           nn.ReLU(),
+                                           nn.Linear(hypernet_embed, self.n_agents))
 
         # V(s) instead of a bias for the last layers
         self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),

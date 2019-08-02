@@ -44,7 +44,11 @@ for map_name in maps:
         {
             "name": name,
             "env_args.map_name": map_name,
-            "mixer": "qmix_ns"
+            "mixer": "qmix_ns",
+            "skip_connections": [False],
+            "gated": False,
+            "mixing_embed_dim": [32],
+            "hypernet_layers": [2]
         },
         repeats=parallel_repeat)
 
@@ -54,7 +58,11 @@ for map_name in maps:
         {
             "name": name,
             "env_args.map_name": map_name,
-            "mixer": "qmix_lin"
+            "mixer": "qmix_lin",
+            "skip_connections": [False],
+            "gated": False,
+            "mixing_embed_dim": [32],
+            "hypernet_layers": [2]
         },
         repeats=parallel_repeat)
 
@@ -64,7 +72,11 @@ for map_name in maps:
         {
             "name": name,
             "env_args.map_name": map_name,
-            "mixer": "vdn_state"
+            "mixer": "vdn_state",
+            "skip_connections": [False],
+            "gated": False,
+            "mixing_embed_dim": [32],
+            "hypernet_layers": [2]
         },
         repeats=parallel_repeat)
 
