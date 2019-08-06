@@ -122,7 +122,7 @@ class VDNState(nn.Module):
 
 class QMixer2LayerLin(nn.Module):
     def __init__(self, args):
-        super(QMixer, self).__init__()
+        super(QMixer2LayerLin, self).__init__()
 
         self.args = args
 
