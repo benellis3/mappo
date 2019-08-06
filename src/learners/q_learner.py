@@ -2,8 +2,7 @@ import copy
 from components.episode_buffer import EpisodeBatch
 from modules.mixers.vdn import VDNMixer
 from modules.mixers.qmix import QMixer
-from modules.mixers.qmix_ablations import QMixerLin, QMixerNS, VDNState
-from modules.mixers.qtran import QTran as QTranAlt
+from modules.mixers.qmix_ablations import QMixerLin, QMixerNS, VDNState, QMixer2LayerLin
 import torch as th
 from torch.optim import RMSprop
 
@@ -24,14 +23,14 @@ class QLearner:
                 self.mixer = VDNMixer()
             elif args.mixer == "qmix":
                 self.mixer = QMixer(args)
+            elif args.mixer == "qmix_2layerlin":
+                self.mixer = QMixer2LayerLin(args)
             elif args.mixer == "qmix_ns":
                 self.mixer = QMixerNS(args)
             elif args.mixer == "qmix_lin":
                 self.mixer = QMixerLin(args)
             elif args.mixer == "vdn_state":
                 self.mixer = VDNState(args)
-            elif args.mixer == "qtran_alt":
-                self.mixer = QTranAlt(args)
             else:
                 raise ValueError("Mixer {} not recognised.".format(args.mixer))
             self.params += list(self.mixer.parameters())
@@ -87,30 +86,24 @@ class QLearner:
         else:
             target_max_qvals = target_mac_out.max(dim=3)[0]
 
-        if self.args.mixer == "qtran_alt":
-            counter_qs, vs = self.mixer(batch[:, :-1])
-            target_counter_qs, target_vs = self.target_mixer(batch[:, 1:])
+        # Mix
+        if self.mixer is not None:
+            chosen_action_qvals = self.mixer(chosen_action_qvals, batch["state"][:, :-1])
+            target_max_qvals = self.target_mixer(target_max_qvals, batch["state"][:, 1:])
 
-            pass
-        else:
-            # Mix
-            if self.mixer is not None:
-                chosen_action_qvals = self.mixer(chosen_action_qvals, batch["state"][:, :-1])
-                target_max_qvals = self.target_mixer(target_max_qvals, batch["state"][:, 1:])
+        # Calculate 1-step Q-Learning targets
+        targets = rewards + self.args.gamma * (1 - terminated) * target_max_qvals
 
-            # Calculate 1-step Q-Learning targets
-            targets = rewards + self.args.gamma * (1 - terminated) * target_max_qvals
+        # Td-error
+        td_error = (chosen_action_qvals - targets.detach())
 
-            # Td-error
-            td_error = (chosen_action_qvals - targets.detach())
+        mask = mask.expand_as(td_error)
 
-            mask = mask.expand_as(td_error)
+        # 0-out the targets that came from padded data
+        masked_td_error = td_error * mask
 
-            # 0-out the targets that came from padded data
-            masked_td_error = td_error * mask
-
-            # Normal L2 loss, take mean over actual data
-            loss = (masked_td_error ** 2).sum() / mask.sum()
+        # Normal L2 loss, take mean over actual data
+        loss = (masked_td_error ** 2).sum() / mask.sum()
 
         # Optimise
         self.optimiser.zero_grad()
