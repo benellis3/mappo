@@ -42,6 +42,62 @@ class QMixerLin(nn.Module):
         q_tot = y.view(bs, -1, 1)
         return q_tot
 
+class QMixerLinSwitch(nn.Module):
+    def __init__(self, args):
+        super(QMixerLinSwitch, self).__init__()
+
+        self.args = args
+        self.n_agents = args.n_agents
+        self.state_dim = int(np.prod(args.state_shape))
+        self.embed_dim = args.mixing_embed_dim
+
+        self.linear_switches = getattr(self.args, "linear_switches", 5)
+
+        self.hyper_ws_temp = []
+        hypernet_embed = self.args.hypernet_embed
+        for l in range(self.linear_switches):
+            hyper_w = nn.Linear(self.state_dim, self.n_agents)
+            if getattr(self.args, "hypernet_layers", 1) > 1:
+                assert self.args.hypernet_layers == 2, "Only 1 or 2 hypernet_layers is supported atm!"
+                hyper_w = nn.Sequential(nn.Linear(self.state_dim, hypernet_embed),
+                                               nn.ReLU(),
+                                               nn.Linear(hypernet_embed, self.n_agents))
+            self.hyper_ws_temp.append(hyper_w)
+        self.hyper_ws = th.nn.ModuleList(self.hyper_ws_temp)
+
+        self.switcher = nn.Sequential(nn.Linear(self.state_dim, hypernet_embed),
+                                      nn.ReLU(),
+                                      nn.Linear(hypernet_embed, self.linear_switches),
+                                      nn.Softmax(dim=1))
+
+        # V(s) instead of a bias for the last layers
+        self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),
+                               nn.ReLU(),
+                               nn.Linear(self.embed_dim, 1))
+
+    def forward(self, agent_qs, states):
+        bs = agent_qs.size(0)
+        states = states.reshape(-1, self.state_dim)
+        agent_qs = agent_qs.view(-1, 1, self.n_agents)
+
+        w_finals = []
+        for h in self.hyper_ws:
+            w_final = th.abs(h(states))
+            w_final = w_final.view(-1, self.n_agents, 1)
+            y = th.bmm(agent_qs, w_final)
+            w_finals.append(y)
+
+        ws = th.stack(w_finals, dim=1).squeeze(3).squeeze(2)
+        ss = self.switcher(states)
+
+        # State-dependent bias
+        v = self.V(states).view(-1, 1, 1)
+
+        y = (ws * ss).sum(dim=1, keepdim=True).unsqueeze(2) + v
+        # Reshape and return
+        q_tot = y.view(bs, -1, 1)
+        return q_tot
+
 
 class QMixerNS(nn.Module):
     def __init__(self, args):

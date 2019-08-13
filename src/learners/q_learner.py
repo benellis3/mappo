@@ -3,6 +3,7 @@ from components.episode_buffer import EpisodeBatch
 from modules.mixers.vdn import VDNMixer
 from modules.mixers.qmix import QMixer
 from modules.mixers.qmix_ablations import QMixerLin, QMixerNS, VDNState, QMixer2LayerLin
+from modules.mixers.qmix_ablations import QMixerLinSwitch
 import torch as th
 from torch.optim import RMSprop
 
@@ -31,6 +32,8 @@ class QLearner:
                 self.mixer = QMixerLin(args)
             elif args.mixer == "vdn_state":
                 self.mixer = VDNState(args)
+            elif args.mixer == "qmixer_lin_switch":
+                self.mixer = QMixerLinSwitch(args)
             else:
                 raise ValueError("Mixer {} not recognised.".format(args.mixer))
             self.params += list(self.mixer.parameters())
