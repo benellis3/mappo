@@ -52,6 +52,10 @@ class QMixer(nn.Module):
         if self.args.gated:
             self.gate = nn.Parameter(th.ones(size=(1,)) * 0.5)
 
+        self.non_lin = F.elu
+        if getattr(self.args, "mixer_non_lin", "elu") == "tanh":
+            self.non_lin = F.tanh
+
     def forward(self, agent_qs, states):
         bs = agent_qs.size(0)
         states = states.reshape(-1, self.state_dim)
@@ -61,7 +65,8 @@ class QMixer(nn.Module):
         b1 = self.hyper_b_1(states)
         w1 = w1.view(-1, self.n_agents, self.embed_dim)
         b1 = b1.view(-1, 1, self.embed_dim)
-        hidden = F.elu(th.bmm(agent_qs, w1) + b1)
+
+        hidden = self.non_lin(th.bmm(agent_qs, w1) + b1)
         # Second layer
         w_final = th.abs(self.hyper_w_final(states))
         w_final = w_final.view(-1, self.embed_dim, 1)

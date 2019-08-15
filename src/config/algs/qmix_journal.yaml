@@ -23,6 +23,7 @@ skip_connections: False
 gated: False
 hypernet_layers: 1
 hypernet_embed: 64
+mixer_non_lin: elu
 
 hyper_initialization_nonzeros: 0
 
