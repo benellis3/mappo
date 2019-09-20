@@ -4,9 +4,76 @@ import torch.nn.functional as F
 import numpy as np
 
 
-class QTran(nn.Module):
+class QTranBase(nn.Module):
     def __init__(self, args):
-        super(QTran, self).__init__()
+        super(QTranBase, self).__init__()
+
+        self.args = args
+
+        self.n_agents = args.n_agents
+        self.n_actions = args.n_actions
+        self.state_dim = int(np.prod(args.state_shape))
+
+        self.embed_dim = args.mixing_embed_dim
+
+        # Q(s,u)
+        # Q takes [state, u] as input
+        q_input_size = self.state_dim + (self.n_agents * self.n_actions)
+
+        if self.args.network_size == "small":
+            self.Q = nn.Sequential(nn.Linear(q_input_size, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, 1))
+
+            # V(s)
+            self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, 1))
+        elif self.args.network_size == "big":
+            self.Q = nn.Sequential(nn.Linear(q_input_size, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, 1))
+            # V(s)
+            self.V = nn.Sequential(nn.Linear(self.state_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, self.embed_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(self.embed_dim, 1))
+        else:
+            assert False
+
+    def forward(self, batch, actions=None):
+        bs = batch.batch_size
+        ts = batch.max_seq_length
+
+        states = batch["state"].reshape(bs * ts, self.state_dim)
+
+        if actions is None:
+            # Use the actions taken by the agents
+            actions = batch["actions_onehot"].reshape(bs * ts, self.n_agents * self.n_actions)
+        else:
+            # It will arrive as (bs, ts, agents, actions), we need to reshape it
+            actions = actions.reshape(bs * ts, self.n_agents * self.n_actions)
+
+        inputs = th.cat([states, actions], dim=1)
+
+        q_outputs = self.Q(inputs)
+
+        states = batch["state"].reshape(bs * ts, self.state_dim)
+        v_outputs = self.V(states)
+
+        return q_outputs, v_outputs
+
+
+class QTranAlt(nn.Module):
+    def __init__(self, args):
+        super(QTranAlt, self).__init__()
 
         self.args = args
 
@@ -72,3 +139,5 @@ class QTran(nn.Module):
         v_outputs = self.V(states)
 
         return q_outputs, v_outputs
+
+

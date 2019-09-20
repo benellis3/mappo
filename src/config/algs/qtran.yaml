@@ -16,8 +16,8 @@ target_update_interval: 200
 # use the Q_Learner to train
 agent_output_type: "q"
 learner: "qtran_learner"
-double_q: True
-mixer: "qtran_alt"
+double_q: False
+mixer: "qtran_base"
 mixing_embed_dim: 64
 
 opt_loss: 1
@@ -25,4 +25,4 @@ nopt_min_loss: 1
 
 network_size: small
 
-name: "qtran_alt"
+name: "qtran_base"
