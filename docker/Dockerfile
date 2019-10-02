@@ -33,9 +33,10 @@ RUN pip3 install ruamel.base ryd
 RUN mkdir /install
 WORKDIR /install
 
+RUN pip3 install jsonpickle==0.9.6
 # install Sacred (from OxWhirl fork)
 RUN pip3 install setuptools
-RUN pip3 install sacred
+RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /install/sacred && python3 setup.py install
 
 # Install pymongo
 RUN pip3 install pymongo
