@@ -35,7 +35,7 @@ WORKDIR /install
 
 # install Sacred (from OxWhirl fork)
 RUN pip3 install setuptools
-RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /install/sacred && python3 setup.py install
+RUN pip3 install sacred
 
 # Install pymongo
 RUN pip3 install pymongo
@@ -47,6 +47,7 @@ RUN pip3 install torch
 RUN pip3 install torchvision snakeviz pytest probscale
 
 ## -- SMAC
+ENV smac_ver 1
 RUN pip3 install git+https://github.com/oxwhirl/smac.git
 ENV SC2PATH /pymarl/3rdparty/StarCraftII
 
