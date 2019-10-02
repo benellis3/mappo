@@ -44,8 +44,7 @@ RUN pip3 install pymongo
 #### -------------------------------------------------------------------
 #### install pytorch
 #### -------------------------------------------------------------------
-RUN pip3 install torch
-RUN pip3 install torchvision snakeviz pytest probscale
+RUN pip3 install torch==1.1.0
 
 ## -- SMAC
 ENV smac_ver 1
