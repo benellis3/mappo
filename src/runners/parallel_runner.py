@@ -19,7 +19,7 @@ class ParallelRunner:
         # TODO: Add a delay when making sc2 envs
         self.parent_conns, self.worker_conns = zip(*[Pipe() for _ in range(self.batch_size)])
         env_fn = env_REGISTRY[self.args.env]
-        if self.args.env == 'sc2':
+        if 'sc2' in self.args.env:
             self.ps = [Process(target=env_worker, args=(worker_conn, CloudpickleWrapper(partial(env_fn, **self.args.env_args))))
                        for worker_conn in self.worker_conns]
         else:
