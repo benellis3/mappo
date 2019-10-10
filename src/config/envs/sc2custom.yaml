@@ -2,6 +2,7 @@ env: sc2custom
 
 env_args:
   continuing_episode: False
+  episode_limit: 150
   difficulty: "7"
   game_version: null
   map_name: "empty"
