@@ -12,7 +12,7 @@ class EpisodeRunner:
         self.batch_size = self.args.batch_size_run
         assert self.batch_size == 1
 
-        if self.args.env == 'sc2':
+        if 'sc2' in self.args.env:
             self.env = env_REGISTRY[self.args.env](**self.args.env_args)
         else:
             self.env = env_REGISTRY[self.args.env](env_args=self.args.env_args, args=args)
