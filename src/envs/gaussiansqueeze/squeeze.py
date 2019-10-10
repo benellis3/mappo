@@ -13,8 +13,8 @@ class GaussianSqueeze(MultiAgentEnv):
             args = convert(args)
 
         # Define the agents and actions
-        self.n_agents = 10
-        self.n_actions = 10
+        self.n_agents = 2
+        self.n_actions = 11
         self.episode_limit = 1
 
         # Paper says 0.2, but the author's code uses 2.
