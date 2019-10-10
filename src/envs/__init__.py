@@ -8,7 +8,11 @@ from .test import IntegrationTestEnv
 from .multiagentenv import MultiAgentEnv
 from .stag_hunt import StagHunt
 #from .starcraft2 import StarCraft2Env
-from smac.env import MultiAgentEnv, StarCraft2Env, StarCraft2CustomEnv
+from smac.env import MultiAgentEnv, StarCraft2Env
+try:
+    from smac.env import StarCraft2CustomEnv
+except Exception as e:
+    print(e)
 from .gaussiansqueeze.squeeze import GaussianSqueeze
 from .matrix_game.matrix_game_simple import Matrixgame
 
@@ -29,7 +33,10 @@ REGISTRY["integration_test"] = partial(env_fn, env=IntegrationTestEnv)
 REGISTRY["box_push"] = partial(env_fn, env=CoopBoxPushing)
 REGISTRY["stag_hunt"] = partial(env_fn, env=StagHunt)
 REGISTRY["sc2"] = partial(env_fn, env=StarCraft2Env)
-REGISTRY["sc2custom"] = partial(env_fn, env=StarCraft2CustomEnv)
+try:
+    REGISTRY["sc2custom"] = partial(env_fn, env=StarCraft2CustomEnv)
+except Exception as e:
+    print(e)
 REGISTRY["squeeze"] = partial(env_fn, env=GaussianSqueeze)
 
 try:
