@@ -99,8 +99,8 @@ class QLearner:
 
             # Td loss targets
             td_targets = rewards.reshape(-1,1) + self.args.gamma * (1 - terminated.reshape(-1, 1)) * target_joint_qs
-            td_error = (joint_qs - td_targets.detach()).unsqueeze(1)
-            masked_td_error = td_error * mask
+            td_error = (joint_qs - td_targets.detach())
+            masked_td_error = td_error * mask.reshape(-1, 1)
             td_loss = (masked_td_error ** 2).sum() / mask.sum()
             # -- TD Loss --
 
@@ -113,7 +113,7 @@ class QLearner:
 
             # max_actions_qvals = th.gather(mac_out[:, :-1], dim=3, index=max_actions_current[:,:-1])
             opt_error = max_actions_qvals[:,:-1].sum(dim=2).reshape(-1, 1) - max_joint_qs.detach() + vs
-            masked_opt_error = opt_error * mask
+            masked_opt_error = opt_error * mask.reshape(-1, 1)
             opt_loss = (masked_opt_error ** 2).sum() / mask.sum()
             # -- Opt Loss --
 
@@ -121,7 +121,7 @@ class QLearner:
             # target_joint_qs, _ = self.target_mixer(batch[:, :-1])
             nopt_values = chosen_action_qvals.sum(dim=2).reshape(-1, 1) - joint_qs.detach() + vs # Don't use target networks here either
             nopt_error = nopt_values.clamp(max=0)
-            masked_nopt_error = nopt_error * mask
+            masked_nopt_error = nopt_error * mask.reshape(-1, 1)
             nopt_loss = (masked_nopt_error ** 2).sum() / mask.sum()
             # -- Nopt loss --
 
