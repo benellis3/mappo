@@ -1,0 +1,9 @@
+# ---- Defaults for 4 agents hunting 1 stag and 1 hare in a 10x10 environment
+
+env: "random_matrix_game"
+
+env_args:
+  n_agents: 2
+  n_actions: 2
+
+t_max: 20000

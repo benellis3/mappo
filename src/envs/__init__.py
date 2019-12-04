@@ -15,6 +15,7 @@ except Exception as e:
     print(e)
 from .gaussiansqueeze.squeeze import GaussianSqueeze
 from .matrix_game.matrix_game_simple import Matrixgame
+from .matrix_game.matrix_game_random import RandomMatrixgame
 
 
 # TODO: Do we need this?
@@ -29,6 +30,7 @@ REGISTRY["pred_prey"] = partial(env_fn, env=PredatorPreyCapture)
 #REGISTRY["pred_prey_cython"] = partial(env_fn,
 #                                     env = PredatorPreyCaptureCython)
 REGISTRY["matrix_game"] = partial(env_fn, env=Matrixgame)
+REGISTRY["random_matrix_game"] = partial(env_fn, env=RandomMatrixgame)
 REGISTRY["integration_test"] = partial(env_fn, env=IntegrationTestEnv)
 REGISTRY["box_push"] = partial(env_fn, env=CoopBoxPushing)
 REGISTRY["stag_hunt"] = partial(env_fn, env=StagHunt)
