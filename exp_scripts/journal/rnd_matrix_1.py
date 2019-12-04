@@ -36,6 +36,8 @@ for agents in [2,3,4]:
         extend_param_dicts(param_dicts, shared_params,
             {
                 "name": name,
+                "env_args.n_agents": agents,
+                "env_args.n_actions": actions,
             },
             repeats=parallel_repeat)
 
@@ -44,6 +46,8 @@ for agents in [2,3,4]:
             {
                 "name": name,
                 "mixer": "vdn",
+                "env_args.n_agents": agents,
+                "env_args.n_actions": actions,
             },
             repeats=parallel_repeat)
 
