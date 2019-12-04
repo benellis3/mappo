@@ -1,7 +1,8 @@
 from run_experiment import extend_param_dicts
 
 server_list = [
-    ("legolas", [0], 18),
+    ("orion", [0,1,2,3,4,5,6,7], 2),
+    ("orion", [4,5,6,7], 1),
 ]
 
 label = "random_matrix_games__4_Dec_2019_v1"

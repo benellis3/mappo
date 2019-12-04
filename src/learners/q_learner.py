@@ -129,7 +129,7 @@ class QLearner:
                 self.logger.log_stat("gate", self.mixer.gate.cpu().item(), t_env)
             if batch.max_seq_length == 2:
                 # We are in a 1-step env. Calculate the max Q-Value for logging
-                max_agent_qvals = mac_out_detach[:,0].max(dim=2)[0]
+                max_agent_qvals = mac_out_detach[:,0].max(dim=2, keepdim=True)[0]
                 max_qtots = self.mixer(max_agent_qvals, batch["state"][:,0])
                 self.logger.log_stat("max_qtot", max_qtots.mean().item(), t_env)
             self.log_stats_t = t_env
