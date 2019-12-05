@@ -50,7 +50,7 @@ class MultiAgentEnv(object):
         raise NotImplementedError
 
     def close(self):
-        raise NotImplementedError
+        pass # This gets called all the time.
 
     def seed(self):
         raise NotImplementedError
