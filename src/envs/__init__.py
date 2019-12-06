@@ -16,6 +16,7 @@ except Exception as e:
 from .gaussiansqueeze.squeeze import GaussianSqueeze
 from .matrix_game.matrix_game_simple import Matrixgame
 from .matrix_game.matrix_game_random import RandomMatrixgame
+from .test.parallel_test import RandomEnv
 
 
 # TODO: Do we need this?
@@ -27,6 +28,7 @@ def env_fn(env, **kwargs) -> MultiAgentEnv: # TODO: this may be a more complex f
 REGISTRY = {}
 REGISTRY["pred_prey__old"] = partial(env_fn, env=PredatorPreyOldEnv)
 REGISTRY["pred_prey"] = partial(env_fn, env=PredatorPreyCapture)
+REGISTRY["rnd"] = partial(env_fn, env=RandomEnv)
 #REGISTRY["pred_prey_cython"] = partial(env_fn,
 #                                     env = PredatorPreyCaptureCython)
 REGISTRY["matrix_game"] = partial(env_fn, env=Matrixgame)
