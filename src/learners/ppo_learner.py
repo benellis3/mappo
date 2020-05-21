@@ -188,10 +188,16 @@ class PPOLearner:
 
                 prob_ratio = th.clamp(th.exp(mb_old_neglogp - mb_neglogp), 0.0, 16.0)
 
-                pg_loss_unclipped = - mb_adv * prob_ratio
-                pg_loss_clipped = - mb_adv * th.clamp(prob_ratio,
-                                                      1 - self.args.ppo_policy_clip_param,
-                                                      1 + self.args.ppo_policy_clip_param)
+                if self.args.is_advantage_normalized:
+                    pg_loss_unclipped = - mb_norm_adv * prob_ratio
+                    pg_loss_clipped = - mb_norm_adv * th.clamp(prob_ratio,
+                                                        1 - self.args.ppo_policy_clip_param,
+                                                        1 + self.args.ppo_policy_clip_param)
+                else:
+                    pg_loss_unclipped = - mb_adv * prob_ratio
+                    pg_loss_clipped = - mb_adv * th.clamp(prob_ratio,
+                                                        1 - self.args.ppo_policy_clip_param,
+                                                        1 + self.args.ppo_policy_clip_param)
 
                 pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * actor_mask) / ( actor_mask.sum() + 1e-5)
 

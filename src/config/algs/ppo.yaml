@@ -39,4 +39,6 @@ entroy_loss_coeff: 0.005
 ppo_policy_clip_param: 0.2
 entropy_loss_coeff: 0.000
 
+is_advantage_normalized: True
+
 name: "centralV"

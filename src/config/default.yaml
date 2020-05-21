@@ -51,6 +51,6 @@ repeat_id: 1
 label: "default_label"
 
 # --- Sacred mongodb credentials ---
-db_url: mongodb://pymarlOwner:EMC7Jp98c8rE7FxxN7g82DT5spGsVr9A@gandalf.cs.ox.ac.uk:27017/pymarl
-db_name: pymarl
+db_url: mongodb://mongo_user:mongo_password@localhost:27017/sacred?authSource=admin
+db_name: sacred
 no-mongo: False
