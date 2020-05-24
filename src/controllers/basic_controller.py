@@ -9,6 +9,10 @@ class BasicMAC:
         self.n_agents = args.n_agents
         self.args = args
         input_shape = self._get_input_shape(scheme)
+        self.framestack_num = self.args.env_args.get("framestack_num", None)
+        if self.framestack_num:
+            assert input_shape % self.framestack_num == 0
+            input_shape = (self.framestack_num, input_shape // self.framestack_num) # channels come first
         self._build_agents(input_shape)
         self.agent_output_type = args.agent_output_type
 
@@ -50,9 +54,15 @@ class BasicMAC:
                     # Zero out the unavailable actions
                     agent_outs[reshaped_avail_actions == 0] = 0.0
 
+        elif self.agent_output_type == "gaussian_mean":
+            raise NotImplementedError
+
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
 
     def init_hidden(self, batch_size):
+        if self.args.agent != "rnn":
+            # only rnn needs to initialize hidden states
+            return
         self.hidden_states = self.agent.init_hidden().unsqueeze(0).expand(batch_size, self.n_agents, -1)  # bav
 
     def parameters(self):

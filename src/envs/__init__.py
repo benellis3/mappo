@@ -17,6 +17,7 @@ from .gaussiansqueeze.squeeze import GaussianSqueeze
 from .matrix_game.matrix_game_simple import Matrixgame
 from .matrix_game.matrix_game_random import RandomMatrixgame
 from .test.parallel_test import RandomEnv
+from .env_wrappers import FrameStackStartCraft2Env
 
 
 # TODO: Do we need this?
@@ -37,6 +38,7 @@ REGISTRY["integration_test"] = partial(env_fn, env=IntegrationTestEnv)
 REGISTRY["box_push"] = partial(env_fn, env=CoopBoxPushing)
 REGISTRY["stag_hunt"] = partial(env_fn, env=StagHunt)
 REGISTRY["sc2"] = partial(env_fn, env=StarCraft2Env)
+REGISTRY["sc2framestack"] = partial(env_fn, env=FrameStackStartCraft2Env)
 try:
     REGISTRY["sc2custom"] = partial(env_fn, env=StarCraft2CustomEnv)
 except Exception as e:
