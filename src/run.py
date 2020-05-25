@@ -92,15 +92,17 @@ def run_sequential(args, logger):
     args.n_actions = env_info["n_actions"]
     args.state_shape = env_info["state_shape"]
 
+    framestack_num = args.env_args.get("framestack_num", 1)
     # Default/Base scheme
     scheme = {
-        "state": {"vshape": env_info["state_shape"]},
-        "obs": {"vshape": env_info["obs_shape"], "group": "agents"},
+        "state": {"vshape": env_info["state_shape"] * framestack_num},
+        "obs": {"vshape": env_info["obs_shape"] * framestack_num, "group": "agents"},
         "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},
         "avail_actions": {"vshape": (env_info["n_actions"],), "group": "agents", "dtype": th.int},
         "reward": {"vshape": (1,)},
         "terminated": {"vshape": (1,), "dtype": th.uint8},
     }
+
     groups = {
         "agents": args.n_agents
     }
