@@ -55,6 +55,8 @@ class PPOLearner:
             self.critic_train_fn = self.train_critic_sequential
         elif args.critic_train_mode == "batch":
             self.critic_train_fn = self.train_critic_batched
+        elif args.critic_train_mode == "ppo":
+            self.critic_train_fn = self.train_critic_ppo
         else:
             raise NotImplementedError
 
@@ -236,7 +238,7 @@ class PPOLearner:
             self.logger.log_stat("kl divergence", th.mean( th.tensor(approxkl_lst) ).item(), t_env)
             self.log_stats_t = t_env
 
-    def train_critic_sequential(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
+    def train_critic_ppo(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
                                 avail_actions, mask):
         # Optimise critic
         target_vals = th.zeros((batch.batch_size, rewards.size(1)+1, self.n_agents))
@@ -311,6 +313,82 @@ class PPOLearner:
             # OR THIS IF ACCUMULATING N-step RETURN LATER
             q_vals = all_vals[:, :-1]
             v_s = all_vals[:, :-1]
+
+        return q_vals, v_s, running_log
+
+    def train_critic_sequential(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
+                                avail_actions, mask):
+        # Optimise critic
+        target_vals = target_critic(batch)
+
+        all_vals = th.zeros_like(target_vals)
+
+        # target_vals = target_vals[:, :-1]
+
+        if critic.output_type == 'q':
+            target_vals = th.gather(target_vals, dim=3, index=actions)
+            # target_vals = th.cat([target_vals[:, 1:], th.zeros_like(target_vals[:, 0:1])], dim=1)
+        target_vals = target_vals.squeeze(3)
+
+        # Calculate td-lambda targets
+        targets = build_td_lambda_targets(rewards, terminated, mask, target_vals, self.n_agents,
+                                          self.args.gamma, self.args.td_lambda)
+
+        running_log = {
+            "critic_loss": [],
+            "critic_grad_norm": [],
+            "td_error_abs": [],
+            "target_mean": [],
+            "q_taken_mean": [],
+        }
+
+        for t in reversed(range(rewards.size(1) + 1)):
+            vals_t = critic(batch, t)
+            all_vals[:, t] = vals_t.squeeze(1)
+
+            if t == rewards.size(1):
+                continue
+
+            mask_t = mask[:, t]
+            if mask_t.sum() == 0:
+                continue
+
+            if critic.output_type == "q":
+                vals_t = th.gather(vals_t, dim=3, index=actions[:, t:t+1]).squeeze(3).squeeze(1)
+            else:
+                vals_t = vals_t.squeeze(3).squeeze(1)
+            targets_t = targets[:, t]
+
+            td_error = (vals_t - targets_t.detach())
+
+            # 0-out the targets that came from padded data
+            masked_td_error = td_error * mask_t
+
+            # Normal L2 loss, take mean over actual data
+            loss = (masked_td_error ** 2).sum() / mask_t.sum()  # Not dividing by number of agents, only # valid timesteps
+            optimiser.zero_grad()
+            loss.backward()
+            grad_norm = th.nn.utils.clip_grad_norm_(optimiser.param_groups[0]["params"], self.args.grad_norm_clip)
+            optimiser.step()
+            self.critic_training_steps += 1
+
+            running_log["critic_loss"].append(loss.item())
+            running_log["critic_grad_norm"].append(grad_norm)
+            mask_elems = mask_t.sum().item()
+            running_log["td_error_abs"].append((masked_td_error.abs().sum().item() / mask_elems))
+            running_log["q_taken_mean"].append((vals_t * mask_t).sum().item() / mask_elems)
+            running_log["target_mean"].append((targets_t * mask_t).sum().item() / mask_elems)
+
+        if critic.output_type == 'q':
+            q_vals = all_vals[:, :-1]
+            v_s = None
+        else:
+            # USE THIS FOR GAE:
+            # q_vals = build_td_lambda_targets(rewards, terminated, mask, all_vals.squeeze(3)[:, 1:], self.n_agents,
+            #                                  self.args.gamma, self.args.td_lambda)
+            # OR THIS IF ACCUMULATING N-step RETURN LATER
+            q_vals = all_vals[:, :-1].squeeze(3)
+            v_s = all_vals[:, :-1].squeeze(3)
 
         return q_vals, v_s, running_log
 
