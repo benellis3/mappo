@@ -159,7 +159,8 @@ class PPOLearner:
                 mac_out = []
                 self.mac.init_hidden(batch.batch_size)
                 for t in range(batch.max_seq_length - 1):
-                    agent_outs = self.mac.forward(batch, t=t)
+                    # training needs to update the running mean std
+                    agent_outs = self.mac.forward(batch, t=t, updating_rms=True)
                     mac_out.append(agent_outs)
                 mac_out = th.stack(mac_out, dim=1)  # Concat over time
 
@@ -226,6 +227,8 @@ class PPOLearner:
             self.logger.log_stat("pg_loss", th.mean( th.tensor(pg_loss_lst) ).item(), t_env)
             self.logger.log_stat("agent_grad_norm", grad_norm, t_env)
             self.logger.log_stat("pi_max", (pi.max(dim=-1)[0] * mask).sum().item() / mask.sum().item(), t_env)
+            self.logger.log_stat("entropy", th.mean( th.tensor(entropy_lst) ).item(), t_env)
+            self.logger.log_stat("kl divergence", th.mean( th.tensor(approxkl_lst) ).item(), t_env)
             self.log_stats_t = t_env
 
     def train_critic_sequential(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,

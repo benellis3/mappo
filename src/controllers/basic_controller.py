@@ -1,5 +1,6 @@
 from modules.agents import REGISTRY as agent_REGISTRY
 from components.action_selectors import REGISTRY as action_REGISTRY
+from components.running_mean_std import RunningMeanStd
 import torch as th
 
 
@@ -9,6 +10,13 @@ class BasicMAC:
         self.n_agents = args.n_agents
         self.args = args
         input_shape = self._get_input_shape(scheme)
+
+        if getattr(args, "is_observation_normalized", None):
+            self.is_obs_normalized = True
+            self.obs_rms = RunningMeanStd(shape=input_shape)
+        else:
+            self.is_obs_normalized = False
+
         self.framestack_num = self.args.env_args.get("framestack_num", None)
         if self.framestack_num:
             assert input_shape % self.framestack_num == 0
@@ -27,8 +35,14 @@ class BasicMAC:
         chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions[bs], t_env, test_mode=test_mode)
         return chosen_actions
 
-    def forward(self, ep_batch, t, test_mode=False):
+    def forward(self, ep_batch, t, test_mode=False, updating_rms=False):
         agent_inputs = self._build_inputs(ep_batch, t)
+        if self.is_obs_normalized:
+            if updating_rms:
+                self.obs_rms.update(agent_inputs)
+            agent_inputs = (agent_inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var) + 1e-5)
+            agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
+
         avail_actions = ep_batch["avail_actions"][:, t]
         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
 
