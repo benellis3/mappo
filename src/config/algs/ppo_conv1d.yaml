@@ -32,8 +32,8 @@ td_lambda: 0.8
 # use COMA
 agent_output_type: "pi_logits"
 learner: "ppo_learner"
-critic_q_fn: "centralV"
-critic_baseline_fn: "centralV"
+critic_q_fn: "conv1d_critic"
+critic_baseline_fn: "conv1d_critic"
 critic_train_mode: "seq"
 critic_train_reps: 1
 q_nstep: 1 # 1 corresponds to normal r + gammaV

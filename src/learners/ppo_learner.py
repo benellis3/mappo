@@ -2,6 +2,7 @@ import copy
 from components.episode_buffer import EpisodeBatch
 from modules.critics.coma import COMACritic
 from modules.critics.centralV import CentralVCritic
+from modules.critics.conv1d_critic import Conv1dCritic
 from utils.rl_utils import build_td_lambda_targets
 import torch as th
 import numpy as np
@@ -25,6 +26,9 @@ class PPOLearner:
             self.critic = COMACritic(scheme, args)
         elif args.critic_q_fn == "centralV":
             self.critic = CentralVCritic(scheme, args)
+        elif args.critic_q_fn == "conv1d_critic":
+            self.critic = Conv1dCritic(scheme, args)
+
         self.target_critic = copy.deepcopy(self.critic)
 
         self.critic_params = list(self.critic.parameters())
@@ -52,7 +56,7 @@ class PPOLearner:
         elif args.critic_train_mode == "batch":
             self.critic_train_fn = self.train_critic_batched
         else:
-            raise ValueError
+            raise NotImplementedError
 
         self.last_target_update_step = 0
         self.critic_training_steps = 0
@@ -97,7 +101,7 @@ class PPOLearner:
         for _ in range(self.args.critic_train_reps):
             q_sa, v_s, critic_train_stats = self.critic_train_fn(self.critic, self.target_critic, self.critic_optimiser, batch,
                                                                  rewards, terminated, actions, avail_actions, critic_mask)
-
+    
         if self.separate_baseline_critic:
             for _ in range(self.args.critic_train_reps):
                 q_sa_baseline, v_s_baseline, critic_train_stats_baseline = \
@@ -119,6 +123,7 @@ class PPOLearner:
             q_sa = th.gather(q_sa, dim=3, index=actions).squeeze(3)
             if self.args.critic_q_fn == "coma" and self.args.coma_mean_q:
                 q_sa = q_sa.mean(2, keepdim=True).expand(-1, -1, self.n_agents)
+
         q_sa = self.nstep_returns(rewards, mask, q_sa, self.args.q_nstep)
 
         advantages = (q_sa - baseline).detach().squeeze()
@@ -234,7 +239,11 @@ class PPOLearner:
     def train_critic_sequential(self, critic, target_critic, optimiser, batch, rewards, terminated, actions,
                                 avail_actions, mask):
         # Optimise critic
-        target_vals = target_critic(batch)
+        target_vals = th.zeros((batch.batch_size, rewards.size(1)+1, self.n_agents))
+
+        for t in reversed(range(rewards.size(1) + 1)):
+            tmp_val = target_critic(batch, t)
+            target_vals[:, t] = tmp_val.view(batch.batch_size, self.n_agents)
 
         all_vals = th.zeros_like(target_vals)
 
@@ -243,7 +252,7 @@ class PPOLearner:
         if critic.output_type == 'q':
             target_vals = th.gather(target_vals, dim=3, index=actions)
             # target_vals = th.cat([target_vals[:, 1:], th.zeros_like(target_vals[:, 0:1])], dim=1)
-        target_vals = target_vals.squeeze(3)
+        # target_vals = target_vals.squeeze(3)
 
         # Calculate td-lambda targets
         targets = build_td_lambda_targets(rewards, terminated, mask, target_vals, self.n_agents,
@@ -258,8 +267,8 @@ class PPOLearner:
         }
 
         for t in reversed(range(rewards.size(1) + 1)):
-            vals_t = critic(batch, t)
-            all_vals[:, t] = vals_t.squeeze(1)
+            vals_t = critic(batch, t).view(batch.batch_size, self.n_agents)
+            all_vals[:, t] = vals_t
 
             if t == rewards.size(1):
                 continue
@@ -270,8 +279,6 @@ class PPOLearner:
 
             if critic.output_type == "q":
                 vals_t = th.gather(vals_t, dim=3, index=actions[:, t:t+1]).squeeze(3).squeeze(1)
-            else:
-                vals_t = vals_t.squeeze(3).squeeze(1)
             targets_t = targets[:, t]
 
             td_error = (vals_t - targets_t.detach())
@@ -302,8 +309,8 @@ class PPOLearner:
             # q_vals = build_td_lambda_targets(rewards, terminated, mask, all_vals.squeeze(3)[:, 1:], self.n_agents,
             #                                  self.args.gamma, self.args.td_lambda)
             # OR THIS IF ACCUMULATING N-step RETURN LATER
-            q_vals = all_vals[:, :-1].squeeze(3)
-            v_s = all_vals[:, :-1].squeeze(3)
+            q_vals = all_vals[:, :-1]
+            v_s = all_vals[:, :-1]
 
         return q_vals, v_s, running_log
 

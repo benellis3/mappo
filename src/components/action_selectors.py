@@ -1,11 +1,34 @@
 import numpy as np
 import torch as th
 from torch.autograd import Variable
-from torch.distributions import Categorical
+from torch.distributions import Categorical, MultivariateNormal
 from torch.nn.functional import softmax
 from .epsilon_schedules import DecayThenFlatSchedule
 
 REGISTRY = {}
+
+class GaussianActionSelector():
+
+    def __init__(self, args):
+        self.args = args
+
+        self.schedule = DecayThenFlatSchedule(args.epsilon_start, args.epsilon_finish, args.epsilon_anneal_time,
+                                              decay="linear")
+        self.epsilon = self.schedule.eval(0)
+        self.test_greedy = getattr(args, "test_greedy", True)
+
+    def select_action(self, agent_inputs, t_env, test_mode=False):
+        self.epsilon = self.schedule.eval(t_env)
+
+        mu, sigma = agent_inputs[0], agent_inputs[1]
+        if test_mode:
+            return mu
+        else:
+            distr = th.distributions.Normal(mu, sigma)
+            return distr.sample().squeeze()
+
+REGISTRY["gaussian"] = GaussianActionSelector
+
 
 class MultinomialActionSelector():
 
