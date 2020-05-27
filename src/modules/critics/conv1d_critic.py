@@ -22,13 +22,13 @@ class Conv1dCritic(nn.Module):
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, 1)
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
-            if isinstance(m, nn.Conv1d):
-                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+        #     if isinstance(m, nn.Conv1d):
+        #         nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+        #     if isinstance(m, nn.Linear):
+        #         nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
 
     def forward(self, ep_batch, t=None):
         inputs = self._build_inputs(ep_batch, t)
@@ -44,7 +44,7 @@ class Conv1dCritic(nn.Module):
         x = F.relu(self.fc1(x))        
         x = F.relu(self.fc2(x))
         q = self.fc3(x)
-        return q
+        return q.view(ep_batch.batch_size, self.n_agents)
 
     def _only_conv1d(self, inputs):
         x = F.relu(self.conv1(inputs))

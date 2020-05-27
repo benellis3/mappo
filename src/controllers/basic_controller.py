@@ -27,6 +27,7 @@ class BasicMAC:
         self.action_selector = action_REGISTRY[args.action_selector](args)
 
         self.hidden_states = None
+        self.other_outs = None
 
     def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
         # Only select actions for the selected batch elements in bs
@@ -44,7 +45,13 @@ class BasicMAC:
             agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
 
         avail_actions = ep_batch["avail_actions"][:, t]
-        agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
+        agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
+
+        if isinstance(other_outs, dict):
+            self.hidden_states = other_outs.pop("hidden_states")
+            self.other_outs = other_outs
+        else:
+            self.hidden_states = other_outs
 
         if self.agent_output_type == "pi_logits":
 

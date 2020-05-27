@@ -18,6 +18,7 @@ class Conv1dAgent(nn.Module):
         if n_outs is None:
             n_outs = args.n_actions
         self.fc3 = nn.Linear(128, n_outs)
+        self.fc_val = nn.Linear(128, 1)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -40,7 +41,11 @@ class Conv1dAgent(nn.Module):
         x = F.relu(self.fc1(x))        
         x = F.relu(self.fc2(x))
         q = self.fc3(x)
-        return q, None
+        val = self.fc_val(x)
+        other_outs = {}
+        other_outs.update({"hidden_states": None})
+        other_outs.update({"values": val})
+        return q, other_outs
 
     def _only_conv1d(self, inputs):
         x = F.relu(self.conv1(inputs))

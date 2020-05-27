@@ -3,6 +3,7 @@ from .coma_learner import COMALearner
 from .actor_critic_learner import ActorCriticLearner
 from .qtran_learner import QLearner as QTranLearner
 from .ppo_learner import PPOLearner
+from .ppo_learner_centralV import PPOLearnerCentralV
 
 REGISTRY = {}
 
@@ -11,3 +12,4 @@ REGISTRY["qtran_learner"] = QTranLearner
 REGISTRY["coma_learner"] = COMALearner
 REGISTRY["actor_critic_learner"] = ActorCriticLearner
 REGISTRY["ppo_learner"] = PPOLearner
+REGISTRY["ppo_learner_centralV"] = PPOLearnerCentralV
