@@ -12,7 +12,7 @@ test_greedy: True # Use greedy evaluation (if False, will set epsilon floor to 0
 log_interval: 2000 # Log summary of stats after every {} timesteps
 runner_log_interval: 2000 # Log runner stats (not test stats) every {} timesteps
 learner_log_interval: 2000 # Log training stats every {} timesteps
-t_max: 10000 # Stop running after this many timesteps
+t_max: 400000 # Stop running after this many timesteps
 use_cuda: True # Use gpu by default unless it isn't available
 buffer_cpu_only: False # If true we won't keep all of the replay buffer in vram
 
@@ -28,10 +28,6 @@ local_results_path: "results" # Path for local results
 
 # --- RL hyperparameters ---
 gamma: 0.99
-batch_size: 32 # Number of episodes to train on
-buffer_size: 32 # Size of the replay buffer
-lr: 0.0005 # Learning rate for agents
-critic_lr: 0.0005 # Learning rate for critics
 recurrent_critic: False
 optim_alpha: 0.99 # RMSProp alpha
 optim_eps: 0.00001 # RMSProp epsilon

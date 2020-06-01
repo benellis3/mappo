@@ -42,6 +42,8 @@ class MultinomialActionSelector():
 
     def select_action(self, agent_inputs, avail_actions, t_env, test_mode=False):
         masked_policies = agent_inputs.clone()
+        n_actions = masked_policies.size(-1)
+
         masked_policies[avail_actions == 0.0] = 0.0
 
         self.epsilon = self.schedule.eval(t_env)
@@ -49,7 +51,16 @@ class MultinomialActionSelector():
         if test_mode and self.test_greedy:
             picked_actions = masked_policies.max(dim=2)[1]
         else:
-            picked_actions = Categorical(masked_policies).sample().long()
+            uniform_probs = th.ones_like(masked_policies)/n_actions
+            uniform_probs[avail_actions == 0.0] = 0.0
+            uniform_dist = Categorical(probs= uniform_probs)
+            random_actions = uniform_dist.sample().long()
+
+            random_num = np.random.rand() # between 0.0 -- 1.0
+            if random_num <= self.epsilon:
+                return random_actions
+            else:
+                return Categorical(probs=masked_policies).sample().long()
 
         return picked_actions
 
