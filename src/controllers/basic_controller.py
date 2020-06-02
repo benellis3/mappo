@@ -23,6 +23,7 @@ class BasicMAC:
             input_shape = (self.framestack_num, input_shape // self.framestack_num) # channels come first
         self._build_agents(input_shape)
         self.agent_output_type = args.agent_output_type
+        self.need_agent_logits = getattr(args, "need_agent_logits", False)
 
         self.action_selector = action_REGISTRY[args.action_selector](args)
 
@@ -39,7 +40,7 @@ class BasicMAC:
     def update_rms(self, batch_obs):
         self.obs_rms.update(batch_obs)
 
-    def forward_obs(self, obs, avail_actions):
+    def forward_obs(self, obs):
         # obs.shape: num_transitions * num_features
         agent_inputs = obs
         if self.is_obs_normalized:
@@ -55,8 +56,6 @@ class BasicMAC:
             self.hidden_states = other_outs
 
         if self.agent_output_type == "pi_logits":
-            if getattr(self.args, "mask_before_softmax", True):
-                agent_outs[avail_actions == 0] = -1e10
             agent_outs = th.nn.functional.log_softmax(agent_outs, dim=-1)
 
         elif self.agent_output_type == "gaussian_mean":
@@ -88,7 +87,6 @@ class BasicMAC:
                 agent_outs[reshaped_avail_actions == 0] = -1e10
 
             agent_outs = th.nn.functional.softmax(agent_outs, dim=-1)
-            # agent_outs = th.clamp(agent_outs, min=1e-20)
             # if not test_mode:
             #     # Epsilon floor
             #     epsilon_action_num = agent_outs.size(-1)
