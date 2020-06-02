@@ -80,7 +80,7 @@ class PPOLearner:
         index = th.nonzero(mask).squeeze()
         actions = actions.flatten()[index]
         pi_taken = pi_taken.flatten()[index]
-        actions_neglogp = -th.log(pi_taken)
+        actions_neglogp = -th.log(pi_taken + 1e-10)
         returns = returns.flatten()[index]
         values = old_values.flatten()[index]
         advantages = advs.flatten()[index]
@@ -114,7 +114,8 @@ class PPOLearner:
 
         if getattr(self.args, "is_observation_normalized", False):
             self.mac.update_rms(obs)
-            self.conv1d_critic.update_rms(obs)
+            if self.is_separate_actor_critic:
+                self.conv1d_critic.update_rms(obs)
 
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -127,15 +128,12 @@ class PPOLearner:
         loss_lst = []
         grad_norm_lst = []
 
-        rnd_idx = np.random.permutation(num)
-        rnd_step = int(np.ceil(len(rnd_idx) // self.mini_batches_num))
 
         for _ in range(0, self.args.mini_epochs_num):
+            rnd_idx = np.random.permutation(num)
+            rnd_step = len(rnd_idx) // self.mini_batches_num
             for j in range(0, self.mini_batches_num):
-                if j == self.mini_batches_num-1:
-                    curr_idx = rnd_idx[j*rnd_step :]
-                else:
-                    curr_idx = rnd_idx[j*rnd_step : j*rnd_step+rnd_step]
+                curr_idx = rnd_idx[j*rnd_step : j*rnd_step+rnd_step]
 
                 mb_actions = actions[curr_idx]
                 mb_adv = advantages[curr_idx]

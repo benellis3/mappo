@@ -6,8 +6,8 @@ obs_last_action: False # Include the agent's last action (one_hot) in the observ
 # --- PPO specific parameters ---
 
 action_selector: "multinomial"
-epsilon_start: .0
-epsilon_finish: .0
+epsilon_start: .5
+epsilon_finish: .01
 epsilon_anneal_time: 100000
 mask_before_softmax: True
 
@@ -41,6 +41,5 @@ ppo_value_clip_param: 5
 is_advantage_normalized: False
 is_observation_normalized: True
 is_separate_actor_critic: True
-
 
 name: "ppo_conv1d"

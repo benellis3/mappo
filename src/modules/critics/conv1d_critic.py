@@ -29,13 +29,13 @@ class Conv1dCritic(nn.Module):
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, 1)
 
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
-        #     if isinstance(m, nn.Conv1d):
-        #         nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
-        #     if isinstance(m, nn.Linear):
-        #         nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+            if isinstance(m, nn.Conv1d):
+                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
     
     def update_rms(self, batch_obs):
         self.obs_rms.update(batch_obs)
@@ -43,8 +43,8 @@ class Conv1dCritic(nn.Module):
     def forward_obs(self, obs):
         inputs = obs
         if self.is_obs_normalized:
-            inputs = (inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var) + 1e-5)
-            inputs = th.clamp(inputs, min=-5.0, max=5.0) # clip to range
+            inputs = (inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var + 1e-5))
+            # inputs = th.clamp(inputs, min=-5.0, max=5.0) # clip to range
 
         assert inputs.shape[-1] % self.dim_channels == 0 # frames are stacked exactly
         inputs = inputs.view(inputs.shape[0], 
@@ -65,7 +65,7 @@ class Conv1dCritic(nn.Module):
 
         if self.is_obs_normalized:
             inputs = (inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var) + 1e-5)
-            inputs = th.clamp(inputs, min=-5.0, max=5.0) # clip to range
+            # inputs = th.clamp(inputs, min=-5.0, max=5.0) # clip to range
 
         assert inputs.shape[-1] % self.dim_channels == 0 # frames are stacked exactly
         inputs = inputs.view(inputs.shape[0], 
