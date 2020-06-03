@@ -44,8 +44,8 @@ class BasicMAC:
         # obs.shape: num_transitions * num_features
         agent_inputs = obs
         if self.is_obs_normalized:
-            agent_inputs = (agent_inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var) + 1e-5)
-            agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
+            agent_inputs = (agent_inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var + 1e-5))
+            # agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
 
         agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
 
@@ -67,8 +67,8 @@ class BasicMAC:
     def forward(self, ep_batch, t, test_mode=False):
         agent_inputs = self._build_inputs(ep_batch, t)
         if self.is_obs_normalized:
-            agent_inputs = (agent_inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var) + 1e-5)
-            agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
+            agent_inputs = (agent_inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var + 1e-5))
+            # agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
 
         avail_actions = ep_batch["avail_actions"][:, t]
         agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
