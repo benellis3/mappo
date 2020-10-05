@@ -13,7 +13,7 @@ log_interval: 2000 # Log summary of stats after every {} timesteps
 runner_log_interval: 2000 # Log runner stats (not test stats) every {} timesteps
 learner_log_interval: 2000 # Log training stats every {} timesteps
 t_max: 400000 # Stop running after this many timesteps
-use_cuda: True # Use gpu by default unless it isn't available
+use_cuda: False # Use gpu by default unless it isn't available
 buffer_cpu_only: False # If true we won't keep all of the replay buffer in vram
 
 # --- Logging options ---
@@ -41,6 +41,6 @@ repeat_id: 1
 label: "default_label"
 
 # --- Sacred mongodb credentials ---
-db_url: mongodb://mongo_user:mongo_password@localhost:27017/sacred?authSource=admin
-db_name: sacred
+db_url: mongodb://pymarlOwner:EMC7Jp98c8rE7FxxN7g82DT5spGsVr9A@gandalf.cs.ox.ac.uk:27017/pymarl
+db_name: pymarl
 no-mongo: False

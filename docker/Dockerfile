@@ -49,6 +49,12 @@ RUN pip3 install torch==1.1.0
 ## -- SMAC
 ENV smac_ver 1
 RUN pip3 install git+https://github.com/oxwhirl/smac.git
-ENV SC2PATH /pymarl/3rdparty/StarCraftII
+ENV SC2PATH /home/minsun/pymarl/3rdparty/StarCraftII
 
-WORKDIR /pymarl
+ARG UID
+RUN useradd -u $UID --create-home minsun
+USER minsun
+WORKDIR /home/minsun/pymarl
+
+RUN echo 'set editing-mode vi' >> /home/minsun/.inputrc
+RUN echo 'set keymap vi' >> /home/minsun/.inputrc
