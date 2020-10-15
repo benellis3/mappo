@@ -21,7 +21,6 @@ class PPOLearner:
         self.mac = mac
         self.agent_params = list(mac.parameters())
         self.ppo_policy_clip_params = args.ppo_policy_clip_param
-        self.ppo_value_clip_params = args.ppo_value_clip_param
 
         if getattr(self.args, "is_separate_actor_critic", False):
             self.is_separate_actor_critic = True
@@ -44,6 +43,7 @@ class PPOLearner:
 
     def make_transitions(self, batch: EpisodeBatch):
         actions = batch["actions"][:, :-1].cuda()
+        avail_actions = batch["avail_actions"][:, :-1].cuda()
         rewards = batch["reward"][:, :-1].cuda()
         mask = batch["filled"].float().cuda()
         obs = batch["obs"][:, :-1].cuda()
@@ -79,8 +79,9 @@ class PPOLearner:
         mask = mask.flatten()
         index = th.nonzero(mask).squeeze()
         actions = actions.flatten()[index]
+        avail_actions = avail_actions.reshape((-1, avail_actions.shape[-1]))[index]
         pi_taken = pi_taken.flatten()[index]
-        actions_neglogp = -th.log(pi_taken + 1e-10)
+        actions_neglogp = -th.log(pi_taken)
         returns = returns.flatten()[index]
         values = old_values.flatten()[index]
         advantages = advs.flatten()[index]
@@ -90,6 +91,7 @@ class PPOLearner:
         transitions = {}
         transitions.update({"num": int(th.sum(mask))})
         transitions.update({"actions": actions.detach()})
+        transitions.update({"avail_actions": avail_actions.detach()})
         transitions.update({"actions_neglogp": actions_neglogp.detach()})
         transitions.update({"returns": returns.detach()})
         transitions.update({"values": values.detach()})
@@ -105,6 +107,7 @@ class PPOLearner:
         transitions = self.make_transitions(batch)
         num             = transitions["num"]
         actions         = transitions["actions"]
+        avail_actions   = transitions["avail_actions"]
         actions_neglogp = transitions["actions_neglogp"]
         returns         = transitions["returns"]
         values          = transitions["values"]
@@ -118,16 +121,15 @@ class PPOLearner:
                 self.conv1d_critic.update_rms(obs)
 
         if getattr(self.args, "is_advantage_normalized", False):
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+            advantages = (advantages - advantages.mean()) / advantages.std()
 
         ## feeding and training
-        approxkl_lst = []
-        entropy_lst = []
+        approxkl_lst = [] 
+        entropy_lst = [] 
         critic_loss_lst = []
         actor_loss_lst = []
         loss_lst = []
         grad_norm_lst = []
-
 
         for _ in range(0, self.args.mini_epochs_num):
             rnd_idx = np.random.permutation(num)
@@ -135,14 +137,15 @@ class PPOLearner:
             for j in range(0, self.mini_batches_num):
                 curr_idx = rnd_idx[j*rnd_step : j*rnd_step+rnd_step]
 
-                mb_actions = actions[curr_idx]
-                mb_adv = advantages[curr_idx]
-                mb_ret = returns[curr_idx]
-                mb_old_values = values[curr_idx]
-                mb_old_neglogp = actions_neglogp[curr_idx]
-                mb_obs = obs[curr_idx]
+                mb_actions      = actions[curr_idx]
+                mb_avail_actions= avail_actions[curr_idx]
+                mb_adv          = advantages[curr_idx]
+                mb_ret          = returns[curr_idx]
+                mb_old_values   = values[curr_idx]
+                mb_old_neglogp  = actions_neglogp[curr_idx]
+                mb_obs          = obs[curr_idx]
 
-                mb_logp = self.mac.forward_obs(mb_obs)
+                mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions)
                 if self.is_separate_actor_critic:
                     mb_values = self.conv1d_critic.forward_obs(mb_obs)
                 else:
@@ -153,6 +156,7 @@ class PPOLearner:
                 with th.no_grad():
                     approxkl = 0.5 * ((mb_old_neglogp - mb_neglogp)**2).mean()
                     approxkl_lst.append(approxkl)
+                import pdb; pdb.set_trace()
 
                 entropy = -1.0 * (mb_logp * th.exp(mb_logp)).sum(dim=-1).mean()
                 entropy_lst.append(entropy)
