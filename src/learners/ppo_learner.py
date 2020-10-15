@@ -43,10 +43,10 @@ class PPOLearner:
         self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
     def make_transitions(self, batch: EpisodeBatch):
-        actions = batch["actions"][:, :-1]
-        rewards = batch["reward"][:, :-1]
-        mask = batch["filled"].float()
-        obs = batch["obs"][:, :-1]
+        actions = batch["actions"][:, :-1].cuda()
+        rewards = batch["reward"][:, :-1].cuda()
+        mask = batch["filled"].float().cuda()
+        obs = batch["obs"][:, :-1].cuda()
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
@@ -56,8 +56,8 @@ class PPOLearner:
 
         mask = mask.repeat(1, 1, self.n_agents)
 
-        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents))
-        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions))
+        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents)).cuda()
+        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions)).cuda()
 
         for t in range(rewards.shape[1] + 1):
             action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=True)
@@ -193,7 +193,6 @@ class PPOLearner:
         critic_train_stats["critic_loss"].append(th.mean(th.tensor(critic_loss_lst)).item())
         critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
         critic_train_stats["loss"].append(th.mean(th.tensor(loss_lst)).item())
-        critic_train_stats["advantage"].append((th.mean(advantages)).mean().item())
         critic_train_stats["grad_norm"].append(np.mean(grad_norm_lst))
 
         if t_env - self.log_stats_t >= self.args.learner_log_interval:
@@ -223,8 +222,8 @@ class PPOLearner:
 
     def cuda(self):
         self.mac.cuda()
-        if hasattr(self, "critic"):
-            self.mac.critic.cuda()
+        if hasattr(self, "conv1d_critic"):
+            self.conv1d_critic.cuda()
 
     def save_models(self, path):
         self.mac.save_models(path)

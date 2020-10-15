@@ -64,7 +64,7 @@ class Conv1dCritic(nn.Module):
         inputs = self._build_inputs(ep_batch, t)
 
         if self.is_obs_normalized:
-            inputs = (inputs - self.obs_rms.mean) / (th.sqrt(self.obs_rms.var) + 1e-5)
+            inputs = (inputs - self.obs_rms.mean.cuda()) / th.sqrt(self.obs_rms.var).cuda()
             # inputs = th.clamp(inputs, min=-5.0, max=5.0) # clip to range
 
         assert inputs.shape[-1] % self.dim_channels == 0 # frames are stacked exactly
