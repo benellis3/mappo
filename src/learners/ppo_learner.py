@@ -170,16 +170,7 @@ class PPOLearner:
                 actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
                 actor_loss_lst.append(actor_loss)
 
-                # Construct critic loss
-                clipped_values = mb_old_values + th.clamp(mb_values - mb_old_values,
-                                                        -self.ppo_value_clip_params,
-                                                        +self.ppo_value_clip_params)
-
-                # have to extend rewards to each agent if we have independent learning setting
-                critic_loss_clipped = (clipped_values - mb_ret)**2
-                critic_loss_raw = (mb_values - mb_ret)**2
-                critic_loss = 0.5 * th.mean(th.max(critic_loss_raw, critic_loss_clipped))
-
+                critic_loss = 0.5 * th.mean((mb_values - mb_ret)**2)
                 critic_loss_lst.append(critic_loss)
 
                 loss = actor_loss + self.args.critic_loss_coeff * critic_loss
