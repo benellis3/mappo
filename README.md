@@ -30,6 +30,10 @@ to the
 maps folder (which you will have to create first).
 
 ## Run an experiment 
+```
+# run ppo experiments on map MMM2
+./run.sh 0 python3 src/main.py --config=ppo_conv1d --env-config=sc2framestack with env_args.map_name=MMM2
+```
 
 Run one of the EXPERIMENTs from the folder `src/config/experiments`
 on a specific GPU using some special PARAMETERS:
