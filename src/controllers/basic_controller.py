@@ -91,19 +91,6 @@ class BasicMAC:
                 agent_outs[reshaped_avail_actions == 0] = -1e10
 
             agent_outs = th.nn.functional.softmax(agent_outs, dim=-1)
-            # if not test_mode:
-            #     # Epsilon floor
-            #     epsilon_action_num = agent_outs.size(-1)
-            #     if getattr(self.args, "mask_before_softmax", True):
-            #         # With probability epsilon, we will pick an available action uniformly
-            #         epsilon_action_num = reshaped_avail_actions.sum(dim=1, keepdim=True).float()
-
-            #     agent_outs = ((1 - self.action_selector.epsilon) * agent_outs
-            #                    + th.ones_like(agent_outs) * self.action_selector.epsilon/epsilon_action_num)
-
-            #     if getattr(self.args, "mask_before_softmax", True):
-            #         # Zero out the unavailable actions
-            #         agent_outs[reshaped_avail_actions == 0] = 0.0
 
         elif self.agent_output_type == "gaussian_mean":
             raise NotImplementedError
