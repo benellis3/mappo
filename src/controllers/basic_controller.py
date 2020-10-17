@@ -111,6 +111,7 @@ class BasicMAC:
 
     def cuda(self):
         self.agent.cuda()
+        self.obs_rms.cuda()
 
     def save_models(self, path):
         th.save(self.agent.state_dict(), "{}/agent.th".format(path))
