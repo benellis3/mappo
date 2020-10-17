@@ -1,10 +1,7 @@
 # Fast MVC-style deep MARL framework
 
 Includes implementations of algorithms:
-- COMA
-- IQL
-- VDN (untested)
-- QMIX (untested)
+- Independent PPO
 
 ## Installation instructions
 
@@ -30,30 +27,11 @@ to the
 maps folder (which you will have to create first).
 
 ## Run an experiment 
-
-Run one of the EXPERIMENTs from the folder `src/config/experiments`
-on a specific GPU using some special PARAMETERS:
 ```
-cd pymarl/src
-../run.sh <GPU> python3 main.py --exp_name=<EXPERIMENT> with <PARAMETERS>
+# run ppo experiments on map MMM2
+./run.sh 0 python3 src/main.py --config=ppo_conv1d --env-config=sc2framestack with env_args.map_name=MMM2
 ```
 
-Keep an eye on your docker containers, they will be named
-`<USER>_pymarl_GPU_<GPU>_<RANDOM>`:
-```
-docker ps
-```
-
-If you do not want them anymore, kill a container named `NAME` with
-```
-docker kill <NAME>
-docker rm <NAME>
-```
-
-If you want to get rid of *all* your containers, execute 
-```
-pymarl/kill.sh
-```
 
 ## Run SC2 baselines
 
