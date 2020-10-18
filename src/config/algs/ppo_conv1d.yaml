@@ -27,6 +27,7 @@ td_lambda: 0.97
 
 agent_output_type: "pi_logits"
 learner: "ppo_learner"
+critic: "conv1d_critic"
 
 mini_epochs_num: 2
 mini_batches_num: 16

@@ -1,6 +1,6 @@
 import copy
 from components.episode_buffer import EpisodeBatch
-from modules.critics.conv1d_critic import Conv1dCritic
+from modules.critics import critic_REGISTRY
 # from modules.critics.independent import IndependentCritic
 import torch as th
 from torch.optim import RMSprop, Adam
@@ -24,8 +24,8 @@ class PPOLearner:
 
         if getattr(self.args, "is_separate_actor_critic", False):
             self.is_separate_actor_critic = True
-            self.conv1d_critic = Conv1dCritic(scheme, args)
-            self.critic_params = list(self.conv1d_critic.parameters())
+            self.critic = critic_REGISTRY[self.args.critic](scheme, args)
+            self.critic_params = list(self.critic.parameters())
             self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor)
             self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic)
         else:
@@ -43,11 +43,11 @@ class PPOLearner:
         self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
     def make_transitions(self, batch: EpisodeBatch):
-        actions = batch["actions"][:, :-1].cuda()
-        avail_actions = batch["avail_actions"][:, :-1].cuda()
-        rewards = batch["reward"][:, :-1].cuda()
-        mask = batch["filled"].float().cuda()
-        obs = batch["obs"][:, :-1].cuda()
+        actions = batch["actions"][:, :-1]
+        avail_actions = batch["avail_actions"][:, :-1]
+        rewards = batch["reward"][:, :-1]
+        mask = batch["filled"].float()
+        obs = batch["obs"][:, :-1]
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
@@ -63,15 +63,15 @@ class PPOLearner:
         if getattr(self.args, "is_observation_normalized", False):
             self.mac.update_rms(obs)
             if self.is_separate_actor_critic:
-                self.conv1d_critic.update_rms(obs)
+                self.critic.update_rms(obs)
 
-        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents)).cuda()
-        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions)).cuda()
+        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents))
+        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions))
 
         for t in range(rewards.shape[1] + 1):
             action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=True)
             if self.is_separate_actor_critic:
-                old_values[:, t] = self.conv1d_critic(batch, t)
+                old_values[:, t] = self.critic(batch, t).squeeze()
             else:
                 old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
 
@@ -149,7 +149,7 @@ class PPOLearner:
 
                 mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions)
                 if self.is_separate_actor_critic:
-                    mb_values = self.conv1d_critic.forward_obs(mb_obs)
+                    mb_values = self.critic.forward_obs(mb_obs)
                 else:
                     mb_values = self.mac.other_outs["values"]
 
@@ -232,8 +232,8 @@ class PPOLearner:
 
     def cuda(self):
         self.mac.cuda()
-        if hasattr(self, "conv1d_critic"):
-            self.conv1d_critic.cuda()
+        if hasattr(self, "critic"):
+            self.critic.cuda()
 
     def save_models(self, path):
         self.mac.save_models(path)

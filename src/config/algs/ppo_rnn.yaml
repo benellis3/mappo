@@ -25,14 +25,15 @@ env_args:
 target_update_interval: 200
 
 
-lr: 0.0005
-critic_lr: 0.0005
-td_lambda: 0.8
+lr_actor: 0.0002
+lr_critic: 0.0005
+tau: 0.995
+td_lambda: 0.97
 
 # use COMA
 agent_output_type: "pi_logits"
 learner: "ppo_learner"
-critic_q_fn: "centralV"
+critic: "central_v"
 critic_baseline_fn: "centralV"
 critic_train_mode: "seq"
 critic_train_reps: 1
@@ -46,6 +47,6 @@ ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
 is_observation_normalized: False
-
+is_separate_actor_critic: True
 
 name: "centralV"
