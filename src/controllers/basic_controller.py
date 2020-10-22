@@ -91,19 +91,6 @@ class BasicMAC:
                 agent_outs[reshaped_avail_actions == 0] = -1e10
 
             agent_outs = th.nn.functional.softmax(agent_outs, dim=-1)
-            # if not test_mode:
-            #     # Epsilon floor
-            #     epsilon_action_num = agent_outs.size(-1)
-            #     if getattr(self.args, "mask_before_softmax", True):
-            #         # With probability epsilon, we will pick an available action uniformly
-            #         epsilon_action_num = reshaped_avail_actions.sum(dim=1, keepdim=True).float()
-
-            #     agent_outs = ((1 - self.action_selector.epsilon) * agent_outs
-            #                    + th.ones_like(agent_outs) * self.action_selector.epsilon/epsilon_action_num)
-
-            #     if getattr(self.args, "mask_before_softmax", True):
-            #         # Zero out the unavailable actions
-            #         agent_outs[reshaped_avail_actions == 0] = 0.0
 
         elif self.agent_output_type == "gaussian_mean":
             raise NotImplementedError
@@ -124,6 +111,7 @@ class BasicMAC:
 
     def cuda(self):
         self.agent.cuda()
+        self.obs_rms.cuda()
 
     def save_models(self, path):
         th.save(self.agent.state_dict(), "{}/agent.th".format(path))
@@ -153,9 +141,9 @@ class BasicMAC:
 
     def _get_input_shape(self, scheme):
         input_shape = scheme["obs"]["vshape"]
-        if self.args.obs_last_action:
+        if getattr(self.args, 'obs_last_action', None):
             input_shape += scheme["actions_onehot"]["vshape"][0]
-        if self.args.obs_agent_id:
+        if getattr(self.args, 'obs_agent_id', None):
             input_shape += self.n_agents
 
         return input_shape

@@ -1,6 +1,6 @@
 import copy
 from components.episode_buffer import EpisodeBatch
-from modules.critics.conv1d_critic import Conv1dCritic
+from modules.critics import critic_REGISTRY
 # from modules.critics.independent import IndependentCritic
 import torch as th
 from torch.optim import RMSprop, Adam
@@ -24,17 +24,18 @@ class PPOLearner:
 
         if getattr(self.args, "is_separate_actor_critic", False):
             self.is_separate_actor_critic = True
-            self.conv1d_critic = Conv1dCritic(scheme, args)
-            self.critic_params = list(self.conv1d_critic.parameters())
-            self.params = self.agent_params + self.critic_params
+            self.critic = critic_REGISTRY[self.args.critic](scheme, args)
+            self.critic_params = list(self.critic.parameters())
+            self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor)
+            self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic)
         else:
             self.is_separate_actor_critic = False
             self.params = self.agent_params
+            self.optimiser = Adam(params=self.params, lr=args.lr)
 
         # self.optimiser = RMSprop(params=self.params,
         #                          lr=args.lr, alpha=args.optim_alpha, 
         #                          eps=args.optim_eps)
-        self.optimiser = Adam(params=self.params, lr=args.lr)
 
         self.log_stats_t = -self.args.learner_log_interval - 1
 
@@ -42,27 +43,35 @@ class PPOLearner:
         self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
     def make_transitions(self, batch: EpisodeBatch):
-        actions = batch["actions"][:, :-1].cuda()
-        avail_actions = batch["avail_actions"][:, :-1].cuda()
-        rewards = batch["reward"][:, :-1].cuda()
-        mask = batch["filled"].float().cuda()
-        obs = batch["obs"][:, :-1].cuda()
+        actions = batch["actions"][:, :-1]
+        avail_actions = batch["avail_actions"][:, :-1]
+        rewards = batch["reward"][:, :-1]
+        mask = batch["filled"].float()
+        obs = batch["obs"][:, :-1]
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
         terminated[:, 1:] = terminated[:, :-1].clone()
         mask = mask * (1 - terminated)
-
         mask = mask.repeat(1, 1, self.n_agents)
 
-        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents)).cuda()
-        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions)).cuda()
+        obs_mask = mask[:, :-1].clone()
+        obs_mask = obs_mask.flatten()
+        obs_index = th.nonzero(obs_mask).squeeze()
+        obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
+        if getattr(self.args, "is_observation_normalized", False):
+            self.mac.update_rms(obs)
+            if self.is_separate_actor_critic:
+                self.critic.update_rms(obs)
+
+        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents))
+        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions))
 
         for t in range(rewards.shape[1] + 1):
             action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=True)
             if self.is_separate_actor_critic:
-                old_values[:, t] = self.conv1d_critic(batch, t)
+                old_values[:, t] = self.critic(batch, t).squeeze()
             else:
                 old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
 
@@ -81,11 +90,10 @@ class PPOLearner:
         actions = actions.flatten()[index]
         avail_actions = avail_actions.reshape((-1, avail_actions.shape[-1]))[index]
         pi_taken = pi_taken.flatten()[index]
-        actions_neglogp = -th.log(pi_taken)
+        actions_neglogp = -th.log(pi_taken + 1e-6)
         returns = returns.flatten()[index]
         values = old_values.flatten()[index]
         advantages = advs.flatten()[index]
-        obs = obs.reshape((-1, obs.shape[-1]))[index]
         rewards = rewards.flatten()[index]
 
         transitions = {}
@@ -115,13 +123,8 @@ class PPOLearner:
         obs             = transitions["obs"]
         rewards         = transitions["rewards"]
 
-        if getattr(self.args, "is_observation_normalized", False):
-            self.mac.update_rms(obs)
-            if self.is_separate_actor_critic:
-                self.conv1d_critic.update_rms(obs)
-
         if getattr(self.args, "is_advantage_normalized", False):
-            advantages = (advantages - advantages.mean()) / advantages.std()
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
         ## feeding and training
         approxkl_lst = [] 
@@ -129,7 +132,6 @@ class PPOLearner:
         critic_loss_lst = []
         actor_loss_lst = []
         loss_lst = []
-        grad_norm_lst = []
 
         for _ in range(0, self.args.mini_epochs_num):
             rnd_idx = np.random.permutation(num)
@@ -147,7 +149,7 @@ class PPOLearner:
 
                 mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions)
                 if self.is_separate_actor_critic:
-                    mb_values = self.conv1d_critic.forward_obs(mb_obs)
+                    mb_values = self.critic.forward_obs(mb_obs)
                 else:
                     mb_values = self.mac.other_outs["values"]
 
@@ -179,13 +181,19 @@ class PPOLearner:
                 loss = actor_loss + self.args.critic_loss_coeff * critic_loss
                 loss_lst.append(loss)
 
-                self.optimiser.zero_grad()
-                loss.backward()
-                grad_norm = th.nn.utils.clip_grad_norm_(self.params, 
-                                                        self.args.grad_norm_clip)
-                grad_norm_lst.append(grad_norm if isinstance(grad_norm, float) 
-                                               else grad_norm.item()) #pytorch1.5 fix
-                self.optimiser.step()
+                if getattr(self.args, "is_separate_actor_critic", False):
+                    self.optimiser_actor.zero_grad()
+                    actor_loss.backward()
+                    self.optimiser_actor.step()
+
+                    self.optimiser_critic.zero_grad()
+                    critic_loss.backward()
+                    self.optimiser_critic.step()
+
+                else:
+                    self.optimiser.zero_grad()
+                    loss.backward()
+                    self.optimiser.step()
 
         # log stuff
         critic_train_stats["values"].append((th.mean(values)).item())
@@ -196,7 +204,6 @@ class PPOLearner:
         critic_train_stats["critic_loss"].append(th.mean(th.tensor(critic_loss_lst)).item())
         critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
         critic_train_stats["loss"].append(th.mean(th.tensor(loss_lst)).item())
-        critic_train_stats["grad_norm"].append(np.mean(grad_norm_lst))
 
         if t_env - self.log_stats_t >= self.args.learner_log_interval:
             for k,v in critic_train_stats.items():
@@ -225,13 +232,17 @@ class PPOLearner:
 
     def cuda(self):
         self.mac.cuda()
-        if hasattr(self, "conv1d_critic"):
-            self.conv1d_critic.cuda()
+        if hasattr(self, "critic"):
+            self.critic.cuda()
 
     def save_models(self, path):
         self.mac.save_models(path)
         th.save(self.mac.critic.state_dict(), "{}/critic.th".format(path))
-        th.save(self.optimiser.state_dict(), "{}/opt.th".format(path))
+        if getattr(self.args, "is_separate_actor_critic", False):
+            th.save(self.optimiser_actor.state_dict(), "{}/opt_actor.th".format(path))
+            th.save(self.optimiser_critic.state_dict(), "{}/opt_critic.th".format(path))
+        else:
+            th.save(self.optimiser.state_dict(), "{}/opt.th".format(path))
 
     def load_models(self, path):
         self.mac.load_models(path)
@@ -239,4 +250,8 @@ class PPOLearner:
         # Not quite right but I don't want to save target networks
         if hasattr(self, "target_critic"):
             self.target_critic.load_state_dict(self.critic.state_dict())
-        self.optimiser.load_state_dict(th.load("{}/opt.th".format(path), map_location=lambda storage, loc: storage))
+        if getattr(self.args, "is_separate_actor_critic", False):
+            self.optimiser_actor.load_state_dict("{}/opt_actor.th".format(path))
+            self.optimiser_critic.load_state_dict("{}/opt_critic.th".format(path))
+        else:
+            self.optimiser.load_state_dict(th.load("{}/opt.th".format(path), map_location=lambda storage, loc: storage))

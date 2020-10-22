@@ -5,8 +5,8 @@ import torch as th
 class RunningMeanStd(object):
     # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
     def __init__(self, epsilon=1e-4, shape=()):
-        self.mean = th.zeros(shape, dtype=th.float32).cuda()
-        self.var = th.ones(shape, dtype=th.float32).cuda()
+        self.mean = th.zeros(shape, dtype=th.float32)
+        self.var = th.ones(shape, dtype=th.float32)
         self.count = epsilon
 
     def update(self, x):
@@ -18,6 +18,10 @@ class RunningMeanStd(object):
     def update_from_moments(self, batch_mean, batch_var, batch_count):
         self.mean, self.var, self.count = update_mean_var_count_from_moments(
             self.mean, self.var, self.count, batch_mean, batch_var, batch_count)
+
+    def cuda(self):
+        self.mean.cuda()
+        self.var.cuda()
 
 def update_mean_var_count_from_moments(mean, var, count, batch_mean, batch_var, batch_count):
     delta = batch_mean - mean

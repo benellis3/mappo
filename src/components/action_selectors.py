@@ -35,28 +35,14 @@ class MultinomialActionSelector():
     def __init__(self, args):
         self.args = args
 
-        self.schedule = DecayThenFlatSchedule(args.epsilon_start, args.epsilon_finish, args.epsilon_anneal_time,
-                                              decay="linear")
-        self.epsilon = self.schedule.eval(0)
-        self.test_greedy = getattr(args, "test_greedy", True)
-
     def select_action(self, agent_inputs, avail_actions, t_env, test_mode=False):
         masked_policies = agent_inputs.clone()
         masked_policies[avail_actions == 0.0] = 0.0
-        self.epsilon = self.schedule.eval(t_env)
 
-        if test_mode and self.test_greedy:
+        if test_mode:
             picked_actions = masked_policies.max(dim=2)[1]
         else:
-            random_num = np.random.rand() # between 0.0 -- 1.0
-            if random_num <= self.epsilon:
-                n_actions = masked_policies.size(-1)
-                uniform_probs = th.ones_like(masked_policies)/n_actions
-                uniform_probs[avail_actions == 0.0] = 0.0
-                uniform_dist = Categorical(probs= uniform_probs)
-                picked_actions = uniform_dist.sample().long()
-            else:
-                picked_actions = Categorical(probs=masked_policies).sample().long()
+            picked_actions = Categorical(probs=masked_policies).sample().long()
 
         return picked_actions
 

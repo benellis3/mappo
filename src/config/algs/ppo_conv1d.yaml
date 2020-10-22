@@ -6,9 +6,6 @@ obs_last_action: False # Include the agent's last action (one_hot) in the observ
 # --- PPO specific parameters ---
 
 action_selector: "multinomial"
-epsilon_start: .5
-epsilon_finish: .01
-epsilon_anneal_time: 100000
 mask_before_softmax: True
 
 runner: "parallel"
@@ -23,16 +20,18 @@ env_args:
 # update the target network every {} training steps
 target_update_interval: 200
 
-lr: 0.0005
-tau: 0.95
-td_lambda: 0.8
+lr_actor: 0.0002
+lr_critic: 0.0005
+tau: 0.995
+td_lambda: 0.97
 
 agent_output_type: "pi_logits"
 learner: "ppo_learner"
+critic: "conv1d_critic"
 
-mini_epochs_num: 1
-mini_batches_num: 8
-entropy_loss_coeff: 0.05
+mini_epochs_num: 2
+mini_batches_num: 16
+entropy_loss_coeff: 0.01
 critic_loss_coeff: 1.0
 
 ppo_policy_clip_param: 0.2
