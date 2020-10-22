@@ -156,7 +156,6 @@ class PPOLearner:
                 with th.no_grad():
                     approxkl = 0.5 * ((mb_old_neglogp - mb_neglogp)**2).mean()
                     approxkl_lst.append(approxkl)
-                import pdb; pdb.set_trace()
 
                 entropy = -1.0 * (mb_logp * th.exp(mb_logp)).sum(dim=-1).mean()
                 entropy_lst.append(entropy)
