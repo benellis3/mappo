@@ -26,6 +26,12 @@ class CentralVCritic(nn.Module):
         q = self.fc3(x)
         return q.view(bs, max_t, 1, -1).repeat(1, 1, self.n_agents, 1)
 
+    def forward_obs(self, inputs):
+        x = F.relu(self.fc1(inputs))
+        x = F.relu(self.fc2(x))
+        q = self.fc3(x)
+        return q
+
     def _build_inputs(self, batch, t=None):
         bs = batch.batch_size
         max_t = batch.max_seq_length if t is None else 1

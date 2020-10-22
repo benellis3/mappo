@@ -43,12 +43,25 @@ class PPOLearner:
         self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
     def make_transitions(self, batch: EpisodeBatch):
+        bs = batch.batch_size
+        ts = batch["obs"].shape[1] - 1
         actions = batch["actions"][:, :-1]
         avail_actions = batch["avail_actions"][:, :-1]
         rewards = batch["reward"][:, :-1]
         mask = batch["filled"].float()
         obs = batch["obs"][:, :-1]
         rewards = rewards.repeat(1, 1, self.n_agents)
+
+        # append last actions
+        if self.args.obs_last_action:
+            last_actions = th.zeros_like(batch["actions_onehot"][:, :-1])
+            last_actions[:, 1:] = batch["actions_onehot"][:, :-2] # right shift actions
+            obs = th.cat((obs, last_actions), dim=-1)
+
+        # apend agent id
+        if self.args.obs_agent_id: 
+            ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, ts, self.n_agents, -1)
+            obs = th.cat((obs, ids), dim=-1)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
@@ -65,10 +78,18 @@ class PPOLearner:
             if self.is_separate_actor_critic:
                 self.critic.update_rms(obs)
 
-        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents))
-        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions))
+        old_values = th.zeros((bs, ts + 1, self.n_agents)).cuda()
+        action_probs = th.zeros((bs, ts + 1, self.n_agents, self.n_actions)).cuda()
+
+        if self.args.agent == 'rnn':
+            self.mac.init_hidden(bs)
+            h_shape = self.mac.hidden_states.shape
+            hidden_states = th.zeros((h_shape[0], ts+1, h_shape[1], h_shape[2])).cuda()
 
         for t in range(rewards.shape[1] + 1):
+            if self.args.agent == 'rnn':
+                hidden_states[:, t] = self.mac.hidden_states.reshape(h_shape)
+
             action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=True)
             if self.is_separate_actor_critic:
                 old_values[:, t] = self.critic(batch, t).squeeze()
@@ -83,10 +104,12 @@ class PPOLearner:
         returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
                                                    self.args.gamma, self.args.tau)
         old_values = old_values[:, :-1]
+        hidden_states = hidden_states[:, :-1]
         
         mask = mask[:, :-1]
         mask = mask.flatten()
         index = th.nonzero(mask).squeeze()
+        hidden_states = hidden_states.reshape((-1, hidden_states.shape[-1]))[index]
         actions = actions.flatten()[index]
         avail_actions = avail_actions.reshape((-1, avail_actions.shape[-1]))[index]
         pi_taken = pi_taken.flatten()[index]
@@ -98,6 +121,7 @@ class PPOLearner:
 
         transitions = {}
         transitions.update({"num": int(th.sum(mask))})
+        transitions.update({"hidden_states": hidden_states.detach()})
         transitions.update({"actions": actions.detach()})
         transitions.update({"avail_actions": avail_actions.detach()})
         transitions.update({"actions_neglogp": actions_neglogp.detach()})
@@ -115,6 +139,7 @@ class PPOLearner:
         transitions = self.make_transitions(batch)
         num             = transitions["num"]
         actions         = transitions["actions"]
+        hidden_states   = transitions["hidden_states"]
         avail_actions   = transitions["avail_actions"]
         actions_neglogp = transitions["actions_neglogp"]
         returns         = transitions["returns"]
@@ -140,6 +165,7 @@ class PPOLearner:
                 curr_idx = rnd_idx[j*rnd_step : j*rnd_step+rnd_step]
 
                 mb_actions      = actions[curr_idx]
+                mb_hidden_states= hidden_states[curr_idx]
                 mb_avail_actions= avail_actions[curr_idx]
                 mb_adv          = advantages[curr_idx]
                 mb_ret          = returns[curr_idx]
@@ -147,7 +173,11 @@ class PPOLearner:
                 mb_old_neglogp  = actions_neglogp[curr_idx]
                 mb_obs          = obs[curr_idx]
 
-                mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions)
+                if self.args.agent == "rnn":
+                    mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions, mb_hidden_states)
+                else:
+                    mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions)
+
                 if self.is_separate_actor_critic:
                     mb_values = self.critic.forward_obs(mb_obs)
                 else:
