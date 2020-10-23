@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 class VanillaCritic(nn.Module):
     def __init__(self, scheme, args):
-        super(CentralVCritic, self).__init__()
+        super(VanillaCritic, self).__init__()
 
         self.args = args
         self.n_actions = args.n_actions
@@ -24,7 +24,7 @@ class VanillaCritic(nn.Module):
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         q = self.fc3(x)
-        return q.view(bs, max_t, 1, -1).repeat(1, 1, self.n_agents, 1)
+        return q.view(bs, self.n_agents, -1)
 
     def forward_obs(self, inputs):
         x = F.relu(self.fc1(inputs))
