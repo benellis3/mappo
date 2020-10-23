@@ -127,7 +127,6 @@ if __name__ == '__main__':
             no_mongodb = True
             break
 
-
     # If there is no url set for the mongodb, we cannot use it
     if not no_mongodb and "db_url" not in config_dict:
         no_mongodb = True

@@ -44,7 +44,8 @@ class Matrixgame(MultiAgentEnv):
 
     def get_obs_agent(self, agent_id):
         """ Returns observation for agent_id """
-        raise NotImplementedError
+        return [self.state for _ in range(self.n_agents)]
+        # raise NotImplementedError
 
     def get_obs_size(self):
         """ Returns the shape of the observation """
@@ -74,5 +75,6 @@ class Matrixgame(MultiAgentEnv):
         return self.n_actions
 
     def get_stats(self):
-        raise NotImplementedError
+        # raise NotImplementedError
+        pass
 
