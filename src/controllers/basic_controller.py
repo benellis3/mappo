@@ -40,20 +40,18 @@ class BasicMAC:
     def update_rms(self, batch_obs):
         self.obs_rms.update(batch_obs)
 
-    def forward_obs(self, obs, avail_actions):
+    def forward_obs(self, obs, avail_actions, hidden_states=None):
         # obs.shape: num_transitions * num_features
         agent_inputs = obs
         if self.is_obs_normalized:
             agent_inputs = (agent_inputs - self.obs_rms.mean) / th.sqrt(self.obs_rms.var)
             # agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
 
-        agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
-
-        if isinstance(other_outs, dict):
-            self.hidden_states = other_outs.pop("hidden_states")
-            self.other_outs = other_outs
+        # NOTE: obs has been flatten; self.hidden_states also need to do that
+        if hidden_states is not None:
+            agent_outs, other_outs = self.agent(agent_inputs, hidden_states)
         else:
-            self.hidden_states = other_outs
+            agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
 
         if self.agent_output_type == "pi_logits":
             if getattr(self.args, "mask_before_softmax", True):
@@ -111,7 +109,8 @@ class BasicMAC:
 
     def cuda(self):
         self.agent.cuda()
-        self.obs_rms.cuda()
+        if getattr(self.args, "is_observation_normalized", None):
+            self.obs_rms.cuda()
 
     def save_models(self, path):
         th.save(self.agent.state_dict(), "{}/agent.th".format(path))
