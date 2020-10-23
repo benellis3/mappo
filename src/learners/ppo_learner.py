@@ -53,13 +53,13 @@ class PPOLearner:
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # append last actions
-        if self.args.obs_last_action:
+        if getattr(self.args, 'obs_last_action', None):
             last_actions = th.zeros_like(batch["actions_onehot"][:, :-1])
             last_actions[:, 1:] = batch["actions_onehot"][:, :-2] # right shift actions
             obs = th.cat((obs, last_actions), dim=-1)
 
         # apend agent id
-        if self.args.obs_agent_id: 
+        if getattr(self.args, 'obs_agent_id', None): 
             ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, ts, self.n_agents, -1)
             obs = th.cat((obs, ids), dim=-1)
 
