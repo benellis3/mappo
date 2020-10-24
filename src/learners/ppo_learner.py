@@ -205,7 +205,7 @@ class PPOLearner:
 
                 if self.actor_critic_mode:
                     # actor critic loss
-                    pg_loss = mb_adv * mb_neglogp
+                    pg_loss = th.mean(mb_adv * mb_neglogp)
                 else: 
                     # ppo loss
                     prob_ratio = th.clamp(th.exp(mb_old_neglogp - mb_neglogp), 0.0, 16.0)
