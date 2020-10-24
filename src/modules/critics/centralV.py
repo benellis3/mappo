@@ -40,27 +40,28 @@ class CentralVCritic(nn.Module):
         # state
         inputs.append(batch["state"][:, ts])
 
-        # observations
-        inputs.append(batch["obs"][:, ts].view(bs, max_t, -1))
+        if self.args.obs_last_action:
+            if t == 0:
+                inputs.append(th.zeros_like(batch["actions_onehot"][:, t]))
+            else:
+                inputs.append(batch["actions_onehot"][:, t-1])
+        if self.args.obs_agent_id:
+            inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, -1, -1))
 
-        # last actions
-        if t == 0:
-            inputs.append(th.zeros_like(batch["actions_onehot"][:, 0:1]).view(bs, max_t, 1, -1))
-        elif isinstance(t, int):
-            inputs.append(batch["actions_onehot"][:, slice(t-1, t)].view(bs, max_t, 1, -1))
-        else:
-            last_actions = th.cat([th.zeros_like(batch["actions_onehot"][:, 0:1]), batch["actions_onehot"][:, :-1]], dim=1)
-            last_actions = last_actions.view(bs, max_t, 1, -1)
-            inputs.append(last_actions)
+        inputs = th.cat([x.reshape(bs*self.n_agents, -1) for x in inputs], dim=1)
 
-        inputs = th.cat([x.reshape(bs * max_t, -1) for x in inputs], dim=1)
         return inputs, bs, max_t
 
     def _get_input_shape(self, scheme):
         # state
         input_shape = scheme["state"]["vshape"]
-        # observations
-        input_shape += scheme["obs"]["vshape"] * self.n_agents
-        # last actions
-        input_shape += scheme["actions_onehot"]["vshape"][0] * self.n_agents
+
+        # last action
+        if getattr(self.args, 'obs_last_action', None):
+            input_shape += scheme["actions_onehot"]["vshape"][0]
+
+        # agent id
+        if getattr(self.args, 'obs_agent_id', None):
+            input_shape += self.n_agents
+            
         return input_shape

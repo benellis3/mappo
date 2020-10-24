@@ -1,15 +1,11 @@
 import copy
-from components.episode_buffer import EpisodeBatch
-from modules.critics import critic_REGISTRY
-# from modules.critics.independent import IndependentCritic
+import numpy as np
 import torch as th
-from torch.optim import RMSprop, Adam
 import torch.nn.functional as F
 from collections import defaultdict
-import numpy as np
-from utils.rl_utils import build_td_lambda_targets
-
-# from torch.distributions import Categorical
+from torch.optim import RMSprop, Adam
+from modules.critics import critic_REGISTRY
+from components.episode_buffer import EpisodeBatch
 
 class PPOLearner:
     def __init__(self, mac, scheme, logger, args):
@@ -33,6 +29,9 @@ class PPOLearner:
             self.params = self.agent_params
             self.optimiser = Adam(params=self.params, lr=args.lr)
 
+        self.central_v = getattr(self.args, "is_central_value", False):
+        self.actor_critic_mode = getattr(self.args, "actor_critic_mode", False):
+
         # self.optimiser = RMSprop(params=self.params,
         #                          lr=args.lr, alpha=args.optim_alpha, 
         #                          eps=args.optim_eps)
@@ -50,6 +49,7 @@ class PPOLearner:
         rewards = batch["reward"][:, :-1]
         mask = batch["filled"].float()
         obs = batch["obs"][:, :-1]
+        states = batch["state"][:, :-1]
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # append last actions
@@ -57,11 +57,13 @@ class PPOLearner:
             last_actions = th.zeros_like(batch["actions_onehot"][:, :-1])
             last_actions[:, 1:] = batch["actions_onehot"][:, :-2] # right shift actions
             obs = th.cat((obs, last_actions), dim=-1)
+            states = th.cat((states, last_actions), dim=-1)
 
         # apend agent id
         if getattr(self.args, 'obs_agent_id', None): 
             ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, ts, self.n_agents, -1)
             obs = th.cat((obs, ids), dim=-1)
+            states = th.cat((states, ids), dim=-1)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
@@ -73,10 +75,15 @@ class PPOLearner:
         obs_mask = obs_mask.flatten()
         obs_index = th.nonzero(obs_mask).squeeze()
         obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
+        states = states.reshape((-1, states.shape[-1]))[obs_index]
         if getattr(self.args, "is_observation_normalized", False):
-            self.mac.update_rms(obs)
+            if self.central_v:
+                tmp_inputs = states
+            else:
+                tmp_inputs = obs
+            self.mac.update_rms(tmp_inputs)
             if self.is_separate_actor_critic:
-                self.critic.update_rms(obs)
+                self.critic.update_rms(tmp_inputs)
 
         old_values = th.zeros((bs, ts + 1, self.n_agents)).cuda()
         action_probs = th.zeros((bs, ts + 1, self.n_agents, self.n_actions)).cuda()
@@ -129,6 +136,7 @@ class PPOLearner:
         transitions.update({"values": values.detach()})
         transitions.update({"advantages": advantages.detach()})
         transitions.update({"obs": obs.detach()})
+        transitions.update({"states": states.detach()})
         transitions.update({"rewards": rewards.detach()})
 
         return transitions
@@ -145,8 +153,11 @@ class PPOLearner:
         returns         = transitions["returns"]
         values          = transitions["values"]
         advantages      = transitions["advantages"]
-        obs             = transitions["obs"]
         rewards         = transitions["rewards"]
+        if self.central_v:
+            obs         = transitions["states"]
+        else:
+            obs         = transitions["obs"]
 
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
@@ -192,14 +203,17 @@ class PPOLearner:
                 entropy = -1.0 * (mb_logp * th.exp(mb_logp)).sum(dim=-1).mean()
                 entropy_lst.append(entropy)
 
-                prob_ratio = th.clamp(th.exp(mb_old_neglogp - mb_neglogp), 0.0, 16.0)
-
-                pg_loss_unclipped = - mb_adv * prob_ratio
-                pg_loss_clipped = - mb_adv * th.clamp(prob_ratio,
-                                                    1 - self.args.ppo_policy_clip_param,
-                                                    1 + self.args.ppo_policy_clip_param)
-
-                pg_loss = th.mean(th.max(pg_loss_unclipped, pg_loss_clipped))
+                if self.actor_critic_mode:
+                    # actor critic loss
+                    pg_loss = mb_adv * mb_neglogp
+                else: 
+                    # ppo loss
+                    prob_ratio = th.clamp(th.exp(mb_old_neglogp - mb_neglogp), 0.0, 16.0)
+                    pg_loss_unclipped = - mb_adv * prob_ratio
+                    pg_loss_clipped = - mb_adv * th.clamp(prob_ratio,
+                                                        1 - self.args.ppo_policy_clip_param,
+                                                        1 + self.args.ppo_policy_clip_param)
+                    pg_loss = th.mean(th.max(pg_loss_unclipped, pg_loss_clipped))
 
                 # Construct overall loss
                 actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
@@ -219,7 +233,6 @@ class PPOLearner:
                     self.optimiser_critic.zero_grad()
                     critic_loss.backward()
                     self.optimiser_critic.step()
-
                 else:
                     self.optimiser.zero_grad()
                     loss.backward()
