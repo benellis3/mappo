@@ -9,6 +9,7 @@ class BasicMAC:
     def __init__(self, scheme, groups, args):
         self.n_agents = args.n_agents
         self.args = args
+        self.central_v = getattr(self.args, 'is_central_value', False)
         input_shape = self._get_input_shape(scheme)
 
         if getattr(args, "is_observation_normalized", None):
@@ -126,7 +127,12 @@ class BasicMAC:
         # Other MACs might want to e.g. delegate building inputs to each agent
         bs = batch.batch_size
         inputs = []
-        inputs.append(batch["obs"][:, t])  # b1av
+        if self.central_v:
+            state = batch["state"][:, t].unsqueeze(dim=1).expand((-1, self.n_agents, -1))
+            inputs.append(state)  # b1av
+        else:
+            inputs.append(batch["obs"][:, t])  # b1av
+
         if self.args.obs_last_action:
             if t == 0:
                 inputs.append(th.zeros_like(batch["actions_onehot"][:, t]))
@@ -139,7 +145,11 @@ class BasicMAC:
         return inputs
 
     def _get_input_shape(self, scheme):
-        input_shape = scheme["obs"]["vshape"]
+        if self.central_v:
+            input_shape = scheme["state"]["vshape"]
+        else:
+            input_shape = scheme["obs"]["vshape"]
+
         if getattr(self.args, 'obs_last_action', None):
             input_shape += scheme["actions_onehot"]["vshape"][0]
         if getattr(self.args, 'obs_agent_id', None):

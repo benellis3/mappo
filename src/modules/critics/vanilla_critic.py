@@ -10,6 +10,7 @@ class VanillaCritic(nn.Module):
         self.args = args
         self.n_actions = args.n_actions
         self.n_agents = args.n_agents
+        self.central_v = getattr(self.args, 'is_central_value', False)
 
         input_shape = self._get_input_shape(scheme)
         self.output_type = "v"
@@ -39,7 +40,11 @@ class VanillaCritic(nn.Module):
         inputs = []
 
         # observations
-        inputs.append(batch["obs"][:, ts].view(bs, max_t, -1))
+        if self.central_v:
+            state = batch["state"][:, ts].expand((-1, self.n_agents, -1))
+            inputs.append(state)
+        else:
+            inputs.append(batch["obs"][:, ts].view(bs, max_t, -1))
 
         if self.args.obs_last_action:
             if t == 0:
@@ -55,7 +60,10 @@ class VanillaCritic(nn.Module):
 
     def _get_input_shape(self, scheme):
         # observations
-        input_shape = scheme["obs"]["vshape"]
+        if self.central_v:
+            input_shape = scheme["state"]["vshape"]
+        else:
+            input_shape = scheme["obs"]["vshape"]
 
         # last action
         if getattr(self.args, 'obs_last_action', None):

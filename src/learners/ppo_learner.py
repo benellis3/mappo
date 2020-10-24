@@ -29,8 +29,8 @@ class PPOLearner:
             self.params = self.agent_params
             self.optimiser = Adam(params=self.params, lr=args.lr)
 
-        self.central_v = getattr(self.args, "is_central_value", False):
-        self.actor_critic_mode = getattr(self.args, "actor_critic_mode", False):
+        self.central_v = getattr(self.args, "is_central_value", False)
+        self.actor_critic_mode = getattr(self.args, "actor_critic_mode", False)
 
         # self.optimiser = RMSprop(params=self.params,
         #                          lr=args.lr, alpha=args.optim_alpha, 
@@ -49,7 +49,7 @@ class PPOLearner:
         rewards = batch["reward"][:, :-1]
         mask = batch["filled"].float()
         obs = batch["obs"][:, :-1]
-        states = batch["state"][:, :-1]
+        states = batch["state"][:, :-1].unsqueeze(dim=2).expand(-1, -1, self.n_agents, -1)
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # append last actions
