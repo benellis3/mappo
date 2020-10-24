@@ -22,7 +22,8 @@ class PPOLearner:
             self.is_separate_actor_critic = True
             self.critic = critic_REGISTRY[self.args.critic](scheme, args)
             self.critic_params = list(self.critic.parameters())
-            self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor)
+            self.optimiser_actor = RMSprop(params=self.agent_params, lr=args.lr_actor,
+                                           alpha=args.optim_alpha, eps=args.optim_eps)
             self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic)
         else:
             self.is_separate_actor_critic = False
@@ -86,7 +87,7 @@ class PPOLearner:
                 self.critic.update_rms(tmp_inputs)
 
         old_values = th.zeros((bs, ts + 1, self.n_agents)).cuda()
-        action_probs = th.zeros((bs, ts + 1, self.n_agents, self.n_actions)).cuda()
+        action_logits = th.zeros((bs, ts + 1, self.n_agents, self.n_actions)).cuda()
 
         if self.args.agent == 'rnn':
             self.mac.init_hidden(bs)
@@ -97,7 +98,7 @@ class PPOLearner:
             if self.args.agent == 'rnn':
                 hidden_states[:, t] = self.mac.hidden_states.reshape(h_shape)
 
-            action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=True)
+            action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=True)
             if self.is_separate_actor_critic:
                 old_values[:, t] = self.critic(batch, t).squeeze()
             else:
@@ -105,9 +106,10 @@ class PPOLearner:
 
         old_values[mask == 0.0] = 0.0
 
-        action_probs = action_probs[:, :-1]
-        pi_taken = th.gather(action_probs, dim=3, index=actions).squeeze(3)
+        pi_neglogp = -th.log_softmax(action_logits[:, :-1], dim=-1)
+        actions_neglogp = th.gather(pi_neglogp, dim=3, index=actions).squeeze(3)
 
+        import pdb; pdb.set_trace()
         returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
                                                    self.args.gamma, self.args.tau)
         old_values = old_values[:, :-1]
@@ -119,8 +121,7 @@ class PPOLearner:
         hidden_states = hidden_states.reshape((-1, hidden_states.shape[-1]))[index]
         actions = actions.flatten()[index]
         avail_actions = avail_actions.reshape((-1, avail_actions.shape[-1]))[index]
-        pi_taken = pi_taken.flatten()[index]
-        actions_neglogp = -th.log(pi_taken + 1e-6)
+        actions_neglogp = actions_neglogp.flatten()[index]
         returns = returns.flatten()[index]
         values = old_values.flatten()[index]
         advantages = advs.flatten()[index]
@@ -185,9 +186,10 @@ class PPOLearner:
                 mb_obs          = obs[curr_idx]
 
                 if self.args.agent == "rnn":
-                    mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions, mb_hidden_states)
+                    mb_logits = self.mac.forward_obs(mb_obs, mb_avail_actions, mb_hidden_states)
                 else:
-                    mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions)
+                    mb_logits = self.mac.forward_obs(mb_obs, mb_avail_actions)
+                mb_logp = th.log_softmax(mb_logits, dim=-1)
 
                 if self.is_separate_actor_critic:
                     mb_values = self.critic.forward_obs(mb_obs)
@@ -219,7 +221,7 @@ class PPOLearner:
                 actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
                 actor_loss_lst.append(actor_loss)
 
-                critic_loss = 0.5 * th.mean((mb_values - mb_ret)**2)
+                critic_loss = th.mean((mb_values - mb_ret)**2)
                 critic_loss_lst.append(critic_loss)
 
                 loss = actor_loss + self.args.critic_loss_coeff * critic_loss

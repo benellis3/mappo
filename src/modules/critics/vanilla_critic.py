@@ -1,6 +1,7 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from components.running_mean_std import RunningMeanStd
 
 
 class VanillaCritic(nn.Module):
@@ -15,6 +16,11 @@ class VanillaCritic(nn.Module):
         input_shape = self._get_input_shape(scheme)
         self.output_type = "v"
 
+        if getattr(args, "is_observation_normalized", None):
+            self.is_obs_normalized = True
+            self.obs_rms = RunningMeanStd(shape=np.prod(input_shape))
+        else:
+            self.is_obs_normalized = False
         # Set up network layers
         self.fc1 = nn.Linear(input_shape, 128)
         self.fc2 = nn.Linear(128, 128)
@@ -22,16 +28,26 @@ class VanillaCritic(nn.Module):
 
     def forward(self, batch, t=None):
         inputs, bs, max_t = self._build_inputs(batch, t=t)
+
+        if self.is_obs_normalized: 
+            inputs = (inputs - self.obs_rms.mean) / th.sqrt(self.obs_rms.var)
+
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         q = self.fc3(x)
         return q.view(bs, self.n_agents, -1)
 
     def forward_obs(self, inputs):
+        if self.is_obs_normalized: 
+            inputs = (inputs - self.obs_rms.mean) / th.sqrt(self.obs_rms.var)
+
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         q = self.fc3(x)
         return q
+
+    def update_rms(self, batch_obs):
+        self.obs_rms.update(batch_obs)
 
     def _build_inputs(self, batch, t=None):
         bs = batch.batch_size

@@ -37,12 +37,12 @@ class MultinomialActionSelector():
 
     def select_action(self, agent_inputs, avail_actions, t_env, test_mode=False):
         masked_policies = agent_inputs.clone()
-        masked_policies[avail_actions == 0.0] = 0.0
+        masked_policies[avail_actions == 0.0] = -1e6
 
         if test_mode:
             picked_actions = masked_policies.max(dim=2)[1]
         else:
-            picked_actions = Categorical(probs=masked_policies).sample().long()
+            picked_actions = Categorical(logits=masked_policies).sample().long()
 
         return picked_actions
 
