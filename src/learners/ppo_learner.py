@@ -33,10 +33,6 @@ class PPOLearner:
         self.central_v = getattr(self.args, "is_central_value", False)
         self.actor_critic_mode = getattr(self.args, "actor_critic_mode", False)
 
-        # self.optimiser = RMSprop(params=self.params,
-        #                          lr=args.lr, alpha=args.optim_alpha, 
-        #                          eps=args.optim_eps)
-
         self.log_stats_t = -self.args.learner_log_interval - 1
 
         self.mini_epochs_num = getattr(self.args, "mini_epochs_num", 1)
@@ -53,19 +49,6 @@ class PPOLearner:
         states = batch["state"][:, :-1].unsqueeze(dim=2).expand(-1, -1, self.n_agents, -1)
         rewards = rewards.repeat(1, 1, self.n_agents)
 
-        # append last actions
-        if getattr(self.args, 'obs_last_action', None):
-            last_actions = th.zeros_like(batch["actions_onehot"][:, :-1])
-            last_actions[:, 1:] = batch["actions_onehot"][:, :-2] # right shift actions
-            obs = th.cat((obs, last_actions), dim=-1)
-            states = th.cat((states, last_actions), dim=-1)
-
-        # apend agent id
-        if getattr(self.args, 'obs_agent_id', None): 
-            ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, ts, self.n_agents, -1)
-            obs = th.cat((obs, ids), dim=-1)
-            states = th.cat((states, ids), dim=-1)
-
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
         terminated[:, 1:] = terminated[:, :-1].clone()
@@ -78,13 +61,12 @@ class PPOLearner:
         obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
         states = states.reshape((-1, states.shape[-1]))[obs_index]
         if getattr(self.args, "is_observation_normalized", False):
-            if self.central_v:
-                tmp_inputs = states
-            else:
-                tmp_inputs = obs
             self.mac.update_rms(tmp_inputs)
             if self.is_separate_actor_critic:
-                self.critic.update_rms(tmp_inputs)
+                if self.central_v:
+                    self.critic.update_rms(states)
+                else:
+                    self.critic.update_rms(obs)
 
         old_values = th.zeros((bs, ts + 1, self.n_agents)).cuda()
         action_logits = th.zeros((bs, ts + 1, self.n_agents, self.n_actions)).cuda()
@@ -109,10 +91,12 @@ class PPOLearner:
         pi_neglogp = -th.log_softmax(action_logits[:, :-1], dim=-1)
         actions_neglogp = th.gather(pi_neglogp, dim=3, index=actions).squeeze(3)
 
-        # returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
-        #                                            self.args.gamma, self.args.tau)
-        returns = rewards + self.args.gamma * old_values[:, 1:]
-        advs = returns - old_values[:, :-1]
+        if self.central_v:
+            returns = rewards + self.args.gamma * old_values[:, 1:]
+            advs = returns - old_values[:, :-1]
+        else:
+            returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
+                                                       self.args.gamma, self.args.tau)
 
         old_values = old_values[:, :-1]
         hidden_states = hidden_states[:, :-1]
@@ -157,10 +141,8 @@ class PPOLearner:
         values          = transitions["values"]
         advantages      = transitions["advantages"]
         rewards         = transitions["rewards"]
-        if self.central_v:
-            obs         = transitions["states"]
-        else:
-            obs         = transitions["obs"]
+        obs             = transitions["obs"]
+        states          = transitions["states"]
 
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
@@ -186,6 +168,7 @@ class PPOLearner:
                 mb_old_values   = values[curr_idx]
                 mb_old_neglogp  = actions_neglogp[curr_idx]
                 mb_obs          = obs[curr_idx]
+                mb_states       = states[curr_idx]
 
                 if self.args.agent == "rnn":
                     mb_logits = self.mac.forward_obs(mb_obs, mb_avail_actions, mb_hidden_states)
@@ -194,7 +177,10 @@ class PPOLearner:
                 mb_logp = th.log_softmax(mb_logits, dim=-1)
 
                 if self.is_separate_actor_critic:
-                    mb_values = self.critic.forward_obs(mb_obs)
+                    if self.central_v:
+                        mb_values = self.critic.forward_obs(mb_states)
+                    else:
+                        mb_values = self.critic.forward_obs(mb_obs)
                 else:
                     mb_values = self.mac.other_outs["values"]
 
@@ -207,7 +193,6 @@ class PPOLearner:
                 entropy = -1.0 * (mb_logp * th.exp(mb_logp)).sum(dim=-1).mean()
                 entropy_lst.append(entropy)
 
-                import pdb; pdb.set_trace()
                 if self.actor_critic_mode:
                     # actor critic loss
                     pg_loss = th.mean(mb_adv * mb_neglogp)

@@ -1,3 +1,4 @@
+import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -62,14 +63,6 @@ class VanillaCritic(nn.Module):
         else:
             inputs.append(batch["obs"][:, ts].view(bs, max_t, -1))
 
-        if self.args.obs_last_action:
-            if t == 0:
-                inputs.append(th.zeros_like(batch["actions_onehot"][:, t]))
-            else:
-                inputs.append(batch["actions_onehot"][:, t-1])
-        if self.args.obs_agent_id:
-            inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, -1, -1))
-
         inputs = th.cat([x.reshape(bs*self.n_agents, -1) for x in inputs], dim=1)
 
         return inputs, bs, max_t
@@ -81,11 +74,4 @@ class VanillaCritic(nn.Module):
         else:
             input_shape = scheme["obs"]["vshape"]
 
-        # last action
-        if getattr(self.args, 'obs_last_action', None):
-            input_shape += scheme["actions_onehot"]["vshape"][0]
-
-        # agent id
-        if getattr(self.args, 'obs_agent_id', None):
-            input_shape += self.n_agents
         return input_shape
