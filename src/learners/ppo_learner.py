@@ -61,7 +61,7 @@ class PPOLearner:
         obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
         states = states.reshape((-1, states.shape[-1]))[obs_index]
         if getattr(self.args, "is_observation_normalized", False):
-            self.mac.update_rms(tmp_inputs)
+            self.mac.update_rms(obs)
             if self.is_separate_actor_critic:
                 if self.central_v:
                     self.critic.update_rms(states)
