@@ -109,9 +109,11 @@ class PPOLearner:
         pi_neglogp = -th.log_softmax(action_logits[:, :-1], dim=-1)
         actions_neglogp = th.gather(pi_neglogp, dim=3, index=actions).squeeze(3)
 
-        import pdb; pdb.set_trace()
-        returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
-                                                   self.args.gamma, self.args.tau)
+        # returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
+        #                                            self.args.gamma, self.args.tau)
+        returns = rewards + self.args.gamma * old_values[:, 1:]
+        advs = returns - old_values[:, :-1]
+
         old_values = old_values[:, :-1]
         hidden_states = hidden_states[:, :-1]
         
@@ -205,6 +207,7 @@ class PPOLearner:
                 entropy = -1.0 * (mb_logp * th.exp(mb_logp)).sum(dim=-1).mean()
                 entropy_lst.append(entropy)
 
+                import pdb; pdb.set_trace()
                 if self.actor_critic_mode:
                     # actor critic loss
                     pg_loss = th.mean(mb_adv * mb_neglogp)

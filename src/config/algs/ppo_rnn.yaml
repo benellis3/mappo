@@ -10,7 +10,7 @@ runner: "parallel"
 
 buffer_size: 500
 batch_size_run: 8
-batch_size: 32
+batch_size: 8
 
 # update the target network every {} training steps
 target_update_interval: 200
@@ -26,8 +26,8 @@ agent_output_type: "pi_logits"
 learner: "ppo_learner"
 critic: "vanilla"
 
-mini_epochs_num: 2
-mini_batches_num: 50
+mini_epochs_num: 1
+mini_batches_num: 8
 entropy_loss_coeff: 0.05
 critic_loss_coeff: 1.0
 
