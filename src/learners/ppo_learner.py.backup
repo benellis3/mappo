@@ -38,9 +38,9 @@ class PPOLearner:
         self.mini_epochs_num = getattr(self.args, "mini_epochs_num", 1)
         self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
-    def make_transitions(self, batch, action_logits, old_values):
+    def make_transitions(self, batch: EpisodeBatch):
         bs = batch.batch_size
-        ts = batch["obs"].shape[1]
+        ts = batch["obs"].shape[1] - 1
         actions = batch["actions"][:, :-1]
         avail_actions = batch["avail_actions"][:, :-1]
         rewards = batch["reward"][:, :-1]
@@ -68,7 +68,26 @@ class PPOLearner:
                 else:
                     self.critic.update_rms(obs)
 
+        old_values = th.zeros((bs, ts + 1, self.n_agents)).cuda()
+        action_logits = th.zeros((bs, ts + 1, self.n_agents, self.n_actions)).cuda()
+
+        if self.args.agent == 'rnn':
+            self.mac.init_hidden(bs)
+            h_shape = self.mac.hidden_states.shape
+            hidden_states = th.zeros((h_shape[0], ts+1, h_shape[1], h_shape[2])).cuda()
+
+        for t in range(rewards.shape[1] + 1):
+            if self.args.agent == 'rnn':
+                hidden_states[:, t] = self.mac.hidden_states.reshape(h_shape)
+
+            action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=True)
+            if self.is_separate_actor_critic:
+                old_values[:, t] = self.critic(batch, t).squeeze()
+            else:
+                old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
+
         old_values[mask == 0.0] = 0.0
+
         pi_neglogp = -th.log_softmax(action_logits[:, :-1], dim=-1)
         actions_neglogp = th.gather(pi_neglogp, dim=3, index=actions).squeeze(3)
 
@@ -80,10 +99,12 @@ class PPOLearner:
                                                        self.args.gamma, self.args.tau)
 
         old_values = old_values[:, :-1]
+        hidden_states = hidden_states[:, :-1]
         
         mask = mask[:, :-1]
         mask = mask.flatten()
         index = th.nonzero(mask).squeeze()
+        hidden_states = hidden_states.reshape((-1, hidden_states.shape[-1]))[index]
         actions = actions.flatten()[index]
         avail_actions = avail_actions.reshape((-1, avail_actions.shape[-1]))[index]
         actions_neglogp = actions_neglogp.flatten()[index]
@@ -94,6 +115,7 @@ class PPOLearner:
 
         transitions = {}
         transitions.update({"num": int(th.sum(mask))})
+        transitions.update({"hidden_states": hidden_states.detach()})
         transitions.update({"actions": actions.detach()})
         transitions.update({"avail_actions": avail_actions.detach()})
         transitions.update({"actions_neglogp": actions_neglogp.detach()})
@@ -109,25 +131,18 @@ class PPOLearner:
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
-        bs = batch.batch_size
-        ts = batch["obs"].shape[1]
-
-        if self.args.agent == 'rnn':
-            self.mac.init_hidden(bs)
-
-        for t in range(ts):
-            action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=True)
-            if self.is_separate_actor_critic:
-                old_values[:, t] = self.critic(batch, t).squeeze()
-            else:
-                old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
-
-        transitions = self.make_transitions(batch, action_logits, old_values)
-
+        transitions = self.make_transitions(batch)
         num             = transitions["num"]
+        actions         = transitions["actions"]
+        hidden_states   = transitions["hidden_states"]
+        avail_actions   = transitions["avail_actions"]
         actions_neglogp = transitions["actions_neglogp"]
         returns         = transitions["returns"]
+        values          = transitions["values"]
         advantages      = transitions["advantages"]
+        rewards         = transitions["rewards"]
+        obs             = transitions["obs"]
+        states          = transitions["states"]
 
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
@@ -145,20 +160,31 @@ class PPOLearner:
             for j in range(0, self.mini_batches_num):
                 curr_idx = rnd_idx[j*rnd_step : j*rnd_step+rnd_step]
 
+                mb_actions      = actions[curr_idx]
+                mb_hidden_states= hidden_states[curr_idx]
+                mb_avail_actions= avail_actions[curr_idx]
                 mb_adv          = advantages[curr_idx]
                 mb_ret          = returns[curr_idx]
+                mb_old_values   = values[curr_idx]
                 mb_old_neglogp  = actions_neglogp[curr_idx]
+                mb_obs          = obs[curr_idx]
+                mb_states       = states[curr_idx]
 
-                for t in range(ts):
-                    action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=True)
-                    if self.is_separate_actor_critic:
-                        old_values[:, t] = self.critic(batch, t).squeeze()
+                if self.args.agent == "rnn":
+                    mb_logits = self.mac.forward_obs(mb_obs, mb_avail_actions, mb_hidden_states)
+                else:
+                    mb_logits = self.mac.forward_obs(mb_obs, mb_avail_actions)
+                mb_logp = th.log_softmax(mb_logits, dim=-1)
+
+                if self.is_separate_actor_critic:
+                    if self.central_v:
+                        mb_values = self.critic.forward_obs(mb_states)
                     else:
-                        old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
+                        mb_values = self.critic.forward_obs(mb_obs)
+                else:
+                    mb_values = self.mac.other_outs["values"]
 
-                transitions = self.make_transitions(batch, action_logits, old_values)
-                mb_neglogp = transitions["actions_neglogp"]
-                mb_values = transitions["values"]
+                mb_neglogp = -th.gather(mb_logp, dim=1, index=mb_actions.unsqueeze(-1)).squeeze(-1)
 
                 with th.no_grad():
                     approxkl = 0.5 * ((mb_old_neglogp - mb_neglogp)**2).mean()
