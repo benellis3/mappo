@@ -74,18 +74,21 @@ class PPOLearner:
         if self.args.agent == 'rnn':
             self.mac.init_hidden(bs)
             h_shape = self.mac.hidden_states.shape
-            hidden_states = th.zeros((h_shape[0], ts+1, h_shape[1], h_shape[2])).cuda()
+            hidden_states = []
 
         for t in range(rewards.shape[1] + 1):
             if self.args.agent == 'rnn':
-                hidden_states[:, t] = self.mac.hidden_states.reshape(h_shape)
+                # save hidden states
+                hidden_states.append(self.mac.hidden_states.reshape(h_shape))
 
             action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=True)
+
             if self.is_separate_actor_critic:
                 old_values[:, t] = self.critic(batch, t).squeeze()
             else:
                 old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
 
+        hidden_states = th.transpose(th.stack(hidden_states), 0, 1)
         old_values[mask == 0.0] = 0.0
 
         pi_neglogp = -th.log_softmax(action_logits[:, :-1], dim=-1)
