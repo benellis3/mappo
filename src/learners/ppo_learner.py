@@ -45,8 +45,6 @@ class PPOLearner:
         avail_actions = batch["avail_actions"][:, :-1]
         rewards = batch["reward"][:, :-1]
         mask = batch["filled"].float()
-        obs = batch["obs"][:, :-1]
-        states = batch["state"][:, :-1].unsqueeze(dim=2).expand(-1, -1, self.n_agents, -1)
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
@@ -55,29 +53,18 @@ class PPOLearner:
         mask = mask * (1 - terminated)
         mask = mask.repeat(1, 1, self.n_agents)
 
-        obs_mask = mask[:, :-1].clone()
-        obs_mask = obs_mask.flatten()
-        obs_index = th.nonzero(obs_mask).squeeze()
-        obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
-        states = states.reshape((-1, states.shape[-1]))[obs_index]
-        if getattr(self.args, "is_observation_normalized", False):
-            self.mac.update_rms(obs)
-            if self.is_separate_actor_critic:
-                if self.central_v:
-                    self.critic.update_rms(states)
-                else:
-                    self.critic.update_rms(obs)
-
         old_values[mask == 0.0] = 0.0
         pi_neglogp = -th.log_softmax(action_logits[:, :-1], dim=-1)
         actions_neglogp = th.gather(pi_neglogp, dim=3, index=actions).squeeze(3)
 
-        if self.central_v:
-            returns = rewards + self.args.gamma * old_values[:, 1:]
-            advs = returns - old_values[:, :-1]
-        else:
-            returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
-                                                       self.args.gamma, self.args.tau)
+        # if self.central_v:
+        #     returns = rewards + self.args.gamma * old_values[:, 1:]
+        #     advs = returns - old_values[:, :-1]
+        # else:
+        #     returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
+        #                                                self.args.gamma, self.args.tau)
+        returns = rewards + self.args.gamma * old_values[:, 1:]
+        advs = returns - old_values[:, :-1]
 
         old_values = old_values[:, :-1]
         
@@ -94,17 +81,35 @@ class PPOLearner:
 
         transitions = {}
         transitions.update({"num": int(th.sum(mask))})
-        transitions.update({"actions": actions.detach()})
-        transitions.update({"avail_actions": avail_actions.detach()})
-        transitions.update({"actions_neglogp": actions_neglogp.detach()})
-        transitions.update({"returns": returns.detach()})
-        transitions.update({"values": values.detach()})
-        transitions.update({"advantages": advantages.detach()})
-        transitions.update({"obs": obs.detach()})
-        transitions.update({"states": states.detach()})
-        transitions.update({"rewards": rewards.detach()})
+        transitions.update({"actions": actions})
+        transitions.update({"avail_actions": avail_actions})
+        transitions.update({"actions_neglogp": actions_neglogp})
+        transitions.update({"returns": returns})
+        transitions.update({"values": values})
+        transitions.update({"advantages": advantages})
+        transitions.update({"rewards": rewards})
 
         return transitions
+
+    def flatten_obs_states(self, batch):
+        ts = batch["obs"].shape[1]
+        obs = batch["obs"][:, :-1]
+        states = batch["state"][:, :-1].unsqueeze(dim=2).expand(-1, -1, self.n_agents, -1)
+        mask = batch["filled"].float()
+
+        # right shift terminated flag, to be aligned with openai/baseline setups
+        terminated = batch["terminated"].float()
+        terminated[:, 1:] = terminated[:, :-1].clone()
+        mask = mask * (1 - terminated)
+        mask = mask.repeat(1, 1, self.n_agents)
+
+        obs_mask = mask[:, :-1].clone()
+        obs_mask = obs_mask.flatten()
+        obs_index = th.nonzero(obs_mask).squeeze()
+        obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
+        states = states.reshape((-1, states.shape[-1]))[obs_index]
+
+        return obs, states
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
@@ -112,22 +117,33 @@ class PPOLearner:
         bs = batch.batch_size
         ts = batch["obs"].shape[1]
 
-        if self.args.agent == 'rnn':
-            self.mac.init_hidden(bs)
+        action_logits = th.zeros((bs, ts, self.n_agents, self.n_actions)).cuda()
+        old_values = th.zeros((bs, ts, self.n_agents)).cuda()
 
+        if getattr(self.args, "is_observation_normalized", False):
+            obs, states = self.flatten_obs_states(batch)
+            self.mac.update_rms(obs)
+            if self.is_separate_actor_critic:
+                if self.central_v:
+                    self.critic.update_rms(states)
+                else:
+                    self.critic.update_rms(obs)
+
+        self.mac.init_hidden(bs)
         for t in range(ts):
-            action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=True)
+            action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
             if self.is_separate_actor_critic:
                 old_values[:, t] = self.critic(batch, t).squeeze()
             else:
                 old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
 
-        transitions = self.make_transitions(batch, action_logits, old_values)
-
+        transitions     = self.make_transitions(batch, action_logits, old_values)
         num             = transitions["num"]
-        actions_neglogp = transitions["actions_neglogp"]
-        returns         = transitions["returns"]
-        advantages      = transitions["advantages"]
+        actions_neglogp = transitions["actions_neglogp"].detach()
+        returns         = transitions["returns"].detach()
+        rewards         = transitions["rewards"].detach()
+        values          = transitions["values"].detach()
+        advantages      = transitions["advantages"].detach()
 
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
@@ -149,22 +165,26 @@ class PPOLearner:
                 mb_ret          = returns[curr_idx]
                 mb_old_neglogp  = actions_neglogp[curr_idx]
 
-                for t in range(ts):
-                    action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=True)
-                    if self.is_separate_actor_critic:
-                        old_values[:, t] = self.critic(batch, t).squeeze()
-                    else:
-                        old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
+                tmp_action_logits = th.zeros((bs, ts, self.n_agents, self.n_actions)).cuda()
+                tmp_old_values = th.zeros((bs, ts, self.n_agents)).cuda()
 
-                transitions = self.make_transitions(batch, action_logits, old_values)
-                mb_neglogp = transitions["actions_neglogp"]
-                mb_values = transitions["values"]
+                self.mac.init_hidden(bs)
+                for t in range(ts):
+                    tmp_action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
+                    if self.is_separate_actor_critic:
+                        tmp_old_values[:, t] = self.critic(batch, t).squeeze()
+                    else:
+                        tmp_old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
+
+                transitions = self.make_transitions(batch, tmp_action_logits, tmp_old_values)
+                mb_neglogp = transitions["actions_neglogp"][curr_idx]
+                mb_values = transitions["values"][curr_idx]
 
                 with th.no_grad():
                     approxkl = 0.5 * ((mb_old_neglogp - mb_neglogp)**2).mean()
                     approxkl_lst.append(approxkl)
 
-                entropy = -1.0 * (mb_logp * th.exp(mb_logp)).sum(dim=-1).mean()
+                entropy = -1.0 * (th.softmax(tmp_action_logits, dim=-1) * th.log_softmax(tmp_action_logits, dim=-1)).sum(dim=-1).mean()
                 entropy_lst.append(entropy)
 
                 if self.actor_critic_mode:
