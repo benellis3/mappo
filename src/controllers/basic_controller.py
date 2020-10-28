@@ -40,31 +40,6 @@ class BasicMAC:
     def update_rms(self, batch_obs):
         self.obs_rms.update(batch_obs)
 
-    def forward_obs(self, obs, avail_actions, hidden_states=None):
-        # obs.shape: num_transitions * num_features
-        agent_inputs = obs
-        if self.is_obs_normalized:
-            agent_inputs = (agent_inputs - self.obs_rms.mean.cuda()) / th.sqrt(self.obs_rms.var.cuda())
-            # agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
-
-        # NOTE: obs has been flatten; self.hidden_states also need to do that
-        if hidden_states is not None:
-            agent_outs, other_outs = self.agent(agent_inputs, hidden_states)
-        else:
-            agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
-
-        if self.agent_output_type == "pi_logits":
-            if getattr(self.args, "mask_before_softmax", True):
-                # Make the logits for unavailable actions very negative to minimise their affect on the softmax
-                agent_outs[avail_actions == 0] = -1e6
-            # agent_outs = th.nn.functional.log_softmax(agent_outs, dim=-1)
-
-        elif self.agent_output_type == "gaussian_mean":
-            raise NotImplementedError
-
-        return agent_outs
-
-
     def forward(self, ep_batch, t, test_mode=False):
         agent_inputs = self._build_inputs(ep_batch, t)
         if self.is_obs_normalized:

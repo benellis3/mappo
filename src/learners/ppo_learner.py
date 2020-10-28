@@ -42,7 +42,6 @@ class PPOLearner:
         bs = batch.batch_size
         ts = batch["obs"].shape[1]
         actions = batch["actions"][:, :-1]
-        avail_actions = batch["avail_actions"][:, :-1]
         rewards = batch["reward"][:, :-1]
         mask = batch["filled"].float()
         rewards = rewards.repeat(1, 1, self.n_agents)
@@ -63,6 +62,8 @@ class PPOLearner:
         # else:
         #     returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
         #                                                self.args.gamma, self.args.tau)
+
+        # TD error
         returns = rewards + self.args.gamma * old_values[:, 1:]
         advs = returns - old_values[:, :-1]
 
@@ -72,7 +73,6 @@ class PPOLearner:
         mask = mask.flatten()
         index = th.nonzero(mask).squeeze()
         actions = actions.flatten()[index]
-        avail_actions = avail_actions.reshape((-1, avail_actions.shape[-1]))[index]
         actions_neglogp = actions_neglogp.flatten()[index]
         returns = returns.flatten()[index]
         values = old_values.flatten()[index]
@@ -82,7 +82,6 @@ class PPOLearner:
         transitions = {}
         transitions.update({"num": int(th.sum(mask))})
         transitions.update({"actions": actions})
-        transitions.update({"avail_actions": avail_actions})
         transitions.update({"actions_neglogp": actions_neglogp})
         transitions.update({"returns": returns})
         transitions.update({"values": values})

@@ -38,15 +38,6 @@ class VanillaCritic(nn.Module):
         q = self.fc3(x)
         return q.view(bs, self.n_agents, -1)
 
-    def forward_obs(self, inputs):
-        if self.is_obs_normalized: 
-            inputs = (inputs - self.obs_rms.mean) / th.sqrt(self.obs_rms.var)
-
-        x = F.relu(self.fc1(inputs))
-        x = F.relu(self.fc2(x))
-        q = self.fc3(x)
-        return q
-
     def update_rms(self, batch_obs):
         self.obs_rms.update(batch_obs)
 
