@@ -38,30 +38,20 @@ class PPOLearner:
         self.mini_epochs_num = getattr(self.args, "mini_epochs_num", 1)
         self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
-    def make_transitions(self, batch, action_logits, old_values):
+    def make_transitions(self, batch, mask, action_logits, old_values):
         bs = batch.batch_size
         ts = batch["obs"].shape[1]
         actions = batch["actions"][:, :-1]
         rewards = batch["reward"][:, :-1]
-        mask = batch["filled"].float()
         rewards = rewards.repeat(1, 1, self.n_agents)
-
-        # right shift terminated flag, to be aligned with openai/baseline setups
-        terminated = batch["terminated"].float()
-        terminated[:, 1:] = terminated[:, :-1].clone()
-        mask = mask * (1 - terminated)
-        mask = mask.repeat(1, 1, self.n_agents)
 
         old_values[mask == 0.0] = 0.0
         pi_neglogp = -th.log_softmax(action_logits[:, :-1], dim=-1)
         actions_neglogp = th.gather(pi_neglogp, dim=3, index=actions).squeeze(3)
 
-        # if self.central_v:
-        #     returns = rewards + self.args.gamma * old_values[:, 1:]
-        #     advs = returns - old_values[:, :-1]
-        # else:
-        #     returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
-        #                                                self.args.gamma, self.args.tau)
+        # Generalized advantage estimation
+        # returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
+        #                                            self.args.gamma, self.args.tau)
 
         # TD error
         returns = rewards + self.args.gamma * old_values[:, 1:]
@@ -69,9 +59,9 @@ class PPOLearner:
 
         old_values = old_values[:, :-1]
         
-        mask = mask[:, :-1]
-        mask = mask.flatten()
-        index = th.nonzero(mask).squeeze()
+        mask_flat = mask[:, :-1]
+        mask_flat = mask_flat.flatten()
+        index = th.nonzero(mask_flat).squeeze()
         actions = actions.flatten()[index]
         actions_neglogp = actions_neglogp.flatten()[index]
         returns = returns.flatten()[index]
@@ -80,7 +70,7 @@ class PPOLearner:
         rewards = rewards.flatten()[index]
 
         transitions = {}
-        transitions.update({"num": int(th.sum(mask))})
+        transitions.update({"num": int(th.sum(mask_flat))})
         transitions.update({"actions": actions})
         transitions.update({"actions_neglogp": actions_neglogp})
         transitions.update({"returns": returns})
@@ -90,17 +80,10 @@ class PPOLearner:
 
         return transitions
 
-    def flatten_obs_states(self, batch):
+    def flatten_obs_states(self, batch, mask):
         ts = batch["obs"].shape[1]
         obs = batch["obs"][:, :-1]
         states = batch["state"][:, :-1].unsqueeze(dim=2).expand(-1, -1, self.n_agents, -1)
-        mask = batch["filled"].float()
-
-        # right shift terminated flag, to be aligned with openai/baseline setups
-        terminated = batch["terminated"].float()
-        terminated[:, 1:] = terminated[:, :-1].clone()
-        mask = mask * (1 - terminated)
-        mask = mask.repeat(1, 1, self.n_agents)
 
         obs_mask = mask[:, :-1].clone()
         obs_mask = obs_mask.flatten()
@@ -116,11 +99,18 @@ class PPOLearner:
         bs = batch.batch_size
         ts = batch["obs"].shape[1]
 
+        mask = batch["filled"].float()
+        # right shift terminated flag, to be aligned with openai/baseline setups
+        terminated = batch["terminated"].float()
+        terminated[:, 1:] = terminated[:, :-1].clone()
+        mask = mask * (1 - terminated)
+        mask = mask.repeat(1, 1, self.n_agents)
+
         action_logits = th.zeros((bs, ts, self.n_agents, self.n_actions)).cuda()
         old_values = th.zeros((bs, ts, self.n_agents)).cuda()
 
         if getattr(self.args, "is_observation_normalized", False):
-            obs, states = self.flatten_obs_states(batch)
+            obs, states = self.flatten_obs_states(batch, mask)
             self.mac.update_rms(obs)
             if self.is_separate_actor_critic:
                 if self.central_v:
@@ -136,7 +126,7 @@ class PPOLearner:
             else:
                 old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
 
-        transitions     = self.make_transitions(batch, action_logits, old_values)
+        transitions     = self.make_transitions(batch, mask, action_logits, old_values)
         num             = transitions["num"]
         actions_neglogp = transitions["actions_neglogp"].detach()
         returns         = transitions["returns"].detach()
@@ -175,7 +165,7 @@ class PPOLearner:
                     else:
                         tmp_old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
 
-                transitions = self.make_transitions(batch, tmp_action_logits, tmp_old_values)
+                transitions = self.make_transitions(batch, mask, tmp_action_logits, tmp_old_values)
                 mb_neglogp = transitions["actions_neglogp"][curr_idx]
                 mb_values = transitions["values"][curr_idx]
 
