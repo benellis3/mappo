@@ -81,17 +81,33 @@ class PPOLearner:
         return transitions
 
     def flatten_obs_states(self, batch, mask):
-        ts = batch["obs"].shape[1]
+        shape = batch["obs"].shape
+        bs, ts = shape[0], shape[1]
         obs = batch["obs"][:, :-1]
-        states = batch["state"][:, :-1].unsqueeze(dim=2).expand(-1, -1, self.n_agents, -1)
+        states = batch["state"][:, :-1]
+        actions_onehot = batch["actions_onehot"][:, :-1]
+        last_actions_onehot = th.zeros_like(actions_onehot)
+        # right shift actions
+        last_actions_onehot[:, 1:] = actions_onehot[:, :-1]
 
-        obs_mask = mask[:, :-1].clone()
-        obs_mask = obs_mask.flatten()
-        obs_index = th.nonzero(obs_mask).squeeze()
+        inputs_cv = []
+        inputs_cv.append(states)
+        inputs_cv.append(obs.view(bs, ts-1, -1))
+        inputs_cv.append(last_actions_onehot.view(bs, ts-1, -1))
+        inputs_cv = th.cat(inputs_cv, dim=2) # dim: 0 for bs, 1 for ts, 2 for feature
+        inputs_cv = inputs_cv.reshape((-1, inputs_cv.shape[-1]))
+
+        cv_mask = copy.deepcopy(mask[:, :-1, 0])
+        cv_mask_index = th.nonzero(cv_mask.flatten()).squeeze()
+        inputs_cv = inputs_cv[cv_mask_index]
+
+        states_exp = states.unsqueeze(dim=2).expand(-1, -1, self.n_agents, -1)
+        obs_mask = copy.deepcopy(mask[:, :-1])
+        obs_index = th.nonzero(obs_mask.flatten()).squeeze()
         obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
-        states = states.reshape((-1, states.shape[-1]))[obs_index]
+        states_exp = states_exp.reshape((-1, states_exp.shape[-1]))[obs_index]
 
-        return obs, states
+        return obs, states_exp, inputs_cv
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
@@ -110,11 +126,11 @@ class PPOLearner:
         old_values = th.zeros((bs, ts, self.n_agents)).cuda()
 
         if getattr(self.args, "is_observation_normalized", False):
-            obs, states = self.flatten_obs_states(batch, mask)
+            obs, states, inputs_cv = self.flatten_obs_states(batch, mask)
             self.mac.update_rms(obs)
             if self.is_separate_actor_critic:
                 if self.central_v:
-                    self.critic.update_rms(states)
+                    self.critic.update_rms(inputs_cv)
                 else:
                     self.critic.update_rms(obs)
 
