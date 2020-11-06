@@ -1,8 +1,8 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-from modules.agents import REGISTRY as agent_REGISTRY
 import numpy as np
+from components.running_mean_std import RunningMeanStd
 
 
 class RNNCritic(nn.Module):
@@ -15,6 +15,11 @@ class RNNCritic(nn.Module):
         self.state_dim = int(np.prod(args.state_shape))
 
         input_shape = self._get_input_shape(scheme)
+        if getattr(args, "is_observation_normalized", None):
+            self.is_obs_normalized = True
+            self.obs_rms = RunningMeanStd(shape=np.prod(input_shape))
+        else:
+            self.is_obs_normalized = False
 
         self.fc1 = nn.Linear(input_shape, args.rnn_hidden_dim)
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
@@ -31,6 +36,10 @@ class RNNCritic(nn.Module):
 
         for t in range(batch.max_seq_length):
             inputs = self._build_inputs(batch, t)
+
+            if self.is_obs_normalized: 
+                inputs = (inputs - self.obs_rms.mean) / th.sqrt(self.obs_rms.var)
+
             x = F.relu(self.fc1(inputs))
             h_in = hidden_states.reshape(-1, self.args.rnn_hidden_dim)
             hidden_states = h_in
@@ -45,6 +54,9 @@ class RNNCritic(nn.Module):
 
         output_tensor = th.stack(outputs, dim=1)
         return output_tensor
+
+    def update_rms(self, batch_obs):
+        self.obs_rms.update(batch_obs)
 
     def _build_inputs(self, batch, t):
         # Assumes homogenous agents with flat observations.
