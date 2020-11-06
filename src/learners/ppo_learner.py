@@ -127,7 +127,6 @@ class PPOLearner:
                 self.critic.update_rms(obs)
 
         self.mac.init_hidden(bs)
-        self.critic.init_hidden()
         for t in range(ts):
             action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
         old_values = self.critic(batch).squeeze()
@@ -161,7 +160,6 @@ class PPOLearner:
                 mb_old_neglogp  = actions_neglogp[curr_idx]
 
                 tmp_action_logits = th.zeros((bs, ts, self.n_agents, self.n_actions)).cuda()
-                tmp_old_values = th.zeros((bs, ts, self.n_agents)).cuda()
 
                 self.mac.init_hidden(bs)
                 for t in range(ts):
