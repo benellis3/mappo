@@ -23,13 +23,14 @@ class RNNCritic(nn.Module):
 
         self.fc1 = nn.Linear(input_shape, args.rnn_hidden_dim)
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
-        self.fc2 = nn.Linear(args.rnn_hidden_dim, args.n_actions)
+        self.fc2 = nn.Linear(args.rnn_hidden_dim, 1)
 
     def init_hidden(self):
         # make hidden states on same device as model
         return self.fc1.weight.new(1, self.args.rnn_hidden_dim).zero_()
 
     def forward(self, batch):
+        bs = batch.batch_size
         hidden_states = self.init_hidden().unsqueeze(0).expand(batch.batch_size, self.n_agents, -1)  # bav
 
         outputs = []
@@ -45,12 +46,7 @@ class RNNCritic(nn.Module):
             hidden_states = h_in
             h = self.rnn(x, h_in)
             q = self.fc2(h)
-
-            actions_taken_t = batch["actions"][:,t].reshape(-1,1)
-            qs_taken = th.gather(q, dim=1, index=actions_taken_t).reshape(batch.batch_size, -1)
-            qs_taken_repeat = qs_taken.repeat(1, self.n_agents).reshape(-1, self.n_agents)
-
-            outputs.append(qs_taken_repeat.reshape(batch.batch_size, self.n_agents, self.n_actions))
+            outputs.append(q.reshape(bs, 1, self.n_agents)) # bs * ts * n_agents
 
         output_tensor = th.stack(outputs, dim=1)
         return output_tensor

@@ -18,17 +18,12 @@ class PPOLearner:
         self.agent_params = list(mac.parameters())
         self.ppo_policy_clip_params = args.ppo_policy_clip_param
 
-        if getattr(self.args, "is_separate_actor_critic", False):
-            self.is_separate_actor_critic = True
-            self.critic = critic_REGISTRY[self.args.critic](scheme, args)
-            self.critic_params = list(self.critic.parameters())
-            self.optimiser_actor = RMSprop(params=self.agent_params, lr=args.lr_actor,
-                                           alpha=args.optim_alpha, eps=args.optim_eps)
-            self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic)
-        else:
-            self.is_separate_actor_critic = False
-            self.params = self.agent_params
-            self.optimiser = Adam(params=self.params, lr=args.lr)
+        self.critic = critic_REGISTRY[self.args.critic](scheme, args)
+        self.critic_params = list(self.critic.parameters())
+        self.optimiser_actor = RMSprop(params=self.agent_params, lr=args.lr_actor,
+                                       alpha=args.optim_alpha, eps=args.optim_eps)
+        self.optimiser_critic = RMSprop(params=self.critic_params, lr=args.lr_critic,
+                                       alpha=args.optim_alpha, eps=args.optim_eps)
 
         self.central_v = getattr(self.args, "is_central_value", False)
         self.actor_critic_mode = getattr(self.args, "actor_critic_mode", False)
@@ -123,24 +118,18 @@ class PPOLearner:
         mask = mask.repeat(1, 1, self.n_agents)
 
         action_logits = th.zeros((bs, ts, self.n_agents, self.n_actions)).cuda()
-        old_values = th.zeros((bs, ts, self.n_agents)).cuda()
-
         if getattr(self.args, "is_observation_normalized", False):
             obs, states, inputs_cv = self.flatten_obs_states(batch, mask)
             self.mac.update_rms(obs)
-            if self.is_separate_actor_critic:
-                if self.central_v:
-                    self.critic.update_rms(inputs_cv)
-                else:
-                    self.critic.update_rms(obs)
+            if self.central_v:
+                self.critic.update_rms(inputs_cv)
+            else:
+                self.critic.update_rms(obs)
 
         self.mac.init_hidden(bs)
         for t in range(ts):
             action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
-            if self.is_separate_actor_critic:
-                old_values[:, t] = self.critic(batch, t).squeeze()
-            else:
-                old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
+        old_values = self.critic(batch).squeeze()
 
         transitions     = self.make_transitions(batch, mask, action_logits, old_values)
         num             = transitions["num"]
@@ -171,15 +160,11 @@ class PPOLearner:
                 mb_old_neglogp  = actions_neglogp[curr_idx]
 
                 tmp_action_logits = th.zeros((bs, ts, self.n_agents, self.n_actions)).cuda()
-                tmp_old_values = th.zeros((bs, ts, self.n_agents)).cuda()
 
                 self.mac.init_hidden(bs)
                 for t in range(ts):
                     tmp_action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
-                    if self.is_separate_actor_critic:
-                        tmp_old_values[:, t] = self.critic(batch, t).squeeze()
-                    else:
-                        tmp_old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
+                tmp_old_values = self.critic(batch).squeeze()
 
                 transitions = self.make_transitions(batch, mask, tmp_action_logits, tmp_old_values)
                 mb_neglogp = transitions["actions_neglogp"][curr_idx]
@@ -214,18 +199,13 @@ class PPOLearner:
                 loss = actor_loss + self.args.critic_loss_coeff * critic_loss
                 loss_lst.append(loss)
 
-                if getattr(self.args, "is_separate_actor_critic", False):
-                    self.optimiser_actor.zero_grad()
-                    actor_loss.backward()
-                    self.optimiser_actor.step()
+                self.optimiser_actor.zero_grad()
+                actor_loss.backward()
+                self.optimiser_actor.step()
 
-                    self.optimiser_critic.zero_grad()
-                    critic_loss.backward()
-                    self.optimiser_critic.step()
-                else:
-                    self.optimiser.zero_grad()
-                    loss.backward()
-                    self.optimiser.step()
+                self.optimiser_critic.zero_grad()
+                critic_loss.backward()
+                self.optimiser_critic.step()
 
         # log stuff
         critic_train_stats["values"].append((th.mean(values)).item())
@@ -270,11 +250,8 @@ class PPOLearner:
     def save_models(self, path):
         self.mac.save_models(path)
         th.save(self.mac.critic.state_dict(), "{}/critic.th".format(path))
-        if getattr(self.args, "is_separate_actor_critic", False):
-            th.save(self.optimiser_actor.state_dict(), "{}/opt_actor.th".format(path))
-            th.save(self.optimiser_critic.state_dict(), "{}/opt_critic.th".format(path))
-        else:
-            th.save(self.optimiser.state_dict(), "{}/opt.th".format(path))
+        th.save(self.optimiser_actor.state_dict(), "{}/opt_actor.th".format(path))
+        th.save(self.optimiser_critic.state_dict(), "{}/opt_critic.th".format(path))
 
     def load_models(self, path):
         self.mac.load_models(path)
@@ -282,8 +259,5 @@ class PPOLearner:
         # Not quite right but I don't want to save target networks
         if hasattr(self, "target_critic"):
             self.target_critic.load_state_dict(self.critic.state_dict())
-        if getattr(self.args, "is_separate_actor_critic", False):
-            self.optimiser_actor.load_state_dict("{}/opt_actor.th".format(path))
-            self.optimiser_critic.load_state_dict("{}/opt_critic.th".format(path))
-        else:
-            self.optimiser.load_state_dict(th.load("{}/opt.th".format(path), map_location=lambda storage, loc: storage))
+        self.optimiser_actor.load_state_dict("{}/opt_actor.th".format(path))
+        self.optimiser_critic.load_state_dict("{}/opt_critic.th".format(path))
