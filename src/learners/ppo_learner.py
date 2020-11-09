@@ -33,7 +33,7 @@ class PPOLearner:
         self.mini_epochs_num = getattr(self.args, "mini_epochs_num", 1)
         self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
-    def make_transitions(self, batch, mask, action_logits, old_values):
+    def make_transitions(self, batch, mask, action_logits, old_values, terminated):
         bs = batch.batch_size
         ts = batch["obs"].shape[1]
         actions = batch["actions"][:, :-1]
@@ -45,12 +45,12 @@ class PPOLearner:
         actions_neglogp = th.gather(pi_neglogp, dim=3, index=actions).squeeze(3)
 
         # Generalized advantage estimation
-        # returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
-        #                                            self.args.gamma, self.args.tau)
+        returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
+                                                   self.args.gamma, self.args.tau)
 
         # TD error
-        returns = rewards + self.args.gamma * old_values[:, 1:]
-        advs = returns - old_values[:, :-1]
+        # returns = rewards + self.args.gamma * old_values[:, 1:]
+        # advs = returns - old_values[:, :-1]
 
         old_values = old_values[:, :-1]
         
@@ -131,7 +131,7 @@ class PPOLearner:
             action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
         old_values = self.critic(batch).squeeze()
 
-        transitions     = self.make_transitions(batch, mask, action_logits, old_values)
+        transitions     = self.make_transitions(batch, mask, action_logits, old_values, terminated)
         num             = transitions["num"]
         actions_neglogp = transitions["actions_neglogp"].detach()
         returns         = transitions["returns"].detach()
@@ -166,9 +166,10 @@ class PPOLearner:
                     tmp_action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
                 tmp_old_values = self.critic(batch).squeeze()
 
-                transitions = self.make_transitions(batch, mask, tmp_action_logits, tmp_old_values)
+                transitions = self.make_transitions(batch, mask, tmp_action_logits, tmp_old_values, terminated)
                 mb_neglogp = transitions["actions_neglogp"][curr_idx]
                 mb_values = transitions["values"][curr_idx]
+                mb_old_values = values[curr_idx]
 
                 with th.no_grad():
                     approxkl = 0.5 * ((mb_old_neglogp - mb_neglogp)**2).mean()
@@ -193,7 +194,10 @@ class PPOLearner:
                 actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
                 actor_loss_lst.append(actor_loss)
 
-                critic_loss = th.mean((mb_values - mb_ret)**2)
+                mb_values_clipped = mb_old_values + th.clamp(mb_values - mb_old_values, -0.2, 0.2)
+                critic_loss_clipped = (mb_values_clipped - mb_ret)**2
+                critic_loss = (mb_values - mb_ret)**2 
+                critic_loss = th.mean( th.max(critic_loss_clipped, critic_loss) ) 
                 critic_loss_lst.append(critic_loss)
 
                 loss = actor_loss + self.args.critic_loss_coeff * critic_loss
