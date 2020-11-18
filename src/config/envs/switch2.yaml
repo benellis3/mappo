@@ -1,0 +1,10 @@
+# ---- Defaults for 4 agents hunting 1 stag and 1 hare in a 10x10 environment
+
+env: "Switch2-v0"
+
+test_nepisode: 16
+test_interval: 1000
+log_interval: 1000
+runner_log_interval: 1000
+learner_log_interval: 1000
+t_max: 100000

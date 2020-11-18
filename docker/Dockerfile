@@ -51,6 +51,8 @@ ENV smac_ver 1
 RUN pip3 install git+https://github.com/oxwhirl/smac.git
 ENV SC2PATH /home/minsun/pymarl/3rdparty/StarCraftII
 
+RUN git clone https://github.com/koulanurag/ma-gym.git /install/ma-gym && cd /install/ma-gym && pip3 install -e .
+
 ARG UID
 RUN useradd -u $UID --create-home minsun
 USER minsun
