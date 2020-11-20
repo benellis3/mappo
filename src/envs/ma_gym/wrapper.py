@@ -81,7 +81,7 @@ class MaGymWrapper(MultiAgentEnv):
             else:
                 info[k] = infos[k]
         if terminated and self.ma_env._step_count >= self.ma_env._max_steps:
-            info["episode_limit"] = False
+            info["episode_limit"] = True
 
         if self.debug_render:
             self.ma_env.render()
