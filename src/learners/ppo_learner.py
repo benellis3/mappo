@@ -1,14 +1,13 @@
 import copy
 from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
+import numpy as np
 import torch as th
-from torch.optim import RMSprop, Adam
 import torch.nn.functional as F
 from collections import defaultdict
-import numpy as np
-from utils.rl_utils import build_td_lambda_targets
-
-# from torch.distributions import Categorical
+from torch.optim import RMSprop, Adam
+from modules.critics import critic_REGISTRY
+from components.episode_buffer import EpisodeBatch
 
 class PPOLearner:
     def __init__(self, mac, scheme, logger, args):
@@ -21,20 +20,15 @@ class PPOLearner:
         self.agent_params = list(mac.parameters())
         self.ppo_policy_clip_params = args.ppo_policy_clip_param
 
-        if getattr(self.args, "is_separate_actor_critic", False):
-            self.is_separate_actor_critic = True
-            self.critic = critic_REGISTRY[self.args.critic](scheme, args)
-            self.critic_params = list(self.critic.parameters())
-            self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor)
-            self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic)
-        else:
-            self.is_separate_actor_critic = False
-            self.params = self.agent_params
-            self.optimiser = Adam(params=self.params, lr=args.lr)
+        self.critic = critic_REGISTRY[self.args.critic](scheme, args)
+        self.critic_params = list(self.critic.parameters())
+        self.optimiser_actor = RMSprop(params=self.agent_params, lr=args.lr_actor,
+                                       alpha=args.optim_alpha, eps=args.optim_eps)
+        self.optimiser_critic = RMSprop(params=self.critic_params, lr=args.lr_critic,
+                                       alpha=args.optim_alpha, eps=args.optim_eps)
 
-        # self.optimiser = RMSprop(params=self.params,
-        #                          lr=args.lr, alpha=args.optim_alpha, 
-        #                          eps=args.optim_eps)
+        self.central_v = getattr(self.args, "is_central_value", False)
+        self.actor_critic_mode = getattr(self.args, "actor_critic_mode", False)
 
         self.log_stats_t = -self.args.learner_log_interval - 1
 
@@ -46,10 +40,7 @@ class PPOLearner:
         critic_train_stats = defaultdict(lambda: [])
 
         actions = batch["actions"][:, :-1]
-        avail_actions = batch["avail_actions"][:, :-1]
         rewards = batch["reward"][:, :-1]
-        mask = batch["filled"].float()
-        obs = batch["obs"][:, :-1]
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
@@ -174,11 +165,8 @@ class PPOLearner:
     def save_models(self, path):
         self.mac.save_models(path)
         th.save(self.mac.critic.state_dict(), "{}/critic.th".format(path))
-        if getattr(self.args, "is_separate_actor_critic", False):
-            th.save(self.optimiser_actor.state_dict(), "{}/opt_actor.th".format(path))
-            th.save(self.optimiser_critic.state_dict(), "{}/opt_critic.th".format(path))
-        else:
-            th.save(self.optimiser.state_dict(), "{}/opt.th".format(path))
+        th.save(self.optimiser_actor.state_dict(), "{}/opt_actor.th".format(path))
+        th.save(self.optimiser_critic.state_dict(), "{}/opt_critic.th".format(path))
 
     def load_models(self, path):
         self.mac.load_models(path)
@@ -186,8 +174,5 @@ class PPOLearner:
         # Not quite right but I don't want to save target networks
         if hasattr(self, "target_critic"):
             self.target_critic.load_state_dict(self.critic.state_dict())
-        if getattr(self.args, "is_separate_actor_critic", False):
-            self.optimiser_actor.load_state_dict("{}/opt_actor.th".format(path))
-            self.optimiser_critic.load_state_dict("{}/opt_critic.th".format(path))
-        else:
-            self.optimiser.load_state_dict(th.load("{}/opt.th".format(path), map_location=lambda storage, loc: storage))
+        self.optimiser_actor.load_state_dict("{}/opt_actor.th".format(path))
+        self.optimiser_critic.load_state_dict("{}/opt_critic.th".format(path))

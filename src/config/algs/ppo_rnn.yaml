@@ -1,9 +1,3 @@
-# --- Agent parameters ---
-agent: "rnn" # Default rnn agent
-rnn_hidden_dim: 64 # Size of hidden state for default rnn agent
-obs_agent_id: True # Include the agent's one_hot id in the observation
-obs_last_action: True # Include the agent's last action (one_hot) in the observation
-
 # --- PPO specific parameters ---
 
 action_selector: "multinomial"
@@ -18,26 +12,19 @@ buffer_size: 8
 batch_size_run: 8
 batch_size: 8
 
-env_args:
-  state_last_action: False # critic adds last action internally
-
 # update the target network every {} training steps
 target_update_interval: 200
 
 
-lr_actor: 0.0002
+lr_actor: 0.0005
 lr_critic: 0.0005
 tau: 0.995
-td_lambda: 0.97
+td_lambda: 0.99
 
 # use COMA
 agent_output_type: "pi_logits"
 learner: "ppo_learner"
-critic: "central_v"
-critic_baseline_fn: "centralV"
-critic_train_mode: "seq"
-critic_train_reps: 1
-q_nstep: 1 # 1 corresponds to normal r + gammaV
+critic: "rnn"
 
 mini_epochs_actor: 4
 mini_epochs_critic: 2
@@ -46,7 +33,12 @@ entropy_loss_coeff: 0.000
 ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
-is_observation_normalized: False
+is_observation_normalized: True
 is_separate_actor_critic: True
+is_central_value: False
+actor_critic_mode: False
+obs_agent_id: False
+obs_last_action: False
 
-name: "centralV"
+name: "ppo_rnn"
+

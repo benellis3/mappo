@@ -51,3 +51,17 @@ try:
                               env=StarCraft1Env)
 except Exception as e:
     print(e)
+
+# MaGYM
+try:
+    from .ma_gym.wrapper import MaGymWrapper
+    REGISTRY["Switch2-v0"] = partial(env_fn, env=MaGymWrapper)
+    REGISTRY["Switch4-v0"] = partial(env_fn, env=MaGymWrapper)
+    REGISTRY["Combat-v0"] = partial(env_fn, env=MaGymWrapper)
+    REGISTRY["Checkers-v0"] = partial(env_fn, env=MaGymWrapper)
+    REGISTRY["PredatorPrey5x5-v0"] = partial(env_fn, env=MaGymWrapper)
+    REGISTRY["PredatorPrey7x7-v0"] = partial(env_fn, env=MaGymWrapper)
+    for p in [-2, -3, -4]:
+        REGISTRY["PredatorPrey7x7P{}-v0".format(p)] = partial(env_fn, env=MaGymWrapper)
+except Exception as e:
+    print(e)
