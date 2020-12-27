@@ -39,8 +39,8 @@ critic_train_mode: "seq"
 critic_train_reps: 1
 q_nstep: 1 # 1 corresponds to normal r + gammaV
 
-mini_epochs_num: 1
-mini_batches_num: 2
+mini_epochs_actor: 4
+mini_epochs_critic: 2
 entropy_loss_coeff: 0.000
 
 ppo_policy_clip_param: 0.2

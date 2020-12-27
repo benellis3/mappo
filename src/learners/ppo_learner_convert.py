@@ -1,6 +1,7 @@
 import copy
 from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
+# from modules.critics.independent import IndependentCritic
 import torch as th
 from torch.optim import RMSprop, Adam
 import torch.nn.functional as F
@@ -38,13 +39,10 @@ class PPOLearner:
 
         self.log_stats_t = -self.args.learner_log_interval - 1
 
-        self.mini_epochs_actor = getattr(self.args, "mini_epochs_actor", 4)
-        self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
+        self.mini_epochs_num = getattr(self.args, "mini_epochs_num", 1)
+        self.mini_batches_num = getattr(self.args, "mini_batches_num", 4)
 
-
-    def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
-        critic_train_stats = defaultdict(lambda: [])
-
+    def make_transitions(self, batch: EpisodeBatch):
         actions = batch["actions"][:, :-1]
         avail_actions = batch["avail_actions"][:, :-1]
         rewards = batch["reward"][:, :-1]
@@ -62,7 +60,6 @@ class PPOLearner:
         obs_mask = obs_mask.flatten()
         obs_index = th.nonzero(obs_mask).squeeze()
         obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
-
         if getattr(self.args, "is_observation_normalized", False):
             self.mac.update_rms(obs)
             if self.is_separate_actor_critic:
@@ -71,16 +68,61 @@ class PPOLearner:
         old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents))
         action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions))
 
-        action_probs = action_probs[:, :-1]
-        old_log_pac = th.log(th.gather(action_probs, dim=3, index=actions).squeeze(3))
-
         for t in range(rewards.shape[1] + 1):
-            action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=False)
-            old_values[:, t] = self.critic(batch, t).squeeze()
-        old_values, action_probs = old_values.detach(), action_probs.detach()
+            action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=True)
+            if self.is_separate_actor_critic:
+                old_values[:, t] = self.critic(batch, t).squeeze()
+            else:
+                old_values[:, t] = self.mac.other_outs["values"].view(batch.batch_size, self.n_agents)
 
-        returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
-                                                            self.args.gamma, self.args.tau)
+        old_values[mask == 0.0] = 0.0
+
+        action_probs = action_probs[:, :-1]
+        pi_taken = th.gather(action_probs, dim=3, index=actions).squeeze(3)
+
+        returns, advs = self._compute_returns_advs(old_values, rewards, terminated, 
+                                                   self.args.gamma, self.args.tau)
+        old_values = old_values[:, :-1]
+        
+        mask = mask[:, :-1]
+        mask = mask.flatten()
+        index = th.nonzero(mask).squeeze()
+        actions = actions.flatten()[index]
+        avail_actions = avail_actions.reshape((-1, avail_actions.shape[-1]))[index]
+        pi_taken = pi_taken.flatten()[index]
+        actions_neglogp = -th.log(pi_taken + 1e-6)
+        returns = returns.flatten()[index]
+        values = old_values.flatten()[index]
+        advantages = advs.flatten()[index]
+        rewards = rewards.flatten()[index]
+
+        transitions = {}
+        transitions.update({"num": int(th.sum(mask))})
+        transitions.update({"actions": actions.detach()})
+        transitions.update({"avail_actions": avail_actions.detach()})
+        transitions.update({"actions_neglogp": actions_neglogp.detach()})
+        transitions.update({"returns": returns.detach()})
+        transitions.update({"values": values.detach()})
+        transitions.update({"advantages": advantages.detach()})
+        transitions.update({"obs": obs.detach()})
+        transitions.update({"rewards": rewards.detach()})
+
+        return transitions
+
+    def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
+        critic_train_stats = defaultdict(lambda: [])
+
+        transitions = self.make_transitions(batch)
+        num             = transitions["num"]
+        actions         = transitions["actions"]
+        avail_actions   = transitions["avail_actions"]
+        actions_neglogp = transitions["actions_neglogp"]
+        returns         = transitions["returns"]
+        values          = transitions["values"]
+        advantages      = transitions["advantages"]
+        obs             = transitions["obs"]
+        rewards         = transitions["rewards"]
+
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
@@ -91,45 +133,67 @@ class PPOLearner:
         actor_loss_lst = []
         loss_lst = []
 
-        target_kl = 0.2
+        for _ in range(0, self.args.mini_epochs_num):
+            rnd_idx = np.random.permutation(num)
+            rnd_step = len(rnd_idx) // self.mini_batches_num
+            for j in range(0, self.mini_batches_num):
+                curr_idx = rnd_idx[j*rnd_step : j*rnd_step+rnd_step]
 
-        for _ in range(0, self.mini_epochs_actor):
-            for t in range(rewards.shape[1] + 1):
-                pac[:, t] = self.mac.forward(batch, t = t, test_mode=False)
-            log_pac = th.log(th.gather(pac, dim=1, index=actions.unsqueeze(-1)).squeeze(-1))
+                mb_actions      = actions[curr_idx]
+                mb_avail_actions= avail_actions[curr_idx]
+                mb_adv          = advantages[curr_idx]
+                mb_ret          = returns[curr_idx]
+                mb_old_values   = values[curr_idx]
+                mb_old_neglogp  = actions_neglogp[curr_idx]
+                mb_obs          = obs[curr_idx]
 
-            with th.no_grad():
-                approxkl = 0.5 * ((log_pac - old_log_pac)**2).mean()
-                if approxkl > 1.5 * target_kl:
-                    break
+                mb_logp = self.mac.forward_obs(mb_obs, mb_avail_actions)
+                if self.is_separate_actor_critic:
+                    mb_values = self.critic.forward_obs(mb_obs)
+                else:
+                    mb_values = self.mac.other_outs["values"]
 
-            entropy = -1.0 * (log_pac * th.exp(log_pac)).sum(dim=-1).mean()
-            entropy_lst.append(entropy)
+                mb_neglogp = -th.gather(mb_logp, dim=1, index=mb_actions.unsqueeze(-1)).squeeze(-1)
 
-            prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
+                with th.no_grad():
+                    approxkl = 0.5 * ((mb_old_neglogp - mb_neglogp)**2).mean()
+                    approxkl_lst.append(approxkl)
 
-            pg_loss_unclipped = - advantages * prob_ratio
-            pg_loss_clipped = - advantages * th.clamp(prob_ratio,
-                                                1 - self.args.ppo_policy_clip_param,
-                                                1 + self.args.ppo_policy_clip_param)
+                entropy = -1.0 * (mb_logp * th.exp(mb_logp)).sum(dim=-1).mean()
+                entropy_lst.append(entropy)
 
-            pg_loss = th.mean(th.max(pg_loss_unclipped, pg_loss_clipped))
+                prob_ratio = th.clamp(th.exp(mb_old_neglogp - mb_neglogp), 0.0, 16.0)
 
-            # Construct overall loss
-            actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
-            actor_loss_lst.append(actor_loss)
+                pg_loss_unclipped = - mb_adv * prob_ratio
+                pg_loss_clipped = - mb_adv * th.clamp(prob_ratio,
+                                                    1 - self.args.ppo_policy_clip_param,
+                                                    1 + self.args.ppo_policy_clip_param)
 
-            self.optimiser_actor.zero_grad()
-            actor_loss.backward()
-            self.optimiser_actor.step()
+                pg_loss = th.mean(th.max(pg_loss_unclipped, pg_loss_clipped))
 
-        for _ in range(0, self.mini_epochs_critic):
-            for t in range(rewards.shape[1] + 1):
-                new_values[:, t] = self.critic(batch, t).squeeze()
-            critic_loss = 0.5 * th.mean((new_values - returns)**2)
-            self.optimiser_critic.zero_grad()
-            critic_loss.backward()
-            self.optimiser_critic.step()
+                # Construct overall loss
+                actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
+                actor_loss_lst.append(actor_loss)
+
+                critic_loss = 0.5 * th.mean((mb_values - mb_ret)**2)
+                critic_loss_lst.append(critic_loss)
+
+                loss = actor_loss + self.args.critic_loss_coeff * critic_loss
+                loss_lst.append(loss)
+
+                if getattr(self.args, "is_separate_actor_critic", False):
+                    self.optimiser_actor.zero_grad()
+                    actor_loss.backward()
+                    self.optimiser_actor.step()
+
+                    self.optimiser_critic.zero_grad()
+                    critic_loss.backward()
+                    self.optimiser_critic.step()
+
+                else:
+                    self.optimiser.zero_grad()
+                    loss.backward()
+                    self.optimiser.step()
 
         # log stuff
         critic_train_stats["values"].append((th.mean(values)).item())
