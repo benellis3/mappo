@@ -70,8 +70,11 @@ class PPOLearner:
 
         old_values = self.critic(batch).squeeze().detach()
 
-        returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
-                                                            self.args.gamma, self.args.tau)
+        # returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
+        #                                                     self.args.gamma, self.args.tau)
+        returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, :-1])
+        advantages = returns - old_values[:, :-1]
+
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
