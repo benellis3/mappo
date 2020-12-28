@@ -39,36 +39,36 @@ class PPOLearner:
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
-        actions = batch["actions"][:, :-1]
-        rewards = batch["reward"][:, :-1]
+        actions = batch["actions"][:, :-1].cuda()
+        rewards = batch["reward"][:, :-1].cuda()
+        filled_mask = batch['filled'].float().cuda()
         rewards = rewards.repeat(1, 1, self.n_agents)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
         terminated[:, 1:] = terminated[:, :-1].clone()
-        mask = mask * (1 - terminated)
-        mask = mask.repeat(1, 1, self.n_agents)
-
-        obs_mask = mask[:, :-1].clone()
-        obs_mask = obs_mask.flatten()
-        obs_index = th.nonzero(obs_mask).squeeze()
-        obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
+        filled_mask = filled_mask * (1 - terminated)
+        filled_mask = filled_mask[:, :-1]
+        mask = filled_mask.repeat(1, 1, self.n_agents)
 
         if getattr(self.args, "is_observation_normalized", False):
+            obs_mask = mask[...].clone()
+            obs_mask = obs_mask.flatten()
+
+            obs = batch["obs"][:, :-1].cuda()
+            obs_index = th.nonzero(obs_mask).squeeze()
+            obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
             self.mac.update_rms(obs)
-            if self.is_separate_actor_critic:
-                self.critic.update_rms(obs)
+            self.critic.update_rms(obs)
 
-        old_values = th.zeros((batch.batch_size, rewards.shape[1]+1, self.n_agents))
-        action_probs = th.zeros((batch.batch_size, rewards.shape[1] + 1, self.n_agents, self.n_actions))
+        action_logits = th.zeros((batch.batch_size, rewards.shape[1], self.n_agents, self.n_actions)).cuda()
+        self.mac.init_hidden(batch.batch_size)
+        for t in range(rewards.shape[1]):
+            action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
+        action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
+        old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
 
-        action_probs = action_probs[:, :-1]
-        old_log_pac = th.log(th.gather(action_probs, dim=3, index=actions).squeeze(3))
-
-        for t in range(rewards.shape[1] + 1):
-            action_probs[:, t] = self.mac.forward(batch, t = t, test_mode=False)
-            old_values[:, t] = self.critic(batch, t).squeeze()
-        old_values, action_probs = old_values.detach(), action_probs.detach()
+        old_values = self.critic(batch).squeeze().detach()
 
         returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
                                                             self.args.gamma, self.args.tau)
@@ -80,21 +80,25 @@ class PPOLearner:
         entropy_lst = [] 
         critic_loss_lst = []
         actor_loss_lst = []
-        loss_lst = []
 
         target_kl = 0.2
 
         for _ in range(0, self.mini_epochs_actor):
-            for t in range(rewards.shape[1] + 1):
-                pac[:, t] = self.mac.forward(batch, t = t, test_mode=False)
-            log_pac = th.log(th.gather(pac, dim=1, index=actions.unsqueeze(-1)).squeeze(-1))
+            logits = []
+            self.mac.init_hidden(batch.batch_size)
+            for t in range(rewards.shape[1]):
+                logits.append( self.mac.forward(batch, t = t, test_mode=False) )
+            logits = th.transpose(th.stack(logits), 0, 1)
+            pacs = th.nn.functional.log_softmax(logits, dim=-1)
+            log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
 
             with th.no_grad():
-                approxkl = 0.5 * ((log_pac - old_log_pac)**2).mean()
+                approxkl = 0.5 * th.sum((log_pac - old_log_pac)**2 * mask) / th.sum(mask)
+                approxkl_lst.append(approxkl)
                 if approxkl > 1.5 * target_kl:
                     break
 
-            entropy = -1.0 * (log_pac * th.exp(log_pac)).sum(dim=-1).mean()
+            entropy = th.sum( th.sum(-1.0 * log_pac * th.exp(log_pac), dim=-1) * filled_mask.squeeze() ) / th.sum(filled_mask.squeeze())
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
@@ -104,7 +108,7 @@ class PPOLearner:
                                                 1 - self.args.ppo_policy_clip_param,
                                                 1 + self.args.ppo_policy_clip_param)
 
-            pg_loss = th.mean(th.max(pg_loss_unclipped, pg_loss_clipped))
+            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
@@ -115,22 +119,21 @@ class PPOLearner:
             self.optimiser_actor.step()
 
         for _ in range(0, self.mini_epochs_critic):
-            for t in range(rewards.shape[1] + 1):
-                new_values[:, t] = self.critic(batch, t).squeeze()
-            critic_loss = 0.5 * th.mean((new_values - returns)**2)
+            new_values = self.critic(batch).squeeze()
+            new_values = new_values[:, :-1]
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
+            critic_loss_lst.append(critic_loss)
             self.optimiser_critic.step()
 
         # log stuff
-        critic_train_stats["values"].append((th.mean(values)).item())
         critic_train_stats["rewards"].append(th.mean(rewards).item())
         critic_train_stats["returns"].append((th.mean(returns)).item())
         critic_train_stats["approx_KL"].append(th.mean(th.tensor(approxkl_lst)).item())
         critic_train_stats["entropy"].append(th.mean(th.tensor(entropy_lst)).item())
         critic_train_stats["critic_loss"].append(th.mean(th.tensor(critic_loss_lst)).item())
         critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
-        critic_train_stats["loss"].append(th.mean(th.tensor(loss_lst)).item())
 
         if t_env - self.log_stats_t >= self.args.learner_log_interval:
             for k,v in critic_train_stats.items():

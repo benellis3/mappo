@@ -27,7 +27,7 @@ learner: "ppo_learner"
 critic: "rnn"
 
 mini_epochs_actor: 4
-mini_epochs_critic: 2
+mini_epochs_critic: 8
 entropy_loss_coeff: 0.000
 
 ppo_policy_clip_param: 0.2
