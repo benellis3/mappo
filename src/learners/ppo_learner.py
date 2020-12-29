@@ -34,6 +34,7 @@ class PPOLearner:
 
         self.mini_epochs_actor = getattr(self.args, "mini_epochs_actor", 4)
         self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
+        self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
 
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
@@ -70,10 +71,14 @@ class PPOLearner:
 
         old_values = self.critic(batch).squeeze().detach()
 
-        returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
-                                                            self.args.gamma, self.args.tau)
-        # returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, :-1])
-        # advantages = returns - old_values[:, :-1]
+        if self.advantage_calc_method == "GAE":
+            returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
+                                                                self.args.gamma, self.args.tau)
+        elif self.advantage_calc_method == "TD_Error":
+            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, 1:])
+            advantages = returns - old_values[:, :-1]
+        else:
+            raise NotImplementedError
 
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
