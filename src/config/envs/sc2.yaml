@@ -4,7 +4,7 @@ env_args:
   continuing_episode: False
   difficulty: "7"
   game_version: null
-  map_name: "2m_vs_1z"
+  map_name: "3m"
   move_amount: 2
   obs_all_health: True
   obs_instead_of_state: False
@@ -35,4 +35,4 @@ test_interval: 10000
 log_interval: 2000
 runner_log_interval: 2000
 learner_log_interval: 2000
-t_max: 6000000
+t_max: 2000000
