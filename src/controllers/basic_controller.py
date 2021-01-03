@@ -18,7 +18,7 @@ class BasicMAC:
             self.is_obs_normalized = False
 
         if self.args.agent == "cnn":
-            self.num_frames = getattr(args, "num_frames", 4):
+            self.num_frames = getattr(args, "num_frames", 4)
             self.is_obs_normalized = False # no input normalization
 
         self.framestack_num = self.args.env_args.get("framestack_num", None)
