@@ -105,7 +105,7 @@ class BasicMAC:
         inputs = []
 
         if self.args.agent == "cnn":
-            for i in range(self.num_frames): # stacking 4 frames
+            for i in reversed(range(self.num_frames)): # stacking 4 frames
                 if t - i < 0:
                     inputs.append(th.zeros_like(batch["obs"][:, t]))
                 else:

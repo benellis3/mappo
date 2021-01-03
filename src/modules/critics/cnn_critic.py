@@ -22,9 +22,9 @@ class CNNCritic(nn.Module):
         self.cnn2 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=0)
         self.cnn3 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=0)
 
-        self.fc1 = nn.Linear(256 * 11, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 1)
+        input_dim = input_shape // 2 - 4
+        self.fc1 = nn.Linear(256 * input_dim, 128)
+        self.fc2 = nn.Linear(128, 1)
 
     def init_hidden(self):
         # make hidden states on same device as model
@@ -47,8 +47,7 @@ class CNNCritic(nn.Module):
             x = F.relu(self.cnn3(x))
             x = x.view(inputs.shape[0], -1)
             x = F.relu(self.fc1(x))
-            x = F.relu(self.fc2(x))
-            q = self.fc3(x)
+            q = self.fc2(x)
 
             outputs.append(q.reshape(bs, 1, self.n_agents)) # bs * ts * n_agents
 
@@ -58,7 +57,7 @@ class CNNCritic(nn.Module):
     def _build_inputs(self, batch, t):
         bs = batch.batch_size
         inputs = []
-        for i in range(self.num_frames): # stacking 4 frames
+        for i in reversed(range(self.num_frames)): # stacking 4 frames
             if t - i < 0:
                 inputs.append(th.zeros_like(batch["obs"][:, t]))
             else:
