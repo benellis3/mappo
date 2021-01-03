@@ -75,7 +75,7 @@ class PPOLearner:
             returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
                                                                 self.args.gamma, self.args.tau)
         elif self.advantage_calc_method == "TD_Error":
-            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, 1:])
+            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, 1:]) # terminated has been shifted
             advantages = returns - old_values[:, :-1]
         else:
             raise NotImplementedError
