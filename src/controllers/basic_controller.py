@@ -17,6 +17,10 @@ class BasicMAC:
         else:
             self.is_obs_normalized = False
 
+        if self.args.agent == "cnn":
+            self.num_frames = getattr(args, "num_frames", 4):
+            self.is_obs_normalized = False # no input normalization
+
         self.framestack_num = self.args.env_args.get("framestack_num", None)
         if self.framestack_num:
             assert input_shape % self.framestack_num == 0
@@ -99,15 +103,23 @@ class BasicMAC:
         # Other MACs might want to e.g. delegate building inputs to each agent
         bs = batch.batch_size
         inputs = []
-        inputs.append(batch["obs"][:, t])  # b1av
 
-        if self.args.obs_last_action:
-            if t == 0:
-                inputs.append(th.zeros_like(batch["actions_onehot"][:, t]))
-            else:
-                inputs.append(batch["actions_onehot"][:, t-1])
-        if self.args.obs_agent_id:
-            inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, -1, -1))
+        if self.args.agent == "cnn":
+            for i in range(self.num_frames): # stacking 4 frames
+                if t - i < 0:
+                    inputs.append(th.zeros_like(batch["obs"][:, t]))
+                else:
+                    inputs.append(batch["obs"][:, t-i])
+        else:
+            inputs.append(batch["obs"][:, t])  # b1av
+
+            if self.args.obs_last_action:
+                if t == 0:
+                    inputs.append(th.zeros_like(batch["actions_onehot"][:, t]))
+                else:
+                    inputs.append(batch["actions_onehot"][:, t-1])
+            if self.args.obs_agent_id:
+                inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).expand(bs, -1, -1))
 
         inputs = th.cat([x.reshape(bs*self.n_agents, -1) for x in inputs], dim=1)
         return inputs
