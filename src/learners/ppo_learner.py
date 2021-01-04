@@ -65,6 +65,7 @@ class PPOLearner:
 
         if self.agent_type == "cnn":
             action_logits = self.mac.forward_cnn(batch)
+            action_logits = action_logits[:, :-1]
         elif self.agent_type == "rnn":
             action_logits = th.zeros((batch.batch_size, rewards.shape[1], self.n_agents, self.n_actions)).cuda()
             self.mac.init_hidden(batch.batch_size)
@@ -102,6 +103,7 @@ class PPOLearner:
 
             if self.agent_type == "cnn":
                 logits = self.mac.forward_cnn(batch)
+                logits = logits[:, :-1]
             elif self.agent_type == "rnn":
                 logits = []
                 self.mac.init_hidden(batch.batch_size)
