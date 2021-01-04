@@ -37,44 +37,34 @@ class CNNCritic(nn.Module):
 
     def forward(self, batch):
         bs = batch.batch_size
+        ts = batch.max_seq_length
 
-        outputs = []
+        inputs = []
+        for i in reversed(range(self.num_frames)): # stacking 4 frames
+            tmp_inputs = th.zeros_like(batch["obs"])
+            tmp_inputs[:, i:] = batch["obs"][:, :-i]
+            inputs.append(tmp_inputs)
 
-        for t in range(batch.max_seq_length):
-            inputs = self._build_inputs(batch, t)
-            if self.is_obs_normalized:
-                inputs = (inputs - self.obs_rms.mean.repeat(self.num_frames)) / th.sqrt(self.obs_rms.var.repeat(self.num_frames))
+        inputs = th.cat([x.reshape(bs * self.n_agents * ts, -1) for x in inputs], dim=1)
 
-            input_shape = inputs.shape
-            assert input_shape[1] % self.num_frames == 0
-            inputs = inputs.view(input_shape[0], self.num_frames, input_shape[1]//self.num_frames)
+        if self.is_obs_normalized:
+            inputs = (inputs - self.obs_rms.mean.repeat(self.num_frames)) / th.sqrt(self.obs_rms.var.repeat(self.num_frames))
 
-            x = F.relu(self.cnn1(inputs))
-            x = F.relu(self.cnn2(x))
-            x = F.relu(self.cnn3(x))
-            x = x.view(inputs.shape[0], -1)
-            x = F.relu(self.fc1(x))
-            q = self.fc2(x)
+        input_shape = inputs.shape
+        assert input_shape[1] % self.num_frames == 0
+        inputs = inputs.view(input_shape[0], self.num_frames, input_shape[1]//self.num_frames)
 
-            outputs.append(q.reshape(bs, 1, self.n_agents)) # bs * ts * n_agents
+        x = F.relu(self.cnn1(inputs))
+        x = F.relu(self.cnn2(x))
+        x = F.relu(self.cnn3(x))
+        x = x.view(inputs.shape[0], -1)
+        x = F.relu(self.fc1(x))
+        output_tensor = self.fc2(x)
 
-        output_tensor = th.stack(outputs, dim=1)
         return output_tensor
     
     def update_rms(self, batch_obs):
         self.obs_rms.update(batch_obs)
-
-    def _build_inputs(self, batch, t):
-        bs = batch.batch_size
-        inputs = []
-        for i in reversed(range(self.num_frames)): # stacking 4 frames
-            if t - i < 0:
-                inputs.append(th.zeros_like(batch["obs"][:, t]))
-            else:
-                inputs.append(batch["obs"][:, t-i])
-
-        inputs = th.cat([x.reshape(bs*self.n_agents, -1) for x in inputs], dim=1)
-        return inputs
 
     def _get_input_shape(self, scheme):
         input_shape = scheme["obs"]["vshape"]
