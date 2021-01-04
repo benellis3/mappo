@@ -35,6 +35,7 @@ class PPOLearner:
         self.mini_epochs_actor = getattr(self.args, "mini_epochs_actor", 4)
         self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
+        self.agent_type = getattr(self.args, "agent", None)
 
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
@@ -62,10 +63,16 @@ class PPOLearner:
             self.mac.update_rms(obs)
             self.critic.update_rms(obs)
 
-        action_logits = th.zeros((batch.batch_size, rewards.shape[1], self.n_agents, self.n_actions)).cuda()
-        self.mac.init_hidden(batch.batch_size)
-        for t in range(rewards.shape[1]):
-            action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
+        if self.agent_type == "cnn":
+            action_logits = self.mac.forward_cnn(batch)
+        elif self.agent_type == "rnn":
+            action_logits = th.zeros((batch.batch_size, rewards.shape[1], self.n_agents, self.n_actions)).cuda()
+            self.mac.init_hidden(batch.batch_size)
+            for t in range(rewards.shape[1]):
+                action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
+        else:
+            raise NotImplementedError
+
         action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
         old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
 
@@ -92,11 +99,18 @@ class PPOLearner:
         target_kl = 0.2
 
         for _ in range(0, self.mini_epochs_actor):
-            logits = []
-            self.mac.init_hidden(batch.batch_size)
-            for t in range(rewards.shape[1]):
-                logits.append( self.mac.forward(batch, t = t, test_mode=False) )
-            logits = th.transpose(th.stack(logits), 0, 1)
+
+            if self.agent_type == "cnn":
+                logits = self.mac.forward_cnn(batch)
+            elif self.agent_type == "rnn":
+                logits = []
+                self.mac.init_hidden(batch.batch_size)
+                for t in range(rewards.shape[1]):
+                    logits.append( self.mac.forward(batch, t = t, test_mode=False) )
+                logits = th.transpose(th.stack(logits), 0, 1)
+            else:
+                raise NotImplementedError
+
             pacs = th.nn.functional.log_softmax(logits, dim=-1)
             log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
 

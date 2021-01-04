@@ -22,9 +22,6 @@ class CNNAgent(nn.Module):
         return self.fc1.weight.new(1, self.args.rnn_hidden_dim).zero_()
 
     def forward(self, inputs, hidden_state):
-        input_shape = inputs.shape
-        assert input_shape[1] % self.num_frames == 0
-        inputs = inputs.view(inputs.shape[0], self.num_frames, input_shape[1]//self.num_frames)
         x = F.relu(self.cnn1(inputs))
         x = F.relu(self.cnn2(x))
         x = F.relu(self.cnn3(x))

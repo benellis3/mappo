@@ -71,6 +71,50 @@ class BasicMAC:
 
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
 
+    def forward_cnn(self, batch):
+        bs = batch.batch_size
+        ts = batch.max_seq_length
+
+        inputs = []
+        for i in reversed(range(self.num_frames)): # stacking 4 frames
+            tmp_inputs = th.zeros_like(batch["obs"])
+            if i == 0:
+                tmp_inputs[:, :] = batch["obs"][:, :]
+            else:
+                tmp_inputs[:, i:] = batch["obs"][:, :-i]
+            inputs.append(tmp_inputs)
+
+        inputs = th.cat([x.reshape(bs * ts * self.n_agents, -1) for x in inputs], dim=1)
+
+        if self.is_obs_normalized:
+            inputs = (inputs - self.obs_rms.mean.repeat(self.num_frames)) / th.sqrt(self.obs_rms.var.repeat(self.num_frames))
+
+        input_shape = inputs.shape
+        assert input_shape[1] % self.num_frames == 0
+        agent_inputs = inputs.view(input_shape[0], self.num_frames, input_shape[1]//self.num_frames)
+
+        avail_actions = batch["avail_actions"]
+        agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
+
+        if isinstance(other_outs, dict):
+            self.hidden_states = other_outs.pop("hidden_states")
+            self.other_outs = other_outs
+        else:
+            self.hidden_states = other_outs
+
+        if self.agent_output_type == "pi_logits":
+            if getattr(self.args, "mask_before_softmax", True):
+                # Make the logits for unavailable actions very negative to minimise their affect on the softmax
+                reshaped_avail_actions = avail_actions.reshape(bs * ts * self.n_agents, -1)
+                agent_outs[reshaped_avail_actions == 0] = -1e6
+
+            # agent_outs = th.nn.functional.log_softmax(agent_outs, dim=-1)
+
+        elif self.agent_output_type == "gaussian_mean":
+            raise NotImplementedError
+
+        return agent_outs.view(bs, ts, self.n_agents, -1)
+
     def init_hidden(self, batch_size):
         if self.args.agent != "rnn":
             # only rnn needs to initialize hidden states
