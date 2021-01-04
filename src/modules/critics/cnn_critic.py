@@ -42,10 +42,13 @@ class CNNCritic(nn.Module):
         inputs = []
         for i in reversed(range(self.num_frames)): # stacking 4 frames
             tmp_inputs = th.zeros_like(batch["obs"])
-            tmp_inputs[:, i:] = batch["obs"][:, :-i]
+            if i == 0:
+                tmp_inputs[:, :] = batch["obs"][:, :]
+            else:
+                tmp_inputs[:, i:] = batch["obs"][:, :-i]
             inputs.append(tmp_inputs)
 
-        inputs = th.cat([x.reshape(bs * self.n_agents * ts, -1) for x in inputs], dim=1)
+        inputs = th.cat([x.reshape(bs * ts * self.n_agents, -1) for x in inputs], dim=1)
 
         if self.is_obs_normalized:
             inputs = (inputs - self.obs_rms.mean.repeat(self.num_frames)) / th.sqrt(self.obs_rms.var.repeat(self.num_frames))
@@ -59,8 +62,9 @@ class CNNCritic(nn.Module):
         x = F.relu(self.cnn3(x))
         x = x.view(inputs.shape[0], -1)
         x = F.relu(self.fc1(x))
-        output_tensor = self.fc2(x)
+        q = self.fc2(x)
 
+        output_tensor = q.reshape(bs, ts, self.n_agents)
         return output_tensor
     
     def update_rms(self, batch_obs):
