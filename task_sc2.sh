@@ -27,3 +27,8 @@
 ./run.sh 5 python3 src/main.py --config=ppo_cnn --env-config=sc2 with env_args.map_name="MMM2" t_max=10000000 name="ppo_cnn" label="sc2_MMM2_new_mingfei" &
 ./run.sh 6 python3 src/main.py --config=ppo_cnn --env-config=sc2 with env_args.map_name="MMM2" t_max=10000000 name="ppo_cnn" label="sc2_MMM2_new_mingfei" &
 ./run.sh 7 python3 src/main.py --config=ppo_cnn --env-config=sc2 with env_args.map_name="MMM2" t_max=10000000 name="ppo_cnn" label="sc2_MMM2_new_mingfei" &
+
+./run.sh 4 python3 src/main.py --config=ppo_cnn --env-config=sc2 with env_args.map_name="3m" t_max=2000000 name="ppo_cnn_new" label="sc2_3m_new_mingfei" &
+./run.sh 5 python3 src/main.py --config=ppo_cnn --env-config=sc2 with env_args.map_name="3m" t_max=2000000 name="ppo_cnn_new" label="sc2_3m_new_mingfei" &
+./run.sh 6 python3 src/main.py --config=ppo_cnn --env-config=sc2 with env_args.map_name="3m" t_max=2000000 name="ppo_cnn_new" label="sc2_3m_new_mingfei" &
+./run.sh 7 python3 src/main.py --config=ppo_cnn --env-config=sc2 with env_args.map_name="3m" t_max=2000000 name="ppo_cnn_new" label="sc2_3m_new_mingfei" &
