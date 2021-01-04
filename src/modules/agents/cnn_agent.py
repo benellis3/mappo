@@ -13,7 +13,7 @@ class CNNAgent(nn.Module):
         self.cnn3 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=0)
 
         input_dim = input_shape
-        input_dim = input_dim // 2 - 4 
+        input_dim = input_dim // 2 - 4  # based on cnn output size formula: https://en.wikipedia.org/wiki/Convolutional_neural_network#Convolutional_layer
 
         self.fc1 = nn.Linear(256 * input_dim, 128)
         self.fc2 = nn.Linear(128, args.n_actions)
@@ -24,8 +24,7 @@ class CNNAgent(nn.Module):
     def forward(self, inputs, hidden_state):
         input_shape = inputs.shape
         assert input_shape[1] % self.num_frames == 0
-        inputs = inputs.view(inputs.shape[0], input_shape[1]//self.num_frames, self.num_frames)
-        inputs = th.transpose(inputs, 1 , 2)
+        inputs = inputs.view(inputs.shape[0], self.num_frames, input_shape[1]//self.num_frames)
         x = F.relu(self.cnn1(inputs))
         x = F.relu(self.cnn2(x))
         x = F.relu(self.cnn3(x))

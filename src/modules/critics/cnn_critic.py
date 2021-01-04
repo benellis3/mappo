@@ -14,15 +14,20 @@ class CNNCritic(nn.Module):
         self.n_agents = args.n_agents
         self.state_dim = int(np.prod(args.state_shape))
 
-        input_shape = self._get_input_shape(scheme)
-
         self.num_frames = getattr(args, "num_frames", 4)
+
+        input_shape = self._get_input_shape(scheme)
+        if getattr(args, "is_observation_normalized", None):
+            self.is_obs_normalized = True
+            self.obs_rms = RunningMeanStd(shape=np.prod(input_shape))
+        else:
+            self.is_obs_normalized = False
 
         self.cnn1 = nn.Conv1d(in_channels=self.num_frames, out_channels=64, kernel_size=3, stride=2, padding=1)
         self.cnn2 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=0)
         self.cnn3 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=0)
 
-        input_dim = input_shape // 2 - 4
+        input_dim = input_shape // 2 - 4 # based on cnn output size formula: https://en.wikipedia.org/wiki/Convolutional_neural_network#Convolutional_layer
         self.fc1 = nn.Linear(256 * input_dim, 128)
         self.fc2 = nn.Linear(128, 1)
 
@@ -37,10 +42,12 @@ class CNNCritic(nn.Module):
 
         for t in range(batch.max_seq_length):
             inputs = self._build_inputs(batch, t)
+            if self.is_obs_normalized:
+                inputs = (inputs - self.obs_rms.mean.repeat(self.num_frames)) / th.sqrt(self.obs_rms.var.repeat(self.num_frames))
+
             input_shape = inputs.shape
             assert input_shape[1] % self.num_frames == 0
-            inputs = inputs.view(input_shape[0], input_shape[1]//self.num_frames, self.num_frames)
-            inputs = th.transpose(inputs, 1, 2)
+            inputs = inputs.view(input_shape[0], self.num_frames, input_shape[1]//self.num_frames)
 
             x = F.relu(self.cnn1(inputs))
             x = F.relu(self.cnn2(x))
@@ -53,6 +60,9 @@ class CNNCritic(nn.Module):
 
         output_tensor = th.stack(outputs, dim=1)
         return output_tensor
+    
+    def update_rms(self, batch_obs):
+        self.obs_rms.update(batch_obs)
 
     def _build_inputs(self, batch, t):
         bs = batch.batch_size

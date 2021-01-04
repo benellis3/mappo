@@ -11,20 +11,17 @@ class BasicMAC:
         self.args = args
         input_shape = self._get_input_shape(scheme)
 
+        if self.args.agent == "cnn":
+            self.num_frames = getattr(args, "num_frames", 4)
+
         if getattr(args, "is_observation_normalized", None):
             self.is_obs_normalized = True
             self.obs_rms = RunningMeanStd(shape=input_shape)
         else:
             self.is_obs_normalized = False
 
-        if self.args.agent == "cnn":
-            self.num_frames = getattr(args, "num_frames", 4)
-            self.is_obs_normalized = False # no input normalization
-
         self.framestack_num = self.args.env_args.get("framestack_num", None)
-        if self.framestack_num:
-            assert input_shape % self.framestack_num == 0
-            input_shape = (self.framestack_num, input_shape // self.framestack_num) # channels come first
+
         self._build_agents(input_shape)
         self.agent_output_type = args.agent_output_type
         self.need_agent_logits = getattr(args, "need_agent_logits", False)
@@ -47,8 +44,10 @@ class BasicMAC:
     def forward(self, ep_batch, t, test_mode=False):
         agent_inputs = self._build_inputs(ep_batch, t)
         if self.is_obs_normalized:
-            agent_inputs = (agent_inputs - self.obs_rms.mean.cuda() ) / th.sqrt(self.obs_rms.var.cuda())
-            # agent_inputs = th.clamp(agent_inputs, min=-5.0, max=5.0) # clip to range
+            if self.args.agent == "cnn":
+                agent_inputs = (agent_inputs - self.obs_rms.mean.repeat(self.num_frames).cuda() ) / th.sqrt(self.obs_rms.var.repeat(self.num_frames).cuda())
+            else:
+                agent_inputs = (agent_inputs - self.obs_rms.mean.cuda() ) / th.sqrt(self.obs_rms.var.cuda())
 
         avail_actions = ep_batch["avail_actions"][:, t]
         agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
