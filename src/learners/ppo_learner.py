@@ -122,7 +122,7 @@ class PPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
-            entropy = th.sum( th.sum(-1.0 * log_pac * th.exp(log_pac), dim=-1) * filled_mask.squeeze() ) / th.sum(filled_mask.squeeze())
+            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=-1) * mask.squeeze() ) / th.sum(mask.squeeze())
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
