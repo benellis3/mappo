@@ -9,7 +9,7 @@ from torch.optim import RMSprop, Adam
 from modules.critics import critic_REGISTRY
 from components.episode_buffer import EpisodeBatch
 
-class PPOLearner:
+class CentralPPOLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.n_agents = args.n_agents
@@ -41,14 +41,13 @@ class PPOLearner:
         actions = batch["actions"][:, :-1].cuda()
         rewards = batch["reward"][:, :-1].cuda()
         filled_mask = batch['filled'].float().cuda()
-        rewards = rewards.repeat(1, 1, self.n_agents)
 
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
         terminated[:, 1:] = terminated[:, :-1].clone()
         filled_mask = filled_mask * (1 - terminated)
         filled_mask = filled_mask[:, :-1]
-        mask = filled_mask.repeat(1, 1, self.n_agents)
+        mask = filled_mask.squeeze(dim=-1)
 
         if getattr(self.args, "is_observation_normalized", False):
             obs_mask = mask[...].clone()
@@ -58,11 +57,9 @@ class PPOLearner:
             obs_index = th.nonzero(obs_mask).squeeze()
             obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
             self.mac.update_rms(obs)
-            self.critic.update_rms(obs)
+            self.critic.update_rms(batch)
 
-        if self.agent_type == "cnn":
-            action_logits = self.mac.forward_cnn(batch)
-        elif self.agent_type == "rnn":
+        if self.agent_type == "rnn":
             action_logits = th.zeros((batch.batch_size, rewards.shape[1], self.n_agents, self.n_actions)).cuda()
             self.mac.init_hidden(batch.batch_size)
             for t in range(rewards.shape[1]):
@@ -72,8 +69,11 @@ class PPOLearner:
 
         action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
         old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
+        central_old_log_pac = th.sum(old_log_pac, dim=-1)
 
-        old_values = self.critic(batch).squeeze().detach()
+        old_values = self.critic(batch).squeeze(dim=-1).detach()
+        rewards = rewards.squeeze(dim=-1)
+        terminated = terminated.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
             returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
@@ -97,9 +97,7 @@ class PPOLearner:
 
         for _ in range(0, self.mini_epochs_actor):
 
-            if self.agent_type == "cnn":
-                logits = self.mac.forward_cnn(batch)
-            elif self.agent_type == "rnn":
+            if self.agent_type == "rnn":
                 logits = []
                 self.mac.init_hidden(batch.batch_size)
                 for t in range(rewards.shape[1]):
@@ -111,16 +109,19 @@ class PPOLearner:
             pacs = th.nn.functional.log_softmax(logits, dim=-1)
             log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
 
+            central_log_pac = th.sum(log_pac, dim=-1)
+
             with th.no_grad():
-                approxkl = 0.5 * th.sum((log_pac - old_log_pac)**2 * mask) / th.sum(mask)
+                approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2 * mask) / th.sum(mask)
                 approxkl_lst.append(approxkl)
                 if approxkl > 1.5 * target_kl:
                     break
 
-            entropy = th.sum( th.sum(-1.0 * log_pac * th.exp(log_pac), dim=-1) * filled_mask.squeeze() ) / th.sum(filled_mask.squeeze())
+            central_logp = th.sum(pacs, dim=-2)
+            entropy = th.sum( th.sum(-1.0 * central_logp * th.exp(central_logp), dim=-1) * mask.squeeze() ) / th.sum(mask.squeeze())
             entropy_lst.append(entropy)
 
-            prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
+            prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
 
             pg_loss_unclipped = - advantages * prob_ratio
             pg_loss_clipped = - advantages * th.clamp(prob_ratio,
@@ -168,10 +169,7 @@ class PPOLearner:
         for t in reversed(range(_rewards.size(1))):
             nextnonterminal = 1.0 - _terminated[:, t+1]
             nextvalues = _values[:, t+1]
-
-            nextnonterminal = nextnonterminal.expand_as(nextvalues).float()
-            reward_t = _rewards[:, t].expand_as(nextvalues)
-
+            reward_t = _rewards[:, t]
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
             advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
 
