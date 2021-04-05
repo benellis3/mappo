@@ -49,6 +49,11 @@ class BasicMAC:
             else:
                 agent_inputs = (agent_inputs - self.obs_rms.mean.cuda() ) / th.sqrt(self.obs_rms.var.cuda())
 
+        if self.args.agent == "cnn":
+            input_shape = agent_inputs.shape
+            assert input_shape[1] % self.num_frames == 0
+            agent_inputs = agent_inputs.view(input_shape[0], self.num_frames, input_shape[1]//self.num_frames)
+
         avail_actions = ep_batch["avail_actions"][:, t]
         agent_outs, other_outs = self.agent(agent_inputs, self.hidden_states)
 
