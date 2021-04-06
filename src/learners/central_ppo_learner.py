@@ -67,9 +67,15 @@ class CentralPPOLearner:
         else:
             raise NotImplementedError
 
+        avail_actions = batch["avail_actions"][:, :-1]
+        # no-op (valid only when dead)
+        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
+        survival_info = (avail_actions[:, :, :, 0] == 0).float()
+
         action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
         old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
-        central_old_log_pac = th.sum(old_log_pac, dim=-1)
+        # mask out the dead agents
+        central_old_log_pac = th.sum(old_log_pac * survival_info, dim=-1)
 
         old_values = self.critic(batch).squeeze(dim=-1).detach()
         rewards = rewards.squeeze(dim=-1)
@@ -109,7 +115,8 @@ class CentralPPOLearner:
             pacs = th.nn.functional.log_softmax(logits, dim=-1)
             log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
 
-            central_log_pac = th.sum(log_pac, dim=-1)
+            # mask out the dead agents
+            central_log_pac = th.sum(log_pac * survival_info, dim=-1)
 
             with th.no_grad():
                 approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2 * mask) / th.sum(mask)
@@ -117,7 +124,9 @@ class CentralPPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
-            central_logp = th.sum(pacs, dim=-2)
+            # mask out the dead agents
+            survival_info_expanded = survival_info.unsqueeze(dim=-1).repeat(1, 1, 1, self.n_actions)
+            central_logp = th.sum(pacs * survival_info_expanded, dim=-2)
             entropy = th.sum( th.sum(-1.0 * central_logp * th.exp(central_logp), dim=-1) * mask.squeeze() ) / th.sum(mask.squeeze())
             entropy_lst.append(entropy)
 
