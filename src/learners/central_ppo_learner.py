@@ -49,13 +49,27 @@ class CentralPPOLearner:
         mask = filled_mask.squeeze(dim=-1)
 
         if getattr(self.args, "is_observation_normalized", False):
+            obs = batch["obs"][:, :-1].cuda()
+            bs, ts = batch.batch_size, batch.max_seq_length-1
+
+            inputs = []
+            inputs.append(obs)
+            if self.args.obs_last_action:
+                actions_input = th.zeros_like(batch["actions_onehot"][:, :-1])
+                actions_input[:, 1:] = batch["actions_onehot"][:, :-2]
+                inputs.append(actions_input)
+            if self.args.obs_agent_id:
+                agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, ts, -1, -1)
+                inputs.append(agent_ids)
+
+            inputs = th.cat([x.reshape(bs*ts*self.n_agents, -1) for x in inputs], dim=1)
+
             obs_mask = mask[...].clone()
             obs_mask = obs_mask.flatten()
-
-            obs = batch["obs"][:, :-1].cuda()
             obs_index = th.nonzero(obs_mask).squeeze()
-            obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
-            self.mac.update_rms(obs)
+            inputs = inputs[obs_index]
+
+            self.mac.update_rms(inputs)
             self.critic.update_rms(batch)
 
         if self.agent_type == "rnn":
