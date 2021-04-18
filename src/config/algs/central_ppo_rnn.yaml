@@ -26,9 +26,9 @@ agent_output_type: "pi_logits"
 learner: "central_ppo_learner"
 critic: "central_critic"
 
-mini_epochs_actor: 4
+mini_epochs_actor: 10
 mini_epochs_critic: 8
-entropy_loss_coeff: 0.001
+entropy_loss_coeff: 0.005
 
 # calculating advantage: GAE, TD_Error
 advantage_calc_method: "GAE"
@@ -37,11 +37,11 @@ advantage_calc_method: "GAE"
 ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
-is_observation_normalized: True
+is_observation_normalized: False
 is_central_value: False
 actor_critic_mode: False
-obs_agent_id: False
-obs_last_action: False
+obs_agent_id: True
+obs_last_action: True
 
-name: "ppo_rnn"
+name: "central_ppo_rnn"
 
