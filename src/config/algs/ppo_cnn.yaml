@@ -44,6 +44,7 @@ is_central_value: False
 actor_critic_mode: False
 obs_agent_id: False
 obs_last_action: False
+clip_loss: True
 
 name: "ppo_rnn"
 

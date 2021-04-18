@@ -35,6 +35,8 @@ class PPOLearner:
         self.mini_epochs_actor = getattr(self.args, "mini_epochs_actor", 4)
         self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
+
+        self.clip_loss = getattr(self.args, "clip_loss", True)
         self.agent_type = getattr(self.args, "agent", None)
 
 
@@ -126,14 +128,15 @@ class PPOLearner:
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
-
             pg_loss_unclipped = - advantages * prob_ratio
-            pg_loss_clipped = - advantages * th.clamp(prob_ratio,
+            if self.clip_loss:
+                pg_loss_clipped = - advantages * th.clamp(prob_ratio,
                                                 1 - self.args.ppo_policy_clip_param,
                                                 1 + self.args.ppo_policy_clip_param)
 
-            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
-
+                pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
+            else:
+                pg_loss = th.sum(pg_loss_unclipped * mask) / th.sum(mask)
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
             actor_loss_lst.append(actor_loss)
