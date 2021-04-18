@@ -39,7 +39,6 @@ class PPOLearner:
         self.clip_loss = getattr(self.args, "clip_loss", True)
         self.agent_type = getattr(self.args, "agent", None)
 
-
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
