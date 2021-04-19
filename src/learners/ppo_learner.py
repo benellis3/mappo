@@ -50,6 +50,9 @@ class PPOLearner:
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
         terminated[:, 1:] = terminated[:, :-1].clone()
+        # if the episode terminates on the first step,
+        # we have to explicitly fill the first entry with a 0
+        terminated[:, 0] = 0.0
         filled_mask = filled_mask * (1 - terminated)
         filled_mask = filled_mask[:, :-1]
         mask = filled_mask.repeat(1, 1, self.n_agents)
