@@ -15,10 +15,10 @@ class BasicMAC:
             self.num_frames = getattr(args, "num_frames", 4)
 
         if getattr(args, "is_observation_normalized", None):
-            self.is_obs_normalized = True
+            self.is_observation_normalized = True
             self.obs_rms = RunningMeanStd(shape=input_shape)
         else:
-            self.is_obs_normalized = False
+            self.is_observation_normalized = False
 
         self.framestack_num = self.args.env_args.get("framestack_num", None)
 
@@ -43,7 +43,7 @@ class BasicMAC:
 
     def forward(self, ep_batch, t, test_mode=False):
         agent_inputs = self._build_inputs(ep_batch, t)
-        if self.is_obs_normalized:
+        if self.is_observation_normalized:
             if self.args.agent == "cnn":
                 agent_inputs = (agent_inputs - self.obs_rms.mean.repeat(self.num_frames).cuda() ) / th.sqrt(self.obs_rms.var.repeat(self.num_frames).cuda())
             else:
@@ -91,7 +91,7 @@ class BasicMAC:
 
         inputs = th.cat([x.reshape(bs * ts * self.n_agents, -1) for x in inputs], dim=1)
 
-        if self.is_obs_normalized:
+        if self.is_observation_normalized:
             inputs = (inputs - self.obs_rms.mean.repeat(self.num_frames)) / th.sqrt(self.obs_rms.var.repeat(self.num_frames))
 
         input_shape = inputs.shape

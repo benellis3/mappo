@@ -34,7 +34,6 @@ class CentralPPOLearner:
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
 
-
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
@@ -50,13 +49,27 @@ class CentralPPOLearner:
         mask = filled_mask.squeeze(dim=-1)
 
         if getattr(self.args, "is_observation_normalized", False):
+            obs = batch["obs"][:, :-1].cuda()
+            bs, ts = batch.batch_size, batch.max_seq_length-1
+
+            inputs = []
+            inputs.append(obs)
+            if self.args.obs_last_action:
+                actions_input = th.zeros_like(batch["actions_onehot"][:, :-1])
+                actions_input[:, 1:] = batch["actions_onehot"][:, :-2]
+                inputs.append(actions_input)
+            if self.args.obs_agent_id:
+                agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, ts, -1, -1)
+                inputs.append(agent_ids)
+
+            inputs = th.cat([x.reshape(bs*ts*self.n_agents, -1) for x in inputs], dim=1)
+
             obs_mask = mask[...].clone()
             obs_mask = obs_mask.flatten()
-
-            obs = batch["obs"][:, :-1].cuda()
             obs_index = th.nonzero(obs_mask).squeeze()
-            obs = obs.reshape((-1, obs.shape[-1]))[obs_index]
-            self.mac.update_rms(obs)
+            inputs = inputs[obs_index]
+
+            self.mac.update_rms(inputs)
             self.critic.update_rms(batch)
 
         if self.agent_type == "rnn":
@@ -67,42 +80,60 @@ class CentralPPOLearner:
         else:
             raise NotImplementedError
 
-        avail_actions = batch["avail_actions"][:, :-1]
-        # no-op (valid only when dead)
-        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        survival_info = (avail_actions[:, :, :, 0] == 0).float()
-
-        action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
-        old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
-        # mask out the dead agents
-        central_old_log_pac = th.sum(old_log_pac * survival_info, dim=-1)
-
         old_values = self.critic(batch).squeeze(dim=-1).detach()
         rewards = rewards.squeeze(dim=-1)
         terminated = terminated.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
+            returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
                                                                 self.args.gamma, self.args.tau)
         elif self.advantage_calc_method == "TD_Error":
             returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, 1:]) # terminated has been shifted
+        else:
+            raise NotImplementedError
+
+        ## update the critics
+        critic_loss_lst = []
+        for _ in range(0, self.mini_epochs_critic):
+            new_values = self.critic(batch).squeeze()
+            new_values = new_values[:, :-1]
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
+            self.optimiser_critic.zero_grad()
+            critic_loss.backward()
+            critic_loss_lst.append(critic_loss)
+            self.optimiser_critic.step()
+
+        ## compute advantage
+        old_values = self.critic(batch).squeeze(dim=-1).detach()
+        if self.advantage_calc_method == "GAE":
+            _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
+                                                                self.args.gamma, self.args.tau)
+        elif self.advantage_calc_method == "TD_Error":
+            _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, 1:]) # terminated has been shifted
             advantages = returns - old_values[:, :-1]
         else:
             raise NotImplementedError
 
-        if getattr(self.args, "is_advantage_normalized", False):
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
+        ## prepare for updating actor
+        avail_actions = batch["avail_actions"][:, :-1]
+        # no-op (valid only when dead)
+        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
+        survival_info = (avail_actions[:, :, :, 0] == 0).float()
+        action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
+        old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
+        # mask out the dead agents
+        central_old_log_pac = th.sum(old_log_pac, dim=-1)
 
-        ## feeding and training
         approxkl_lst = [] 
         entropy_lst = [] 
-        critic_loss_lst = []
         actor_loss_lst = []
 
         target_kl = 0.2
+        if getattr(self.args, "is_advantage_normalized", False):
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
+        ## update the actor
         for _ in range(0, self.mini_epochs_actor):
-
             if self.agent_type == "rnn":
                 logits = []
                 self.mac.init_hidden(batch.batch_size)
@@ -116,7 +147,7 @@ class CentralPPOLearner:
             log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
 
             # mask out the dead agents
-            central_log_pac = th.sum(log_pac * survival_info, dim=-1)
+            central_log_pac = th.sum(log_pac, dim=-1)
 
             with th.no_grad():
                 approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2 * mask) / th.sum(mask)
@@ -125,9 +156,7 @@ class CentralPPOLearner:
                     break
 
             # mask out the dead agents
-            survival_info_expanded = survival_info.unsqueeze(dim=-1).repeat(1, 1, 1, self.n_actions)
-            central_logp = th.sum(pacs * survival_info_expanded, dim=-2)
-            entropy = th.sum( th.sum(-1.0 * central_logp * th.exp(central_logp), dim=-1) * mask.squeeze() ) / th.sum(mask.squeeze())
+            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=-1) * survival_info ) / th.sum(survival_info)
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
@@ -146,15 +175,6 @@ class CentralPPOLearner:
             self.optimiser_actor.zero_grad()
             actor_loss.backward()
             self.optimiser_actor.step()
-
-        for _ in range(0, self.mini_epochs_critic):
-            new_values = self.critic(batch).squeeze()
-            new_values = new_values[:, :-1]
-            critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
-            self.optimiser_critic.zero_grad()
-            critic_loss.backward()
-            critic_loss_lst.append(critic_loss)
-            self.optimiser_critic.step()
 
         # log stuff
         critic_train_stats["rewards"].append(th.mean(rewards).item())
