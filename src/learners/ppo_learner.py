@@ -138,7 +138,7 @@ class PPOLearner:
 
                 pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
             else:
-                pg_loss = th.sum(pg_loss_unclipped * mask) / th.sum(mask)
+                pg_loss = th.sum(-log_pac * advantages * mask) / th.sum(mask)
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
             actor_loss_lst.append(actor_loss)
