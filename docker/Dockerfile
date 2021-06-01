@@ -1,28 +1,57 @@
-FROM pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
+FROM nvidia/cuda:8.0-cudnn7-devel-ubuntu16.04
+# FROM ubuntu:16.04
 MAINTAINER Christian Schroeder de Witt
 
-RUN pip install numpy scipy pyyaml matplotlib
-RUN pip install imageio pygame
-RUN pip install tensorboard-logger
-RUN pip install ruamel.base ryd
+# CUDA includes
+ENV CUDA_PATH /usr/local/cuda
+ENV CUDA_INCLUDE_PATH /usr/local/cuda/include
+ENV CUDA_LIBRARY_PATH /usr/local/cuda/lib64
+
+# Ubuntu Packages
+RUN apt-get update -y && apt-get install software-properties-common -y && \
+    add-apt-repository -y multiverse && apt-get update -y && apt-get upgrade -y && \
+    apt-get install -y apt-utils nano vim man build-essential wget sudo && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install curl and other dependencies
+RUN apt-get update -y && apt-get install -y curl libssl-dev openssl libopenblas-dev \
+    libhdf5-dev hdf5-helpers hdf5-tools libhdf5-serial-dev libprotobuf-dev protobuf-compiler && \
+    curl -sk https://raw.githubusercontent.com/torch/distro/master/install-deps | bash && \
+    rm -rf /var/lib/apt/lists/*
+
+
+#Install python3 pip3
+RUN apt-get update
+RUN apt-get -y install python3
+RUN apt-get -y install python3-pip
+RUN pip3 install --upgrade pip
+RUN pip3 install numpy scipy pyyaml matplotlib
+RUN pip3 install imageio pygame
+RUN pip3 install tensorboard-logger
+RUN pip3 install ruamel.base ryd
 
 RUN mkdir /install
 WORKDIR /install
 
-RUN pip install jsonpickle==0.9.6
+RUN pip3 install jsonpickle==0.9.6
 # install Sacred (from OxWhirl fork)
-RUN pip install setuptools
-RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /install/sacred && python setup.py install
+RUN pip3 install setuptools
+RUN git clone https://github.com/oxwhirl/sacred.git /install/sacred && cd /install/sacred && python3 setup.py install
 
 # Install pymongo
-RUN pip install pymongo
+RUN pip3 install pymongo
+
+#### -------------------------------------------------------------------
+#### install pytorch
+#### -------------------------------------------------------------------
+RUN pip3 install torch==1.1.0
 
 ## -- SMAC
 ENV smac_ver 1
-RUN pip install git+https://github.com/oxwhirl/smac.git
+RUN pip3 install git+https://github.com/oxwhirl/smac.git
 ENV SC2PATH /home/minsun/pymarl/3rdparty/StarCraftII
 
-RUN git clone https://github.com/koulanurag/ma-gym.git /install/ma-gym && cd /install/ma-gym && pip install -e .
+RUN git clone https://github.com/koulanurag/ma-gym.git /install/ma-gym && cd /install/ma-gym && pip3 install -e .
 
 ARG UID
 RUN useradd -u $UID --create-home minsun
