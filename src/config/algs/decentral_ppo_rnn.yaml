@@ -1,5 +1,4 @@
 # --- PPO specific parameters ---
-
 action_selector: "multinomial"
 epsilon_start: .5
 epsilon_finish: .01
@@ -15,13 +14,11 @@ batch_size: 8
 # update the target network every {} training steps
 target_update_interval: 200
 
-
 lr_actor: 0.0005
 lr_critic: 0.0005
 tau: 0.995
 td_lambda: 0.99
 
-# use COMA
 agent_output_type: "pi_logits"
 learner: "ppo_learner"
 critic: "rnn"
@@ -37,10 +34,7 @@ ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
 is_observation_normalized: True
-is_central_value: False
-actor_critic_mode: False
-obs_agent_id: False
+obs_agent_id: True
 obs_last_action: False
 
-name: "ppo_rnn"
-
+name: "decentral_ppo_rnn"

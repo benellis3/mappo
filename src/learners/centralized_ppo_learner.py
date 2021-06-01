@@ -1,13 +1,10 @@
-import copy
-from components.episode_buffer import EpisodeBatch
-from modules.critics import critic_REGISTRY
 import numpy as np
 import torch as th
-import torch.nn.functional as F
+from torch.optim import Adam
 from collections import defaultdict
-from torch.optim import RMSprop, Adam
-from modules.critics import critic_REGISTRY
+
 from components.episode_buffer import EpisodeBatch
+from modules.critics import critic_REGISTRY
 
 class CentralPPOLearner:
     def __init__(self, mac, scheme, logger, args):
@@ -22,10 +19,8 @@ class CentralPPOLearner:
 
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
-        self.optimiser_actor = RMSprop(params=self.agent_params, lr=args.lr_actor,
-                                       alpha=args.optim_alpha, eps=args.optim_eps)
-        self.optimiser_critic = RMSprop(params=self.critic_params, lr=args.lr_critic,
-                                       alpha=args.optim_alpha, eps=args.optim_eps)
+        self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor, eps=args.optim_eps)
+        self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic, eps=args.optim_eps)
 
         self.log_stats_t = -self.args.learner_log_interval - 1
 
@@ -37,27 +32,26 @@ class CentralPPOLearner:
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
-        actions = batch["actions"][:, :-1].cuda()
-        rewards = batch["reward"][:, :-1].cuda()
+        actions = batch["actions"].cuda()
+        rewards = batch["reward"].cuda()
         filled_mask = batch['filled'].float().cuda()
 
         # right shift terminated flag, to be aligned with openai/baseline setups
         terminated = batch["terminated"].float()
-        terminated[:, 1:] = terminated[:, :-1].clone()
-        filled_mask = filled_mask * (1 - terminated)
-        filled_mask = filled_mask[:, :-1]
         mask = filled_mask.squeeze(dim=-1)
 
         if getattr(self.args, "is_observation_normalized", False):
-            obs = batch["obs"][:, :-1].cuda()
-            bs, ts = batch.batch_size, batch.max_seq_length-1
+            obs = batch["obs"].cuda()
+            bs, ts = batch.batch_size, batch.max_seq_length
 
             inputs = []
             inputs.append(obs)
+
             if self.args.obs_last_action:
-                actions_input = th.zeros_like(batch["actions_onehot"][:, :-1])
-                actions_input[:, 1:] = batch["actions_onehot"][:, :-2]
+                actions_input = th.zeros_like(batch["actions_onehot"])
+                actions_input[:, 1:] = batch["actions_onehot"][:, :-1]
                 inputs.append(actions_input)
+
             if self.args.obs_agent_id:
                 agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, ts, -1, -1)
                 inputs.append(agent_ids)
@@ -77,6 +71,7 @@ class CentralPPOLearner:
             self.mac.init_hidden(batch.batch_size)
             for t in range(rewards.shape[1]):
                 action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
+
         else:
             raise NotImplementedError
 
@@ -86,9 +81,11 @@ class CentralPPOLearner:
 
         if self.advantage_calc_method == "GAE":
             returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
-                                                                self.args.gamma, self.args.tau)
+                                                    self.args.gamma, self.args.tau)
+
         elif self.advantage_calc_method == "TD_Error":
-            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, 1:]) # terminated has been shifted
+            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, :-1]) # terminated has been shifted
+
         else:
             raise NotImplementedError
 
@@ -96,7 +93,6 @@ class CentralPPOLearner:
         critic_loss_lst = []
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
-            new_values = new_values[:, :-1]
             critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
@@ -107,20 +103,19 @@ class CentralPPOLearner:
         old_values = self.critic(batch).squeeze(dim=-1).detach()
         if self.advantage_calc_method == "GAE":
             _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
-                                                                self.args.gamma, self.args.tau)
+                                                       self.args.gamma, self.args.tau)
         elif self.advantage_calc_method == "TD_Error":
-            _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, 1:]) # terminated has been shifted
+            _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, :-1]) # terminated has been shifted
             advantages = returns - old_values[:, :-1]
+
         else:
             raise NotImplementedError
 
-        ## prepare for updating actor
-        avail_actions = batch["avail_actions"][:, :-1]
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        survival_info = (avail_actions[:, :, :, 0] == 0).float()
         action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
         old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
+
         # mask out the dead agents
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
 
@@ -140,13 +135,14 @@ class CentralPPOLearner:
                 for t in range(rewards.shape[1]):
                     logits.append( self.mac.forward(batch, t = t, test_mode=False) )
                 logits = th.transpose(th.stack(logits), 0, 1)
+
             else:
                 raise NotImplementedError
 
             pacs = th.nn.functional.log_softmax(logits, dim=-1)
             log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
 
-            # mask out the dead agents
+            # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
 
             with th.no_grad():
@@ -155,8 +151,9 @@ class CentralPPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
-            # mask out the dead agents
-            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=-1) * survival_info ) / th.sum(survival_info)
+            # pacs: n_batch * n_timesteps * n_agents * n_actions
+            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=[2, 3]) * mask ) / th.sum(mask)
+            entropy = entropy / self.n_agents
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
@@ -195,8 +192,8 @@ class CentralPPOLearner:
         advs = th.zeros_like(_values)
         lastgaelam = th.zeros_like(_values[:, 0])
 
-        for t in reversed(range(_rewards.size(1))):
-            nextnonterminal = 1.0 - _terminated[:, t+1]
+        for t in reversed(range(_rewards.size(1)-1)):
+            nextnonterminal = 1.0 - _terminated[:, t]
             nextvalues = _values[:, t+1]
             reward_t = _rewards[:, t]
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
@@ -204,7 +201,7 @@ class CentralPPOLearner:
 
         returns = advs + _values
 
-        return returns[:, :-1], advs[:, :-1]
+        return returns, advs
 
     def cuda(self):
         self.mac.cuda()
