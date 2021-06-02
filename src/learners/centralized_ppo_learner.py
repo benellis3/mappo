@@ -32,23 +32,24 @@ class CentralPPOLearner:
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
-        actions = batch["actions"].cuda()
-        rewards = batch["reward"].cuda()
-        filled_mask = batch['filled'].float().cuda()
+        actions = batch["actions"][:, :-1].cuda()
+        rewards = batch["reward"][:, :-1].cuda()
+        filled_mask = batch['filled'][:, :-1].float().cuda()
 
-        # right shift terminated flag, to be aligned with openai/baseline setups
-        terminated = batch["terminated"].float()
+        terminated = batch["terminated"][:, :-1].float().squeeze(dim=-1)
+
         mask = filled_mask.squeeze(dim=-1)
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # mask out the terminal entry
 
         if getattr(self.args, "is_observation_normalized", False):
-            obs = batch["obs"].cuda()
-            bs, ts = batch.batch_size, batch.max_seq_length
+            obs = batch["obs"][:, :-1].cuda()
+            bs, ts = batch.batch_size, batch.max_seq_length-1
 
             inputs = []
             inputs.append(obs)
 
             if self.args.obs_last_action:
-                actions_input = th.zeros_like(batch["actions_onehot"])
+                actions_input = th.zeros_like(batch["actions_onehot"][:, :-1])
                 actions_input[:, 1:] = batch["actions_onehot"][:, :-1]
                 inputs.append(actions_input)
 
@@ -77,14 +78,13 @@ class CentralPPOLearner:
 
         old_values = self.critic(batch).squeeze(dim=-1).detach()
         rewards = rewards.squeeze(dim=-1)
-        terminated = terminated.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
             returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
         elif self.advantage_calc_method == "TD_Error":
-            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, :-1]) # terminated has been shifted
+            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated) # terminated has been shifted
 
         else:
             raise NotImplementedError
@@ -92,14 +92,12 @@ class CentralPPOLearner:
         ## update the critics
         critic_loss_lst = []
         for _ in range(0, self.mini_epochs_critic):
-            new_values = self.critic(batch).squeeze()
+            new_values = self.critic(batch).squeeze()[:, :-1]
             critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
             critic_loss_lst.append(critic_loss)
             self.optimiser_critic.step()
-            if critic_loss > 4000:
-                import pdb; pdb.set_trace()
 
         ## compute advantage
         old_values = self.critic(batch).squeeze(dim=-1).detach()
@@ -107,7 +105,7 @@ class CentralPPOLearner:
             _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
                                                        self.args.gamma, self.args.tau)
         elif self.advantage_calc_method == "TD_Error":
-            _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated[:, :-1]) # terminated has been shifted
+            _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated) # terminated has been shifted
             advantages = returns - old_values[:, :-1]
 
         else:
@@ -189,7 +187,6 @@ class CentralPPOLearner:
             self.log_stats_t = t_env
 
     def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
-        # _values
         returns = th.zeros_like(_values)
         advs = th.zeros_like(_values)
         lastgaelam = th.zeros_like(_values[:, 0])
@@ -197,10 +194,7 @@ class CentralPPOLearner:
 
         for t in reversed(range(ts)):
             nextnonterminal = 1.0 - _terminated[:, t]
-            if t == ts-1:
-                nextvalues = th.zeros_like(_values[:, -1])
-            else:
-                nextvalues = _values[:, t+1]
+            nextvalues = _values[:, t+1]
 
             reward_t = _rewards[:, t]
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
@@ -208,7 +202,7 @@ class CentralPPOLearner:
 
         returns = advs + _values
 
-        return returns, advs
+        return returns[:, :-1], advs[:, :-1]
 
     def cuda(self):
         self.mac.cuda()
