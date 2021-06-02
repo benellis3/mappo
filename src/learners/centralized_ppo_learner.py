@@ -98,6 +98,8 @@ class CentralPPOLearner:
             critic_loss.backward()
             critic_loss_lst.append(critic_loss)
             self.optimiser_critic.step()
+            if critic_loss > 4000:
+                import pdb; pdb.set_trace()
 
         ## compute advantage
         old_values = self.critic(batch).squeeze(dim=-1).detach()
@@ -191,10 +193,15 @@ class CentralPPOLearner:
         returns = th.zeros_like(_values)
         advs = th.zeros_like(_values)
         lastgaelam = th.zeros_like(_values[:, 0])
+        ts = _rewards.size(1)
 
-        for t in reversed(range(_rewards.size(1)-1)):
+        for t in reversed(range(ts)):
             nextnonterminal = 1.0 - _terminated[:, t]
-            nextvalues = _values[:, t+1]
+            if t == ts-1:
+                nextvalues = th.zeros_like(_values[:, -1])
+            else:
+                nextvalues = _values[:, t+1]
+
             reward_t = _rewards[:, t]
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
             advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
