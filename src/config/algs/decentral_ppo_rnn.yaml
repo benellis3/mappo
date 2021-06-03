@@ -20,8 +20,8 @@ tau: 0.995
 td_lambda: 0.99
 
 agent_output_type: "pi_logits"
-learner: "ppo_learner"
-critic: "rnn"
+learner: "decentral_ppo_learner"
+critic: "central_critic"
 
 mini_epochs_actor: 4
 mini_epochs_critic: 8

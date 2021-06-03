@@ -32,24 +32,33 @@ class CentralPPOLearner:
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
-        actions = batch["actions"][:, :-1].cuda()
-        rewards = batch["reward"][:, :-1].cuda()
-        filled_mask = batch['filled'][:, :-1].float().cuda()
-
-        terminated = batch["terminated"][:, :-1].float().squeeze(dim=-1)
+        # TODO: what if one agent dies
+        actions = batch["actions"].cuda()
+        rewards = batch["reward"].cuda()
+        filled_mask = batch['filled'].float().cuda()
+        terminated = batch["terminated"].float().cuda()
 
         mask = filled_mask.squeeze(dim=-1)
-        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # mask out the terminal entry
+        terminated = terminated.squeeze(dim=-1)
+
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # mask out the last entry
+
+        ## get dead agents
+        # no-op (valid only when dead)
+        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
+        avail_actions = batch['avail_actions'].cuda()
+        alive_mask = (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0)
+        num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
 
         if getattr(self.args, "is_observation_normalized", False):
-            obs = batch["obs"][:, :-1].cuda()
-            bs, ts = batch.batch_size, batch.max_seq_length-1
+            obs = batch["obs"].cuda()
+            bs, ts = batch.batch_size, batch.max_seq_length
 
             inputs = []
             inputs.append(obs)
 
             if self.args.obs_last_action:
-                actions_input = th.zeros_like(batch["actions_onehot"][:, :-1])
+                actions_input = th.zeros_like(batch["actions_onehot"])
                 actions_input[:, 1:] = batch["actions_onehot"][:, :-1]
                 inputs.append(actions_input)
 
@@ -92,7 +101,7 @@ class CentralPPOLearner:
         ## update the critics
         critic_loss_lst = []
         for _ in range(0, self.mini_epochs_critic):
-            new_values = self.critic(batch).squeeze()[:, :-1]
+            new_values = self.critic(batch).squeeze()
             critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
@@ -106,13 +115,11 @@ class CentralPPOLearner:
                                                        self.args.gamma, self.args.tau)
         elif self.advantage_calc_method == "TD_Error":
             _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated) # terminated has been shifted
-            advantages = returns - old_values[:, :-1]
+            advantages = returns - old_values
 
         else:
             raise NotImplementedError
 
-        # no-op (valid only when dead)
-        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
         action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
         old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
 
@@ -152,9 +159,9 @@ class CentralPPOLearner:
                     break
 
             # pacs: n_batch * n_timesteps * n_agents * n_actions
-            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=[2, 3]) * mask ) / th.sum(mask)
-            entropy = entropy / self.n_agents
-            entropy_lst.append(entropy)
+            entropy_all_agents = th.sum(-1.0 * pacs * th.exp(pacs)) # dead agents: entropy = 0
+            entropy_per_agents = entropy_all_agents / th.sum(num_alive_agents)
+            entropy_lst.append(entropy_per_agents)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
 
@@ -166,7 +173,7 @@ class CentralPPOLearner:
             pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
 
             # Construct overall loss
-            actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
+            actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy_per_agents
             actor_loss_lst.append(actor_loss)
 
             self.optimiser_actor.zero_grad()
@@ -190,7 +197,7 @@ class CentralPPOLearner:
         returns = th.zeros_like(_values)
         advs = th.zeros_like(_values)
         lastgaelam = th.zeros_like(_values[:, 0])
-        ts = _rewards.size(1)
+        ts = _rewards.size(1) - 1
 
         for t in reversed(range(ts)):
             nextnonterminal = 1.0 - _terminated[:, t]
@@ -202,7 +209,7 @@ class CentralPPOLearner:
 
         returns = advs + _values
 
-        return returns[:, :-1], advs[:, :-1]
+        return returns, advs
 
     def cuda(self):
         self.mac.cuda()
