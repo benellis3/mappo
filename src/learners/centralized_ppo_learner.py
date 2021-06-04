@@ -92,9 +92,6 @@ class CentralPPOLearner:
             returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
-        elif self.advantage_calc_method == "TD_Error":
-            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated) # terminated has been shifted
-
         else:
             raise NotImplementedError
 
@@ -113,10 +110,6 @@ class CentralPPOLearner:
         if self.advantage_calc_method == "GAE":
             _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
                                                        self.args.gamma, self.args.tau)
-        elif self.advantage_calc_method == "TD_Error":
-            _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated) # terminated has been shifted
-            advantages = returns - old_values
-
         else:
             raise NotImplementedError
 
