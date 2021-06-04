@@ -120,8 +120,8 @@ class CentralPPOLearner:
         else:
             raise NotImplementedError
 
-        action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
-        old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
+        log_prob_dist = th.nn.functional.log_softmax(action_logits, dim=-1)
+        old_log_pac = th.gather(log_prob_dist, dim=3, index=actions).squeeze(3).detach()
 
         # mask out the dead agents
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
@@ -146,8 +146,8 @@ class CentralPPOLearner:
             else:
                 raise NotImplementedError
 
-            pacs = th.nn.functional.log_softmax(logits, dim=-1)
-            log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
+            log_prob_dist = th.nn.functional.log_softmax(logits, dim=-1)
+            log_pac = th.gather(log_prob_dist, dim=3, index=actions).squeeze(-1)
 
             # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
@@ -158,10 +158,11 @@ class CentralPPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
-            # pacs: n_batch * n_timesteps * n_agents * n_actions
-            entropy_all_agents = th.sum(-1.0 * pacs * th.exp(pacs)) # dead agents: entropy = 0
-            entropy_per_agents = entropy_all_agents / th.sum(num_alive_agents)
-            entropy_lst.append(entropy_per_agents)
+            # log_prob_dist: n_batch * n_timesteps * n_agents * n_actions
+            entropy_all_agents = th.sum(-1.0 * log_prob_dist * th.exp(log_prob_dist), dim=-1) 
+            # dead agents: entropy = 0
+            entropy = th.sum( th.sum(entropy_all_agents, dim=-1) * mask ) / th.sum(mask)
+            entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
 
@@ -173,7 +174,7 @@ class CentralPPOLearner:
             pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
 
             # Construct overall loss
-            actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy_per_agents
+            actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
             actor_loss_lst.append(actor_loss)
 
             self.optimiser_actor.zero_grad()
