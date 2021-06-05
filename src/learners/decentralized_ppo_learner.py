@@ -85,9 +85,6 @@ class DecentralPPOLearner:
             returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
-        elif self.advantage_calc_method == "TD_Error":
-            returns = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated) # terminated has been shifted
-
         else:
             raise NotImplementedError
 
@@ -106,9 +103,6 @@ class DecentralPPOLearner:
         if self.advantage_calc_method == "GAE":
             _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
                                                        self.args.gamma, self.args.tau)
-        elif self.advantage_calc_method == "TD_Error":
-            _ = rewards + self.args.gamma * old_values[:, 1:] * (1 - terminated) # terminated has been shifted
-            advantages = returns - old_values
 
         else:
             raise NotImplementedError
@@ -118,7 +112,7 @@ class DecentralPPOLearner:
         action_probs = th.nn.functional.log_softmax(action_logits, dim=-1)
         old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3).detach()
 
-        # mask out the dead agents
+        # joint probability
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
 
         approxkl_lst = [] 
@@ -128,6 +122,10 @@ class DecentralPPOLearner:
         target_kl = 0.2
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
+
+        ## expand to n agents
+        advantages = advantages.unsqueeze(-1).repeat(1, 1, self.n_agents)
+        mask_expand = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
 
         ## update the actor
         for _ in range(0, self.mini_epochs_actor):
@@ -148,25 +146,24 @@ class DecentralPPOLearner:
             central_log_pac = th.sum(log_pac, dim=-1)
 
             with th.no_grad():
+                # KL divergence for all agents
                 approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2 * mask) / th.sum(mask)
                 approxkl_lst.append(approxkl)
                 if approxkl > 1.5 * target_kl:
                     break
 
             # pacs: n_batch * n_timesteps * n_agents * n_actions
-            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=[2, 3]) * mask ) / th.sum(mask)
-            entropy = entropy / self.n_agents
+            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=-1) * mask_expand ) / th.sum(mask_expand)
             entropy_lst.append(entropy)
 
-            import pdb; pdb.set_trace()
-            prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
+            prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
 
             pg_loss_unclipped = - advantages * prob_ratio
             pg_loss_clipped = - advantages * th.clamp(prob_ratio,
                                                 1 - self.args.ppo_policy_clip_param,
                                                 1 + self.args.ppo_policy_clip_param)
 
-            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
+            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask_expand) / th.sum(mask_expand)
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
