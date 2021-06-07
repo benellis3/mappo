@@ -47,7 +47,7 @@ class CentralPPOLearner:
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
         avail_actions = batch['avail_actions'].cuda()
-        alive_mask = (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0)
+        alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
         num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
 
         if getattr(self.args, "is_observation_normalized", False):
@@ -151,10 +151,11 @@ class CentralPPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
+            # for shared policy, maximize the policy entropy averaged over all agents & episodes
+            # consider entropy for only alive agents
             # log_prob_dist: n_batch * n_timesteps * n_agents * n_actions
             entropy_all_agents = th.sum(-1.0 * log_prob_dist * th.exp(log_prob_dist), dim=-1) 
-            # dead agents: entropy = 0
-            entropy = th.sum( th.sum(entropy_all_agents, dim=-1) * mask ) / th.sum(mask)
+            entropy = th.sum( entropy_all_agents * alive_mask) / th.sum(alive_mask)
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)

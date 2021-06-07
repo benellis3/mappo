@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from components.running_mean_std import RunningMeanStd
 
 
-class CentralCritic(nn.Module):
+class AgentSpecificCentralCritic(nn.Module):
     def __init__(self, scheme, args):
-        super(CentralCritic, self).__init__()
+        super(AgentSpecificCentralCritic, self).__init__()
 
         self.args = args
         self.n_actions = args.n_actions
@@ -36,7 +36,7 @@ class CentralCritic(nn.Module):
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         q = self.fc3(x)
-        return q.view(bs, max_t, 1)
+        return q.view(bs, max_t, self.n_agents, 1)
 
     def update_rms(self, batch):
         inputs, _, _ = self._build_inputs(batch)
@@ -47,30 +47,24 @@ class CentralCritic(nn.Module):
         max_t = batch.max_seq_length if t is None else 1
         ts = slice(None) if t is None else slice(t, t+1)
         inputs = []
+
         # state
-        inputs.append(batch["state"][:, ts])
+        central_state = batch["state"][:, ts]
+        central_state = central_state.unsqueeze(dim=2)
+        # repeat for n agents
+        central_state = central_state.repeat(1, 1, self.n_agents, 1)
 
-        # observations
-        # inputs.append(batch["obs"][:, ts].view(bs, max_t, -1))
+        inputs.append(central_state)
 
-        # last actions
-        # if t == 0:
-        #     inputs.append(th.zeros_like(batch["actions_onehot"][:, 0:1]).view(bs, max_t, 1, -1))
-        # elif isinstance(t, int):
-        #     inputs.append(batch["actions_onehot"][:, slice(t-1, t)].view(bs, max_t, 1, -1))
-        # else:
-        #     last_actions = th.cat([th.zeros_like(batch["actions_onehot"][:, 0:1]), batch["actions_onehot"][:, :-1]], dim=1)
-        #     last_actions = last_actions.view(bs, max_t, 1, -1)
-        #     inputs.append(last_actions)
+        # agent-specific observation
+        inputs.append(batch["obs"][:, ts])
 
-        inputs = th.cat([x.reshape(bs * max_t, -1) for x in inputs], dim=1)
+        inputs = th.cat([x.reshape(bs * max_t * self.n_agents, -1) for x in inputs], dim=1)
         return inputs, bs, max_t
 
     def _get_input_shape(self, scheme):
         # state
         input_shape = scheme["state"]["vshape"]
-        # observations
-        # input_shape += scheme["obs"]["vshape"] * self.n_agents
-        # last actions
-        # input_shape += scheme["actions_onehot"]["vshape"][0] * self.n_agents
+        # agent-specific observation
+        input_shape += scheme["obs"]["vshape"] * 1
         return input_shape

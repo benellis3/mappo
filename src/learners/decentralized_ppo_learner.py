@@ -29,6 +29,9 @@ class DecentralPPOLearner:
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
 
+        self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
+        assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
+
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
@@ -42,6 +45,13 @@ class DecentralPPOLearner:
         terminated = terminated.squeeze(dim=-1)
 
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # mask out the last entry
+
+        ## get dead agents
+        # no-op (valid only when dead)
+        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
+        avail_actions = batch['avail_actions'].cuda()
+        alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
+        num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
 
         if getattr(self.args, "is_observation_normalized", False):
             obs = batch["obs"].cuda()
@@ -79,7 +89,10 @@ class DecentralPPOLearner:
             raise NotImplementedError
 
         old_values = self.critic(batch).squeeze(dim=-1).detach()
-        rewards = rewards.squeeze(dim=-1)
+        # expand reward to n_agent copies
+        rewards = rewards.repeat(1, 1, self.n_agents)
+        terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
+        mask_expanded = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
 
         if self.advantage_calc_method == "GAE":
             returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
@@ -92,7 +105,7 @@ class DecentralPPOLearner:
         critic_loss_lst = []
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
-            critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask_expanded) / th.sum(mask_expanded)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
             critic_loss_lst.append(critic_loss)
@@ -123,10 +136,6 @@ class DecentralPPOLearner:
         if getattr(self.args, "is_advantage_normalized", False):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
-        ## expand to n agents
-        advantages = advantages.unsqueeze(-1).repeat(1, 1, self.n_agents)
-        mask_expand = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
-
         ## update the actor
         for _ in range(0, self.mini_epochs_actor):
             if self.agent_type == "rnn":
@@ -139,8 +148,8 @@ class DecentralPPOLearner:
             else:
                 raise NotImplementedError
 
-            pacs = th.nn.functional.log_softmax(logits, dim=-1)
-            log_pac = th.gather(pacs, dim=3, index=actions).squeeze(-1)
+            log_prob_dist = th.nn.functional.log_softmax(logits, dim=-1)
+            log_pac = th.gather(log_prob_dist, dim=3, index=actions).squeeze(-1)
 
             # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
@@ -152,8 +161,11 @@ class DecentralPPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
-            # pacs: n_batch * n_timesteps * n_agents * n_actions
-            entropy = th.sum( th.sum(-1.0 * pacs * th.exp(pacs), dim=-1) * mask_expand ) / th.sum(mask_expand)
+            # for shared policy, maximize the policy entropy averaged over all agents & episodes
+            # consider entropy for only alive agents
+            # log_prob_dist: n_batch * n_timesteps * n_agents * n_actions
+            entropy_all_agents = th.sum(-1.0 * log_prob_dist * th.exp(log_prob_dist), dim=-1)
+            entropy = th.sum( entropy_all_agents * alive_mask ) / th.sum(alive_mask)
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
@@ -163,7 +175,7 @@ class DecentralPPOLearner:
                                                 1 - self.args.ppo_policy_clip_param,
                                                 1 + self.args.ppo_policy_clip_param)
 
-            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask_expand) / th.sum(mask_expand)
+            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask_expanded) / th.sum(mask_expanded)
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
