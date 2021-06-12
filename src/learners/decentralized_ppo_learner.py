@@ -138,6 +138,7 @@ class DecentralPPOLearner:
 
         target_kl = 0.2
         if getattr(self.args, "is_advantage_normalized", False):
+            # BUG: should be averaged over valid advantages (i.e., for alive agents)
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
         ## update the actor

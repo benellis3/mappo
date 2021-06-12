@@ -126,11 +126,20 @@ class CentralPPOLearner:
         entropy_lst = [] 
         actor_loss_lst = []
 
-        target_kl = 0.2
         if getattr(self.args, "is_advantage_normalized", False):
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
+            # only consider valid advantages
+            flat_mask = mask.flatten()
+            flat_advantage = advantages.flatten()
+            assert flat_mask.shape[0] == flat_advantage.shape[0]
+            adv_index = th.nonzero(flat_mask).squeeze()
+            valid_adv = flat_advantage[adv_index]
+            batch_mean = th.mean(valid_adv, dim=0)
+            batch_var = th.var(valid_adv, dim=0)
+
+            advantages = (advantages - batch_mean) / (batch_var + 1e-6)
 
         ## update the actor
+        target_kl = 0.2
         for _ in range(0, self.mini_epochs_actor):
             if self.agent_type == "rnn":
                 logits = []
