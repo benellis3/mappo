@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
+from components.running_mean_std import RunningMeanStd
 
 class DecentralPPOLearner:
     def __init__(self, mac, scheme, logger, args):
@@ -32,6 +33,29 @@ class DecentralPPOLearner:
         self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
         assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
 
+        if getattr(self.args, "is_observation_normalized", False):
+            # need to normalize state
+            self.state_rms = RunningMeanStd()
+
+    def normalize_state(self, batch, mask):
+        bs, ts = batch.batch_size, batch.max_seq_length
+
+        state = batch["state"].cuda()
+        flat_state = state.reshape(-1, state.shape[-1])
+        flat_mask = mask.flatten()
+        # ensure the length matches
+        assert flat_state.shape[0] == flat_mask.shape[0]
+        state_index = th.nonzero(flat_mask).squeeze()
+        valid_state = flat_state[state_index]
+        # update state_rms
+        self.state_rms.update(valid_state)
+        state_mean = self.state_rms.mean.unsqueeze(0).unsqueeze(0)
+        state_var = self.state_rms.var.unsqueeze(0).unsqueeze(0)
+        state_mean = state_mean.expand(bs, ts, -1)
+        state_var = state_var.expand(bs, ts, -1)
+        expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
+        batch.data.transition_data['state'] = (batch['state'] - state_mean) / (state_var + 1e-6) * expanded_mask
+
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
@@ -54,30 +78,10 @@ class DecentralPPOLearner:
         num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
 
         if getattr(self.args, "is_observation_normalized", False):
-            obs = batch["obs"].cuda()
-            bs, ts = batch.batch_size, batch.max_seq_length
-
-            inputs = []
-            inputs.append(obs)
-
-            if self.args.obs_last_action:
-                actions_input = th.zeros_like(batch["actions_onehot"])
-                actions_input[:, 1:] = batch["actions_onehot"][:, :-1]
-                inputs.append(actions_input)
-
-            if self.args.obs_agent_id:
-                agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, ts, -1, -1)
-                inputs.append(agent_ids)
-
-            inputs = th.cat([x.reshape(bs*ts*self.n_agents, -1) for x in inputs], dim=1)
-
-            obs_mask = mask[...].clone()
-            obs_mask = obs_mask.flatten()
-            obs_index = th.nonzero(obs_mask).squeeze()
-            inputs = inputs[obs_index]
-
-            self.mac.update_rms(inputs)
-            self.critic.update_rms(batch)
+            # NOTE: obs has already been normalized in basic_controller, only need to update rms
+            self.mac.update_rms(batch, alive_mask)
+            # NOTE: state are being updated
+            self.normalize_state(batch, mask)
 
         if self.agent_type == "rnn":
             action_logits = th.zeros((batch.batch_size, rewards.shape[1], self.n_agents, self.n_actions)).cuda()

@@ -16,12 +16,6 @@ class AgentSpecificCentralCritic(nn.Module):
         input_shape = self._get_input_shape(scheme)
         self.output_type = "v"
 
-        if getattr(args, "is_observation_normalized", None):
-            self.is_obs_normalized = True
-            self.obs_rms = RunningMeanStd(shape=np.prod(input_shape))
-        else:
-            self.is_obs_normalized = False
-
         # Set up network layers
         self.fc1 = nn.Linear(input_shape, 128)
         self.fc2 = nn.Linear(128, 128)
@@ -30,17 +24,10 @@ class AgentSpecificCentralCritic(nn.Module):
     def forward(self, batch, t=None):
         inputs, bs, max_t = self._build_inputs(batch, t=t)
 
-        if self.is_obs_normalized: 
-            inputs = (inputs - self.obs_rms.mean) / th.sqrt(self.obs_rms.var)
-
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         q = self.fc3(x)
         return q.view(bs, max_t, self.n_agents, 1)
-
-    def update_rms(self, batch):
-        inputs, _, _ = self._build_inputs(batch)
-        self.obs_rms.update(inputs)
 
     def _build_inputs(self, batch, t=None):
         bs = batch.batch_size
@@ -59,6 +46,10 @@ class AgentSpecificCentralCritic(nn.Module):
         # agent-specific observation
         inputs.append(batch["obs"][:, ts])
 
+        # agent id
+        agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, max_t, -1, -1)
+        inputs.append(agent_ids[:, ts, :, :])
+
         inputs = th.cat([x.reshape(bs * max_t * self.n_agents, -1) for x in inputs], dim=1)
         return inputs, bs, max_t
 
@@ -67,4 +58,7 @@ class AgentSpecificCentralCritic(nn.Module):
         input_shape = scheme["state"]["vshape"]
         # agent-specific observation
         input_shape += scheme["obs"]["vshape"] * 1
+        # agent id
+        input_shape += self.n_agents
+
         return input_shape

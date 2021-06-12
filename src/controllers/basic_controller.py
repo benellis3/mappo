@@ -1,7 +1,7 @@
 from modules.agents import REGISTRY as agent_REGISTRY
 from components.action_selectors import REGISTRY as action_REGISTRY
-from components.running_mean_std import RunningMeanStd
 import torch as th
+from components.running_mean_std import RunningMeanStd
 
 
 # This multi-agent controller shares parameters between agents
@@ -14,12 +14,6 @@ class BasicMAC:
         if self.args.agent == "cnn":
             self.num_frames = getattr(args, "num_frames", 4)
 
-        if getattr(args, "is_observation_normalized", None):
-            self.is_observation_normalized = True
-            self.obs_rms = RunningMeanStd(shape=input_shape)
-        else:
-            self.is_observation_normalized = False
-
         self.framestack_num = self.args.env_args.get("framestack_num", None)
 
         self._build_agents(input_shape)
@@ -31,23 +25,48 @@ class BasicMAC:
         self.hidden_states = None
         self.other_outs = None
 
+        if getattr(self.args, "is_observation_normalized", False):
+            # need to normalize both obs & state
+            self.obs_rms = RunningMeanStd()
+            self.is_obs_normalized = True
+        else:
+            self.is_obs_normalized = False
+
+    def update_rms(self, batch, alive_mask):
+        obs = batch["obs"].cuda()
+        flat_obs = obs.clone().reshape(-1, obs.shape[-1])
+        flat_alive_mask = alive_mask.flatten()
+        # ensure the length matches
+        assert flat_obs.shape[0] == flat_alive_mask.shape[0]
+        obs_index = th.nonzero(flat_alive_mask).squeeze()
+        valid_obs = flat_obs[obs_index]
+        # update obs_rms
+        self.obs_rms.update(valid_obs)
+
     def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
         # Only select actions for the selected batch elements in bs
         avail_actions = ep_batch["avail_actions"][:, t_ep]
+        alive_mask = ( (avail_actions[:, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
+
+        # normalize obs
+        if self.is_obs_normalized:
+            b_size = ep_batch.batch_size
+            obs_mean = self.obs_rms.mean.unsqueeze(0).unsqueeze(0)
+            obs_var = self.obs_rms.var.unsqueeze(0).unsqueeze(0)
+
+            obs_mean = obs_mean.expand(b_size, self.n_agents, -1)
+            obs_var = obs_var.expand(b_size, self.n_agents, -1)
+            expanded_alive_mask = alive_mask.unsqueeze(-1).expand(-1, -1, obs_mean.shape[-1])
+
+            # update obs directly in batch
+            ep_batch.data.transition_data['obs'][:, t_ep] = (ep_batch['obs'][:, t_ep] - obs_mean) / (obs_var + 1e-6 ) * expanded_alive_mask
+
         agent_outputs = self.forward(ep_batch, t_ep, test_mode=test_mode)
         chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions[bs], t_env, test_mode=test_mode)
         return chosen_actions
 
-    def update_rms(self, batch_obs):
-        self.obs_rms.update(batch_obs)
-
     def forward(self, ep_batch, t, test_mode=False):
         agent_inputs = self._build_inputs(ep_batch, t)
-        if self.is_observation_normalized:
-            if self.args.agent == "cnn":
-                agent_inputs = (agent_inputs - self.obs_rms.mean.repeat(self.num_frames).cuda() ) / th.sqrt(self.obs_rms.var.repeat(self.num_frames).cuda())
-            else:
-                agent_inputs = (agent_inputs - self.obs_rms.mean.cuda() ) / th.sqrt(self.obs_rms.var.cuda())
 
         if self.args.agent == "cnn":
             input_shape = agent_inputs.shape
@@ -91,9 +110,6 @@ class BasicMAC:
 
         inputs = th.cat([x.reshape(bs * ts * self.n_agents, -1) for x in inputs], dim=1)
 
-        if self.is_observation_normalized:
-            inputs = (inputs - self.obs_rms.mean.repeat(self.num_frames)) / th.sqrt(self.obs_rms.var.repeat(self.num_frames))
-
         input_shape = inputs.shape
         assert input_shape[1] % self.num_frames == 0
         agent_inputs = inputs.view(input_shape[0], self.num_frames, input_shape[1]//self.num_frames)
@@ -134,8 +150,6 @@ class BasicMAC:
 
     def cuda(self):
         self.agent.cuda()
-        if getattr(self.args, "is_observation_normalized", None):
-            self.obs_rms.cuda()
 
     def save_models(self, path):
         th.save(self.agent.state_dict(), "{}/agent.th".format(path))
