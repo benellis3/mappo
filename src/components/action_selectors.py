@@ -44,6 +44,13 @@ class MultinomialActionSelector():
         else:
             picked_actions = Categorical(logits=masked_policies).sample().long()
 
+        # add randomness
+        random_numbers = th.rand_like(agent_inputs[:,:,0])
+        pick_random = (random_numbers < 0.1).long()
+        random_actions = Categorical(avail_actions.float()).sample().long()
+
+        picked_actions = pick_random * random_actions + (1 - pick_random) * picked_actions
+
         return picked_actions
 
 REGISTRY["multinomial"] = MultinomialActionSelector

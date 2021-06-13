@@ -4,12 +4,9 @@ mask_before_softmax: True
 
 runner: "parallel"
 
-buffer_size: 8
-batch_size_run: 8
-batch_size: 8
-
-# update the target network every {} training steps
-target_update_interval: 200
+buffer_size: 32
+batch_size_run: 32
+batch_size: 32
 
 lr_actor: 0.0005
 lr_critic: 0.001
@@ -18,10 +15,11 @@ td_lambda: 0.99
 
 agent_output_type: "pi_logits"
 learner: "central_ppo_learner"
-critic: "central_critic"
+critic: "central_rnn_critic"
 
+training_iters: 1
 mini_epochs_actor: 12
-mini_epochs_critic: 8
+mini_epochs_critic: 10
 entropy_loss_coeff: 0.001
 
 # calculating advantage: GAE, TD_Error

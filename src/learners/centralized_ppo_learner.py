@@ -7,6 +7,25 @@ from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
 from components.running_mean_std import RunningMeanStd
 
+def compute_logp_entropy(logits, actions, masks):
+    masked_logits = th.where(masks, logits, th.tensor(th.finfo(logits.dtype).min).to(logits.device))
+    # normalize logits
+    masked_logits = masked_logits - masked_logits.logsumexp(dim=-1, keepdim=True)
+
+    probs = th.nn.functional.softmax(masked_logits, dim=-1)
+    p_log_p = masked_logits * probs
+    p_log_p = th.where(masks, p_log_p, th.tensor(0.0).to(p_log_p.device))
+    entropy = -p_log_p.sum(-1)
+
+    logp = th.gather(masked_logits, dim=-1, index=actions)
+
+    result = {
+        'logp' : th.squeeze(logp),
+        'entropy' : th.squeeze(entropy),
+    }
+    return result
+
+
 class CentralPPOLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
@@ -70,6 +89,7 @@ class CentralPPOLearner:
         avail_actions = batch['avail_actions'].cuda()
         alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
         num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
+        avail_actions = avail_actions.byte()
 
         if getattr(self.args, "is_observation_normalized", False):
             # NOTE: obs has already been normalized in basic_controller, only need to update rms
@@ -111,15 +131,17 @@ class CentralPPOLearner:
         ## compute advantage
         old_values = self.critic(batch).squeeze(dim=-1).detach()
         if self.advantage_calc_method == "GAE":
-            _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
+            returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
                                                        self.args.gamma, self.args.tau)
         else:
             raise NotImplementedError
 
-        log_prob_dist = th.nn.functional.log_softmax(action_logits, dim=-1)
-        old_log_pac = th.gather(log_prob_dist, dim=3, index=actions).squeeze(3).detach()
+        # if t_env > 100000:
+        #     import pdb; pdb.set_trace()
+        old_meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
+        old_log_pac = old_meta_data['logp'].detach() # detached
 
-        # mask out the dead agents
+        # joint probability
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
 
         approxkl_lst = [] 
@@ -136,7 +158,7 @@ class CentralPPOLearner:
             batch_mean = th.mean(valid_adv, dim=0)
             batch_var = th.var(valid_adv, dim=0)
 
-            advantages = (advantages - batch_mean) / (batch_var + 1e-6)
+            advantages = (advantages - batch_mean) / (batch_var + 1e-6) * mask
 
         ## update the actor
         target_kl = 0.2
@@ -151,8 +173,8 @@ class CentralPPOLearner:
             else:
                 raise NotImplementedError
 
-            log_prob_dist = th.nn.functional.log_softmax(logits, dim=-1)
-            log_pac = th.gather(log_prob_dist, dim=3, index=actions).squeeze(-1)
+            meta_data = compute_logp_entropy(logits, actions, avail_actions)
+            log_pac = meta_data['logp']
 
             # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
@@ -163,11 +185,7 @@ class CentralPPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
-            # for shared policy, maximize the policy entropy averaged over all agents & episodes
-            # consider entropy for only alive agents
-            # log_prob_dist: n_batch * n_timesteps * n_agents * n_actions
-            entropy_all_agents = th.sum(-1.0 * log_prob_dist * th.exp(log_prob_dist), dim=-1) 
-            entropy = th.sum( entropy_all_agents * alive_mask) / th.sum(alive_mask)
+            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
