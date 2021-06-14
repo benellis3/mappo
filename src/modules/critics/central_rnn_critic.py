@@ -20,12 +20,8 @@ class CentralRNNCritic(nn.Module):
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
         self.fc2 = nn.Linear(args.rnn_hidden_dim, 1)
 
-    def init_hidden(self):
-        # make hidden states on same device as model
-        return self.fc1.weight.new(1, self.args.rnn_hidden_dim).zero_()
-
     def forward(self, batch, t=None):
-        h_in = self.init_hidden().expand(batch.batch_size, -1)  # bav
+        h_in = self.fc1.weight.new(batch.batch_size, self.args.rnn_hidden_dim).zero_() 
 
         outputs = []
         for t in range(batch.max_seq_length):
