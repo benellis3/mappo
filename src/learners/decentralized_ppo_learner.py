@@ -138,8 +138,17 @@ class DecentralPPOLearner:
 
         target_kl = 0.2
         if getattr(self.args, "is_advantage_normalized", False):
-            # BUG: should be averaged over valid advantages (i.e., for alive agents)
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
+            # only consider valid advantages
+            flat_mask = mask_expanded.flatten()
+            flat_advantage = advantages.flatten()
+            assert flat_mask.shape[0] == flat_advantage.shape[0]
+            adv_index = th.nonzero(flat_mask).squeeze()
+            valid_adv = flat_advantage[adv_index]
+            batch_mean = th.mean(valid_adv, dim=0)
+            batch_var = th.var(valid_adv, dim=0)
+            flat_advantage = (flat_advantage - batch_mean) / (batch_var + 1e-6) * flat_mask
+            bs, ts, _ = advantages.shape
+            advantages = flat_advantage.reshape(bs, ts, self.n_agents)
 
         ## update the actor
         for _ in range(0, self.mini_epochs_actor):

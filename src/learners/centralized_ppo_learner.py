@@ -136,8 +136,6 @@ class CentralPPOLearner:
         else:
             raise NotImplementedError
 
-        # if t_env > 100000:
-        #     import pdb; pdb.set_trace()
         old_meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
         old_log_pac = old_meta_data['logp'].detach() # detached
 
@@ -185,7 +183,7 @@ class CentralPPOLearner:
                 if approxkl > 1.5 * target_kl:
                     break
 
-            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
+            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # alive_mask.sum(); mask out dead agents
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
@@ -225,7 +223,7 @@ class CentralPPOLearner:
         ts = _rewards.size(1) - 1
 
         for t in reversed(range(ts)):
-            nextnonterminal = 1.0 - _terminated[:, t]
+            nextnonterminal = 1.0 - _terminated[:, t] if t < _rewards.size(1) - 1 else th.zeros_like(_terminated[:, t+1])
             nextvalues = _values[:, t+1]
 
             reward_t = _rewards[:, t]
