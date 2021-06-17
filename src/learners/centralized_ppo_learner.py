@@ -85,25 +85,6 @@ class CentralPPOLearner:
         denormalized_values = values * (value_var + 1e-6) + value_mean
         return denormalized_values
 
-    def normalize_state(self, batch, mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
-
-        state = batch["state"][:, :-1].cuda()
-        flat_state = state.reshape(-1, state.shape[-1])
-        flat_mask = mask.flatten()
-        # ensure the length matches
-        assert flat_state.shape[0] == flat_mask.shape[0]
-        state_index = th.nonzero(flat_mask).squeeze()
-        valid_state = flat_state[state_index]
-        # update state_rms
-        self.state_rms.update(valid_state)
-        state_mean = self.state_rms.mean.unsqueeze(0).unsqueeze(0)
-        state_var = self.state_rms.var.unsqueeze(0).unsqueeze(0)
-        state_mean = state_mean.expand(bs, ts, -1)
-        state_var = state_var.expand(bs, ts, -1)
-        expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
-        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / (state_var + 1e-6) * expanded_mask
-
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
@@ -122,17 +103,17 @@ class CentralPPOLearner:
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
         alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
-        num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
+        num_alive_agents = th.sum(alive_mask, dim=-1).float()
         avail_actions = avail_actions.byte()
 
         if getattr(self.args, "is_observation_normalized", False):
             # NOTE: obs has already been normalized in basic_controller, only need to update rms
             self.mac.update_rms(batch, alive_mask)
             # NOTE: state are being updated
-            self.normalize_state(batch, mask)
+            self.critic.update_rms(batch, mask)
 
         if self.agent_type == "rnn":
-            action_logits = th.zeros((batch.batch_size, rewards.shape[1], self.n_agents, self.n_actions)).cuda()
+            action_logits = th.zeros(avail_actions.shape).cuda()
             self.mac.init_hidden(batch.batch_size)
             for t in range(rewards.shape[1]):
                 action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)

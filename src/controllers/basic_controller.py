@@ -40,20 +40,6 @@ class BasicMAC:
     def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
         # Only select actions for the selected batch elements in bs
         avail_actions = ep_batch["avail_actions"][:, t_ep]
-        alive_mask = ( (avail_actions[:, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
-
-        # normalize obs
-        if self.is_obs_normalized:
-            b_size = ep_batch.batch_size
-            obs_mean = self.obs_rms.mean.unsqueeze(0).unsqueeze(0)
-            obs_var = self.obs_rms.var.unsqueeze(0).unsqueeze(0)
-
-            obs_mean = obs_mean.expand(b_size, self.n_agents, -1)
-            obs_var = obs_var.expand(b_size, self.n_agents, -1)
-            expanded_alive_mask = alive_mask.unsqueeze(-1).expand(-1, -1, obs_mean.shape[-1])
-
-            # update obs directly in batch
-            ep_batch.data.transition_data['obs'][:, t_ep] = (ep_batch['obs'][:, t_ep] - obs_mean) / (obs_var + 1e-6 ) * expanded_alive_mask
 
         agent_outputs = self.forward(ep_batch, t_ep, test_mode=test_mode)
         chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions[bs], t_env, test_mode=test_mode)
@@ -92,7 +78,19 @@ class BasicMAC:
         bs = batch.batch_size
         inputs = []
 
-        inputs.append(batch["obs"][:, t])  # b1av
+        obs =batch["obs"][:, t]
+        # normalize obs
+        if self.is_obs_normalized:
+            obs_mean = self.obs_rms.mean.unsqueeze(0).unsqueeze(0)
+            obs_var = self.obs_rms.var.unsqueeze(0).unsqueeze(0)
+
+            obs_mean = obs_mean.expand(bs, self.n_agents, -1)
+            obs_var = obs_var.expand(bs, self.n_agents, -1)
+
+            # update obs directly in batch
+            obs = (obs - obs_mean) / (obs_var + 1e-6 )
+
+        inputs.append(obs) 
 
         if self.args.obs_last_action:
             if t == 0:
