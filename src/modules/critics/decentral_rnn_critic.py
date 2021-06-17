@@ -21,9 +21,12 @@ class DecentralRNNCritic(nn.Module):
         self.fc2 = nn.Linear(args.rnn_hidden_dim, 1)
 
     def forward(self, batch, t=None):
-        h_in = self.fc1.weight.new(batch.batch_size, self.args.rnn_hidden_dim).zero_() 
+        bs, max_t = batch.batch_size, batch.max_seq_length
+
+        h_in = self.fc1.weight.new(batch.batch_size * self.n_agents, self.args.rnn_hidden_dim).zero_() 
 
         outputs = []
+        import pdb; pdb.set_trace()
         for t in range(batch.max_seq_length):
             inputs, _, _ = self._build_inputs(batch, t=t)
 
@@ -33,18 +36,28 @@ class DecentralRNNCritic(nn.Module):
             outputs.append(q) # bs * ts * n_agents
 
         output_tensor = th.stack(outputs, dim=1)
-        return output_tensor
+        return output_tensor.view(bs, max_t, self.n_agents, 1)
 
     def _build_inputs(self, batch, t=None):
         bs = batch.batch_size
         max_t = batch.max_seq_length if t is None else 1
         ts = slice(None) if t is None else slice(t, t+1)
         inputs = []
-        # state
-        inputs.append(batch["state"][:, ts])
 
-        # observations
-        # inputs.append(batch["obs"][:, ts].view(bs, max_t, -1))
+        # state
+        central_state = batch["state"][:, ts]
+        central_state = central_state.unsqueeze(dim=2)
+        # repeat for n agents
+        central_state = central_state.repeat(1, 1, self.n_agents, 1)
+
+        inputs.append(central_state)
+
+        # agent-specific observation
+        inputs.append(batch["obs"][:, ts])
+
+        # agent id
+        agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, max_t, -1, -1)
+        inputs.append(agent_ids[:, ts, :, :])
 
         # last actions
         # if t == 0:
@@ -56,14 +69,16 @@ class DecentralRNNCritic(nn.Module):
         #     last_actions = last_actions.view(bs, max_t, 1, -1)
         #     inputs.append(last_actions)
 
-        inputs = th.cat([x.reshape(bs * max_t, -1) for x in inputs], dim=1)
+        inputs = th.cat([x.reshape(bs * max_t * self.n_agents, -1) for x in inputs], dim=1)
         return inputs, bs, max_t
 
     def _get_input_shape(self, scheme):
         # state
         input_shape = scheme["state"]["vshape"]
-        # observations
-        # input_shape += scheme["obs"]["vshape"] * self.n_agents
+        # agent-specific observation
+        input_shape += scheme["obs"]["vshape"] * 1
+        # agent id
+        input_shape += self.n_agents
         # last actions
         # input_shape += scheme["actions_onehot"]["vshape"][0] * self.n_agents
         return input_shape

@@ -38,9 +38,9 @@ class DecentralPPOLearner:
             self.state_rms = RunningMeanStd()
 
     def normalize_state(self, batch, mask):
-        bs, ts = batch.batch_size, batch.max_seq_length
+        bs, ts = batch.batch_size, batch.max_seq_length-1
 
-        state = batch["state"].cuda()
+        state = batch["state"][:, :-1].cuda()
         flat_state = state.reshape(-1, state.shape[-1])
         flat_mask = mask.flatten()
         # ensure the length matches
@@ -54,26 +54,26 @@ class DecentralPPOLearner:
         state_mean = state_mean.expand(bs, ts, -1)
         state_var = state_var.expand(bs, ts, -1)
         expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
-        batch.data.transition_data['state'] = (batch['state'] - state_mean) / (state_var + 1e-6) * expanded_mask
+        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / (state_var + 1e-6) * expanded_mask
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
-        # TODO: what if one agent dies
-        actions = batch["actions"].cuda()
-        rewards = batch["reward"].cuda()
-        filled_mask = batch['filled'].float().cuda()
-        terminated = batch["terminated"].float().cuda()
+        # Get the relevant quantities
+        rewards = batch["reward"][:, :-1]
+        actions = batch["actions"][:, :-1]
+        terminated = batch["terminated"][:, :-1].float()
+        mask = batch["filled"][:, :-1].float()
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
+        avail_actions = batch["avail_actions"][:, :-1]
 
-        mask = filled_mask.squeeze(dim=-1)
+        mask = mask.squeeze(dim=-1)
         terminated = terminated.squeeze(dim=-1)
-
-        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # mask out the last entry
 
         ## get dead agents
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        avail_actions = batch['avail_actions'].cuda()
+        avail_actions = batch['avail_actions'][:, :-1].cuda()
         alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
         num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
 
@@ -93,6 +93,7 @@ class DecentralPPOLearner:
             raise NotImplementedError
 
         old_values = self.critic(batch).squeeze(dim=-1).detach()
+
         # expand reward to n_agent copies
         rewards = rewards.repeat(1, 1, self.n_agents)
         terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
@@ -109,6 +110,7 @@ class DecentralPPOLearner:
         critic_loss_lst = []
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
+            new_values = new_values[:, :-1]
             critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask_expanded) / th.sum(mask_expanded)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
@@ -213,10 +215,10 @@ class DecentralPPOLearner:
             self.log_stats_t = t_env
 
     def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
-        returns = th.zeros_like(_values)
-        advs = th.zeros_like(_values)
-        lastgaelam = th.zeros_like(_values[:, 0])
-        ts = _rewards.size(1) - 1
+        returns = th.zeros_like(_rewards)
+        advs = th.zeros_like(_rewards)
+        lastgaelam = th.zeros_like(_rewards[:, 0])
+        ts = _rewards.size(1)
 
         for t in reversed(range(ts)):
             nextnonterminal = 1.0 - _terminated[:, t]
@@ -226,7 +228,7 @@ class DecentralPPOLearner:
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
             advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
 
-        returns = advs + _values
+        returns = advs + _values[:, :-1]
 
         return returns, advs
 

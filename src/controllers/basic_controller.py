@@ -27,7 +27,7 @@ class BasicMAC:
             self.is_obs_normalized = False
 
     def update_rms(self, batch, alive_mask):
-        obs = batch["obs"].cuda()
+        obs = batch["obs"][:, :-1].cuda() # ignore the last obs
         flat_obs = obs.clone().reshape(-1, obs.shape[-1])
         flat_alive_mask = alive_mask.flatten()
         # ensure the length matches

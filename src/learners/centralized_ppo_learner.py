@@ -53,10 +53,42 @@ class CentralPPOLearner:
             # need to normalize state
             self.state_rms = RunningMeanStd()
 
-    def normalize_state(self, batch, mask):
-        bs, ts = batch.batch_size, batch.max_seq_length
+        if getattr(self.args, "is_popart", False):
+            # need to normalize value
+            self.value_rms = RunningMeanStd()
 
-        state = batch["state"].cuda()
+    def normalize_value(self, returns, mask):
+        bs, ts = returns.shape[0], returns.shape[1]
+
+        flat_returns = returns.flatten()
+        flat_mask = mask.flatten()
+        # ensure the length matches
+        assert flat_returns.shape[0] == flat_mask.shape[0]
+        returns_index = th.nonzero(flat_mask).squeeze()
+        valid_returns = flat_returns[returns_index]
+        # update value_rms
+        self.value_rms.update(valid_returns)
+        value_mean = self.value_rms.mean.unsqueeze(0)
+        value_var = self.value_rms.var.unsqueeze(0)
+        value_mean = value_mean.expand(bs, ts)
+        value_var = value_var.expand(bs, ts)
+        normalized_returns = (returns - value_mean) / (value_var + 1e-6) * mask
+        return normalized_returns
+
+    def denormalize_value(self, values):
+        bs, ts = values.shape[0], values.shape[1]
+        value_mean = self.value_rms.mean.unsqueeze(0)
+        value_var = self.value_rms.var.unsqueeze(0)
+        value_mean = value_mean.expand(bs, ts)
+        value_var = value_var.expand(bs, ts)
+
+        denormalized_values = values * (value_var + 1e-6) + value_mean
+        return denormalized_values
+
+    def normalize_state(self, batch, mask):
+        bs, ts = batch.batch_size, batch.max_seq_length-1
+
+        state = batch["state"][:, :-1].cuda()
         flat_state = state.reshape(-1, state.shape[-1])
         flat_mask = mask.flatten()
         # ensure the length matches
@@ -70,23 +102,25 @@ class CentralPPOLearner:
         state_mean = state_mean.expand(bs, ts, -1)
         state_var = state_var.expand(bs, ts, -1)
         expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
-        batch.data.transition_data['state'] = (batch['state'] - state_mean) / (state_var + 1e-6) * expanded_mask
+        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / (state_var + 1e-6) * expanded_mask
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
 
-        actions = batch["actions"].cuda()
-        rewards = batch["reward"].cuda()
-        filled_mask = batch['filled'].float().cuda()
-        terminated = batch["terminated"].float().cuda()
+        # Get the relevant quantities
+        rewards = batch["reward"][:, :-1]
+        actions = batch["actions"][:, :-1]
+        terminated = batch["terminated"][:, :-1].float()
+        mask = batch["filled"][:, :-1].float()
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
+        avail_actions = batch["avail_actions"][:, :-1]
 
-        mask = filled_mask.squeeze(dim=-1)
+        mask = mask.squeeze(dim=-1)
         terminated = terminated.squeeze(dim=-1)
 
         ## get dead agents
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        avail_actions = batch['avail_actions'].cuda()
         alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
         num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
         avail_actions = avail_actions.byte()
@@ -107,32 +141,57 @@ class CentralPPOLearner:
             raise NotImplementedError
 
         old_values = self.critic(batch).squeeze(dim=-1).detach()
+        if getattr(self.args, "is_popart", False):
+            old_values = self.denormalize_value(old_values)
+
         rewards = rewards.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
             returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
+        elif self.advantage_calc_method == "TD":
+            returns = rewards + self.args.gamma * (1 - terminated) * old_values[:, 1:]
+
         else:
             raise NotImplementedError
 
         ## update the critics
-        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # mask out the last entry
-
         critic_loss_lst = []
+        old_values = old_values[:, :-1]
+
+        if getattr(self.args, "is_popart", False):
+            returns = self.normalize_value(returns, mask)
+
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
-            critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask) / th.sum(mask)
+            new_values = new_values[:, :-1]
+
+            # vf_losses1 = (new_values - returns) ** 2
+            # clipped_values = th.clamp(new_values - old_values, \
+            #                     -self.args.ppo_policy_clip_param, self.args.ppo_policy_clip_param)
+            # vf_losses2 = (clipped_values - returns) ** 2
+            # vf_loss = th.sum( th.max(vf_losses1, vf_losses2) * mask ) / mask.sum()
+
+            vf_loss = th.sum( (new_values - returns) ** 2 * mask) / mask.sum()
+
             self.optimiser_critic.zero_grad()
-            critic_loss.backward()
+            vf_loss.backward()
             self.optimiser_critic.step()
-            critic_loss_lst.append(critic_loss)
+            critic_loss_lst.append(vf_loss)
 
         ## compute advantage
         old_values = self.critic(batch).squeeze(dim=-1).detach()
+        if getattr(self.args, "is_popart", False):
+            old_values = self.denormalize_value(old_values)
+
         if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
+            _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
                                                        self.args.gamma, self.args.tau)
+
+        elif self.advantage_calc_method == "TD":
+            advantages = rewards + self.args.gamma * (1 - terminated) * old_values[:, 1:] - old_values[:, :-1]
+
         else:
             raise NotImplementedError
 
@@ -217,20 +276,20 @@ class CentralPPOLearner:
             self.log_stats_t = t_env
 
     def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
-        returns = th.zeros_like(_values)
-        advs = th.zeros_like(_values)
-        lastgaelam = th.zeros_like(_values[:, 0])
-        ts = _rewards.size(1) - 1
+        returns = th.zeros_like(_rewards)
+        advs = th.zeros_like(_rewards)
+        lastgaelam = th.zeros_like(_rewards[:, 0])
+        ts = _rewards.size(1)
 
         for t in reversed(range(ts)):
-            nextnonterminal = 1.0 - _terminated[:, t] if t < _rewards.size(1) - 1 else th.zeros_like(_terminated[:, t+1])
+            nextnonterminal = 1.0 - _terminated[:, t]
             nextvalues = _values[:, t+1]
 
             reward_t = _rewards[:, t]
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
             advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
 
-        returns = advs + _values
+        returns = advs + _values[:, :-1]
 
         return returns, advs
 

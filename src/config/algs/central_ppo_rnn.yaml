@@ -4,9 +4,9 @@ mask_before_softmax: True
 
 runner: "parallel"
 
-buffer_size: 32
-batch_size_run: 32
-batch_size: 32
+buffer_size: 8
+batch_size_run: 8
+batch_size: 8
 
 lr_actor: 0.0005
 lr_critic: 0.001
@@ -22,13 +22,16 @@ mini_epochs_actor: 12
 mini_epochs_critic: 10
 entropy_loss_coeff: 0.001
 
-# calculating advantage: GAE, TD_Error
+# calculating advantage: GAE, TD
 advantage_calc_method: "GAE"
+# advantage_calc_method: "TD"
 
 ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
 is_observation_normalized: True
+is_popart: True
+
 obs_agent_id: True
 obs_last_action: False
 

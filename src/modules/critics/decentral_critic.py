@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from components.running_mean_std import RunningMeanStd
 
 
-class AgentSpecificCentralCritic(nn.Module):
+class DecentralCritic(nn.Module):
     def __init__(self, scheme, args):
-        super(AgentSpecificCentralCritic, self).__init__()
+        super(DecentralCritic, self).__init__()
 
         self.args = args
         self.n_actions = args.n_actions
