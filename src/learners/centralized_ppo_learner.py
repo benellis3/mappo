@@ -49,13 +49,14 @@ class CentralPPOLearner:
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
 
-        if getattr(self.args, "is_observation_normalized", False):
-            # need to normalize state
-            self.state_rms = RunningMeanStd()
+        self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
 
         if getattr(self.args, "is_popart", False):
             # need to normalize value
             self.value_rms = RunningMeanStd()
+
+        if self.is_obs_normalized:
+            self.state_rms = RunningMeanStd()
 
     def normalize_value(self, returns, mask):
         bs, ts = returns.shape[0], returns.shape[1]
@@ -72,7 +73,7 @@ class CentralPPOLearner:
         value_var = self.value_rms.var.unsqueeze(0)
         value_mean = value_mean.expand(bs, ts)
         value_var = value_var.expand(bs, ts)
-        normalized_returns = (returns - value_mean) / (value_var + 1e-6) * mask
+        normalized_returns = (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
         return normalized_returns
 
     def denormalize_value(self, values):
@@ -82,10 +83,43 @@ class CentralPPOLearner:
         value_mean = value_mean.expand(bs, ts)
         value_var = value_var.expand(bs, ts)
 
-        denormalized_values = values * (value_var + 1e-6) + value_mean
+        denormalized_values = values * th.sqrt(value_var + 1e-6) + value_mean
         return denormalized_values
 
+    def normalize_state(self, batch, mask):
+        bs, ts = batch.batch_size, batch.max_seq_length-1
+
+        state = batch["state"][:, :-1].cuda()
+        flat_state = state.reshape(-1, state.shape[-1])
+        flat_mask = mask.flatten()
+        # ensure the length matches
+        assert flat_state.shape[0] == flat_mask.shape[0]
+        state_index = th.nonzero(flat_mask).squeeze()
+        valid_state = flat_state[state_index]
+        # update state_rms
+        self.state_rms.update(valid_state)
+        state_mean = self.state_rms.mean.unsqueeze(0).unsqueeze(0)
+        state_var = self.state_rms.var.unsqueeze(0).unsqueeze(0)
+        state_mean = state_mean.expand(bs, ts, -1)
+        state_var = state_var.expand(bs, ts, -1)
+        expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
+        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
+
+    def normalize_obs(self, batch, alive_mask):
+        bs, ts = batch.batch_size, batch.max_seq_length-1
+        obs_mean = self.mac.obs_rms.mean.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+        obs_var = self.mac.obs_rms.var.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+
+        obs_mean = obs_mean.expand(bs, ts, self.n_agents, -1)
+        obs_var = obs_var.expand(bs, ts, self.n_agents, -1)
+
+        expanded_alive_mask = alive_mask.unsqueeze(-1).expand(-1, -1, -1, obs_mean.shape[-1])
+
+        # update obs directly in batch
+        batch.data.transition_data['obs'][:, :-1] = (batch['obs'][:, :-1] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
+
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
+        max_t = batch.max_seq_length-1
         critic_train_stats = defaultdict(lambda: [])
 
         # Get the relevant quantities
@@ -106,41 +140,43 @@ class CentralPPOLearner:
         num_alive_agents = th.sum(alive_mask, dim=-1).float()
         avail_actions = avail_actions.byte()
 
-        if getattr(self.args, "is_observation_normalized", False):
-            # NOTE: obs has already been normalized in basic_controller, only need to update rms
+        if self.is_obs_normalized:
+            # NOTE: obs normalizer needs to be in basic_controller
             self.mac.update_rms(batch, alive_mask)
-            # NOTE: state are being updated
-            self.critic.update_rms(batch, mask)
+            # NOTE: obs in batch is being updated
+            self.normalize_obs(batch, alive_mask)
+            # NOTE: state in batch is being updated
+            self.normalize_state(batch, mask)
 
         if self.agent_type == "rnn":
-            action_logits = th.zeros(avail_actions.shape).cuda()
+            old_action_logits = []
             self.mac.init_hidden(batch.batch_size)
-            for t in range(rewards.shape[1]):
-                action_logits[:, t] = self.mac.forward(batch, t = t, test_mode=False)
+            for t in range(max_t):
+                actor_outs = self.mac.forward(batch, t = t, test_mode=False)
+                old_action_logits.append(actor_outs)
+            old_action_logits = th.stack(old_action_logits, dim=1)
 
         else:
             raise NotImplementedError
 
-        old_values = self.critic(batch).squeeze(dim=-1).detach()
+        old_values_before = self.critic(batch).squeeze(dim=-1).detach()
         if getattr(self.args, "is_popart", False):
-            old_values = self.denormalize_value(old_values)
+            old_values_before = self.denormalize_value(old_values_before)
 
         rewards = rewards.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
-            returns, _ = self._compute_returns_advs(old_values, rewards, terminated, 
+            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
         elif self.advantage_calc_method == "TD":
-            returns = rewards + self.args.gamma * (1 - terminated) * old_values[:, 1:]
+            returns = rewards + self.args.gamma * (1 - terminated) * old_values_before[:, 1:]
 
         else:
             raise NotImplementedError
 
         ## update the critics
         critic_loss_lst = []
-        old_values = old_values[:, :-1]
-
         if getattr(self.args, "is_popart", False):
             returns = self.normalize_value(returns, mask)
 
@@ -162,22 +198,24 @@ class CentralPPOLearner:
             critic_loss_lst.append(vf_loss)
 
         ## compute advantage
-        old_values = self.critic(batch).squeeze(dim=-1).detach()
+        old_values_after = self.critic(batch).squeeze(dim=-1).detach()
         if getattr(self.args, "is_popart", False):
-            old_values = self.denormalize_value(old_values)
+            old_values_after = self.denormalize_value(old_values_after)
 
         if self.advantage_calc_method == "GAE":
-            _, advantages = self._compute_returns_advs(old_values, rewards, terminated, 
+            _, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
                                                        self.args.gamma, self.args.tau)
 
         elif self.advantage_calc_method == "TD":
-            advantages = rewards + self.args.gamma * (1 - terminated) * old_values[:, 1:] - old_values[:, :-1]
+            advantages = rewards + self.args.gamma * (1 - terminated) * old_values_after[:, 1:] - old_values_after[:, :-1]
 
         else:
             raise NotImplementedError
 
-        old_meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
-        old_log_pac = old_meta_data['logp'].detach() # detached
+        # action prob
+        old_action_logits = old_action_logits.detach() # detached
+        old_meta_data = compute_logp_entropy(old_action_logits, actions, avail_actions)
+        old_log_pac = old_meta_data['logp']
 
         # joint probability
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
@@ -196,22 +234,22 @@ class CentralPPOLearner:
             batch_mean = th.mean(valid_adv, dim=0)
             batch_var = th.var(valid_adv, dim=0)
 
-            advantages = (advantages - batch_mean) / (batch_var + 1e-6) * mask
+            advantages = (advantages - batch_mean) / th.sqrt(batch_var + 1e-6) * mask
 
         ## update the actor
         target_kl = 0.2
         for _ in range(0, self.mini_epochs_actor):
             if self.agent_type == "rnn":
-                logits = []
+                action_logits = []
                 self.mac.init_hidden(batch.batch_size)
-                for t in range(rewards.shape[1]):
-                    logits.append( self.mac.forward(batch, t = t, test_mode=False) )
-                logits = th.transpose(th.stack(logits), 0, 1)
-
+                for t in range(max_t):
+                    actor_outs = self.mac.forward(batch, t = t, test_mode=False)
+                    action_logits.append(actor_outs)
+                action_logits = th.stack(action_logits, dim=1)
             else:
                 raise NotImplementedError
 
-            meta_data = compute_logp_entropy(logits, actions, avail_actions)
+            meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
             log_pac = meta_data['logp']
 
             # joint probability

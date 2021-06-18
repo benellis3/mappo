@@ -3,7 +3,6 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class DecentralRNNCritic(nn.Module):
     def __init__(self, scheme, args):
         super(DecentralRNNCritic, self).__init__()
@@ -26,7 +25,6 @@ class DecentralRNNCritic(nn.Module):
         h_in = self.fc1.weight.new(batch.batch_size * self.n_agents, self.args.rnn_hidden_dim).zero_() 
 
         outputs = []
-        import pdb; pdb.set_trace()
         for t in range(batch.max_seq_length):
             inputs, _, _ = self._build_inputs(batch, t=t)
 

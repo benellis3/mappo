@@ -41,12 +41,13 @@ class BasicMAC:
         # Only select actions for the selected batch elements in bs
         avail_actions = ep_batch["avail_actions"][:, t_ep]
 
-        agent_outputs = self.forward(ep_batch, t_ep, test_mode=test_mode)
+        agent_outputs = self.forward(ep_batch, t_ep, test_mode=test_mode, enable_norm=True)
         chosen_actions = self.action_selector.select_action(agent_outputs[bs], avail_actions[bs], t_env, test_mode=test_mode)
         return chosen_actions
 
-    def forward(self, ep_batch, t, test_mode=False):
-        agent_inputs = self._build_inputs(ep_batch, t)
+    def forward(self, ep_batch, t, test_mode=False, enable_norm=False):
+        # For training: obs normalization has already been done in learner
+        agent_inputs = self._build_inputs(ep_batch, t, enable_norm=enable_norm)
         agent_outs = self.agent(agent_inputs)
 
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
@@ -72,7 +73,7 @@ class BasicMAC:
     def _build_agents(self, input_shape):
         self.agent = agent_REGISTRY[self.args.agent](input_shape, self.args)
 
-    def _build_inputs(self, batch, t):
+    def _build_inputs(self, batch, t, enable_norm=False):
         # Assumes homogenous agents with flat observations.
         # Other MACs might want to e.g. delegate building inputs to each agent
         bs = batch.batch_size
@@ -80,7 +81,7 @@ class BasicMAC:
 
         obs =batch["obs"][:, t]
         # normalize obs
-        if self.is_obs_normalized:
+        if enable_norm and self.is_obs_normalized:
             obs_mean = self.obs_rms.mean.unsqueeze(0).unsqueeze(0)
             obs_var = self.obs_rms.var.unsqueeze(0).unsqueeze(0)
 
@@ -88,7 +89,7 @@ class BasicMAC:
             obs_var = obs_var.expand(bs, self.n_agents, -1)
 
             # update obs directly in batch
-            obs = (obs - obs_mean) / (obs_var + 1e-6 )
+            obs = (obs - obs_mean) / th.sqrt(obs_var + 1e-6 )
 
         inputs.append(obs) 
 
