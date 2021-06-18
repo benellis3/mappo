@@ -33,9 +33,14 @@ class DecentralPPOLearner:
         self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
         assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
 
+        self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
+
         if getattr(self.args, "is_popart", False):
             # need to normalize value
             self.value_rms = RunningMeanStd()
+
+        if self.is_obs_normalized:
+            self.state_rms = RunningMeanStd()
 
     def normalize_value(self, returns, mask):
         bs, ts = returns.shape[0], returns.shape[1]
@@ -84,6 +89,19 @@ class DecentralPPOLearner:
         expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
         batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
 
+    def normalize_obs(self, batch, alive_mask):
+        bs, ts = batch.batch_size, batch.max_seq_length-1
+        obs_mean = self.mac.obs_rms.mean.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+        obs_var = self.mac.obs_rms.var.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+
+        obs_mean = obs_mean.expand(bs, ts, self.n_agents, -1)
+        obs_var = obs_var.expand(bs, ts, self.n_agents, -1)
+
+        expanded_alive_mask = alive_mask.unsqueeze(-1).expand(-1, -1, -1, obs_mean.shape[-1])
+
+        # update obs directly in batch
+        batch.data.transition_data['obs'][:, :-1] = (batch['obs'][:, :-1] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
+
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
         max_t = batch.max_seq_length-1
@@ -107,9 +125,11 @@ class DecentralPPOLearner:
         num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
 
         if getattr(self.args, "is_observation_normalized", False):
-            # NOTE: obs has already been normalized in basic_controller, only need to update rms
+            # NOTE: obs normalizer needs to be in basic_controller
             self.mac.update_rms(batch, alive_mask)
-            # NOTE: state are being updated
+            # NOTE: obs in batch is being updated
+            self.normalize_obs(batch, alive_mask)
+            # NOTE: state in batch is being updated
             self.normalize_state(batch, mask)
 
         if self.agent_type == "rnn":

@@ -54,8 +54,8 @@ class DecentralRNNCritic(nn.Module):
         inputs.append(batch["obs"][:, ts])
 
         # agent id
-        agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, max_t, -1, -1)
-        inputs.append(agent_ids[:, ts, :, :])
+        agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, -1, -1, -1)
+        inputs.append(agent_ids)
 
         # last actions
         # if t == 0:
