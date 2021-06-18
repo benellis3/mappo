@@ -31,10 +31,10 @@ class DecentralRNNCritic(nn.Module):
             x = F.relu(self.fc1(inputs))
             h_in = self.rnn(x, h_in)
             q = self.fc2(h_in)
-            outputs.append(q) # bs * ts * n_agents
+            outputs.append(q.view(bs, self.n_agents)) # bs * ts * n_agents
 
         output_tensor = th.stack(outputs, dim=1)
-        return output_tensor.view(bs, max_t, self.n_agents, 1)
+        return output_tensor
 
     def _build_inputs(self, batch, t=None):
         bs = batch.batch_size

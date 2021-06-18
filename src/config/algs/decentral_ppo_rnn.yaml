@@ -35,6 +35,8 @@ ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
 is_observation_normalized: True
+is_popart: True
+
 obs_agent_id: True
 obs_last_action: False
 

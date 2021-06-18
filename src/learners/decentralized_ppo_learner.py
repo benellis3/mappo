@@ -33,6 +33,7 @@ class DecentralPPOLearner:
         self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
         assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
 
+
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
 
         if getattr(self.args, "is_popart", False):
@@ -53,19 +54,19 @@ class DecentralPPOLearner:
         valid_returns = flat_returns[returns_index]
         # update value_rms
         self.value_rms.update(valid_returns)
-        value_mean = self.value_rms.mean.unsqueeze(0)
-        value_var = self.value_rms.var.unsqueeze(0)
-        value_mean = value_mean.expand(bs, ts)
-        value_var = value_var.expand(bs, ts)
+        value_mean = self.value_rms.mean.unsqueeze(0).unsqueeze(0)
+        value_var = self.value_rms.var.unsqueeze(0).unsqueeze(0)
+        value_mean = value_mean.expand(bs, ts, self.n_agents)
+        value_var = value_var.expand(bs, ts, self.n_agents)
         normalized_returns = (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
         return normalized_returns
 
     def denormalize_value(self, values):
         bs, ts = values.shape[0], values.shape[1]
-        value_mean = self.value_rms.mean.unsqueeze(0)
-        value_var = self.value_rms.var.unsqueeze(0)
-        value_mean = value_mean.expand(bs, ts)
-        value_var = value_var.expand(bs, ts)
+        value_mean = self.value_rms.mean.unsqueeze(0).unsqueeze(0)
+        value_var = self.value_rms.var.unsqueeze(0).unsqueeze(0)
+        value_mean = value_mean.expand(bs, ts, self.n_agents)
+        value_var = value_var.expand(bs, ts, self.n_agents)
 
         denormalized_values = values * th.sqrt(value_var + 1e-6) + value_mean
         return denormalized_values
@@ -162,7 +163,7 @@ class DecentralPPOLearner:
         ## update the critics
         critic_loss_lst = []
         if getattr(self.args, "is_popart", False):
-            returns = self.normalize_value(returns, mask)
+            returns = self.normalize_value(returns, mask_expanded)
 
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
@@ -277,16 +278,17 @@ class DecentralPPOLearner:
     def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
         returns = th.zeros_like(_rewards)
         advs = th.zeros_like(_rewards)
-        lastgaelam = th.zeros_like(_rewards[:, 0])
+        lastgaelam = th.zeros_like(_rewards[:, 0]).flatten()
         ts = _rewards.size(1)
 
         for t in reversed(range(ts)):
-            nextnonterminal = 1.0 - _terminated[:, t]
-            nextvalues = _values[:, t+1]
+            nextnonterminal = (1.0 - _terminated[:, t]).flatten()
+            nextvalues = _values[:, t+1].flatten()
 
-            reward_t = _rewards[:, t]
-            delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
-            advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
+            reward_t = _rewards[:, t].flatten()
+            delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t].flatten()
+            lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
+            advs[:, t] = lastgaelam.view(_rewards[:, t].shape)
 
         returns = advs + _values[:, :-1]
 
