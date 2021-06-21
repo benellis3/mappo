@@ -32,6 +32,13 @@ class DecentralPPOLearner:
 
         self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
         assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
+        if self.kl_clipping_mode == 'epoch_adaptive':
+            if self.n_agents < 5:
+                self.mini_epochs_actor = 15
+            elif self.n_agents < 10:
+                self.mini_epochs_actor = 10
+            else:
+                self.mini_epochs_actor = 5
 
         if getattr(self.args, "is_observation_normalized", False):
             # need to normalize state
