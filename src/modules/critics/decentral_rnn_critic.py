@@ -3,7 +3,6 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class DecentralRNNCritic(nn.Module):
     def __init__(self, scheme, args):
         super(DecentralRNNCritic, self).__init__()
@@ -26,17 +25,16 @@ class DecentralRNNCritic(nn.Module):
         h_in = self.fc1.weight.new(batch.batch_size * self.n_agents, self.args.rnn_hidden_dim).zero_() 
 
         outputs = []
-        import pdb; pdb.set_trace()
         for t in range(batch.max_seq_length):
             inputs, _, _ = self._build_inputs(batch, t=t)
 
             x = F.relu(self.fc1(inputs))
             h_in = self.rnn(x, h_in)
             q = self.fc2(h_in)
-            outputs.append(q) # bs * ts * n_agents
+            outputs.append(q.view(bs, self.n_agents)) # bs * ts * n_agents
 
         output_tensor = th.stack(outputs, dim=1)
-        return output_tensor.view(bs, max_t, self.n_agents, 1)
+        return output_tensor
 
     def _build_inputs(self, batch, t=None):
         bs = batch.batch_size
@@ -56,8 +54,8 @@ class DecentralRNNCritic(nn.Module):
         inputs.append(batch["obs"][:, ts])
 
         # agent id
-        agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, max_t, -1, -1)
-        inputs.append(agent_ids[:, ts, :, :])
+        agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, -1, -1, -1)
+        inputs.append(agent_ids)
 
         # last actions
         # if t == 0:
