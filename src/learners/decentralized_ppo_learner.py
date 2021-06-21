@@ -7,6 +7,25 @@ from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
 from components.running_mean_std import RunningMeanStd
 
+
+def compute_logp_entropy(logits, actions, masks):
+    masked_logits = th.where(masks, logits, th.tensor(th.finfo(logits.dtype).min).to(logits.device))
+    # normalize logits
+    masked_logits = masked_logits - masked_logits.logsumexp(dim=-1, keepdim=True)
+
+    probs = th.nn.functional.softmax(masked_logits, dim=-1)
+    p_log_p = masked_logits * probs
+    p_log_p = th.where(masks, p_log_p, th.tensor(0.0).to(p_log_p.device))
+    entropy = -p_log_p.sum(-1)
+
+    logp = th.gather(masked_logits, dim=-1, index=actions)
+
+    result = {
+        'logp' : th.squeeze(logp),
+        'entropy' : th.squeeze(entropy),
+    }
+    return result
+
 class DecentralPPOLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
@@ -123,7 +142,8 @@ class DecentralPPOLearner:
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
         avail_actions = batch['avail_actions'][:, :-1].cuda()
         alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
-        num_alive_agents = th.sum(alive_mask, dim=-1).float() * mask
+        num_alive_agents = th.sum(alive_mask, dim=-1).float()
+        avail_actions = avail_actions.byte()
 
         if getattr(self.args, "is_observation_normalized", False):
             # NOTE: obs normalizer needs to be in basic_controller
@@ -151,7 +171,6 @@ class DecentralPPOLearner:
         # expand reward to n_agent copies
         rewards = rewards.repeat(1, 1, self.n_agents)
         terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
-        mask_expanded = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
 
         if self.advantage_calc_method == "GAE":
             returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
@@ -163,12 +182,12 @@ class DecentralPPOLearner:
         ## update the critics
         critic_loss_lst = []
         if getattr(self.args, "is_popart", False):
-            returns = self.normalize_value(returns, mask_expanded)
+            returns = self.normalize_value(returns, alive_mask)
 
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
             new_values = new_values[:, :-1]
-            critic_loss = 0.5 * th.sum((new_values - returns)**2 * mask_expanded) / th.sum(mask_expanded)
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * alive_mask) / th.sum(alive_mask)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
             critic_loss_lst.append(critic_loss)
@@ -189,8 +208,8 @@ class DecentralPPOLearner:
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
         old_action_logits =old_action_logits.detach()
-        action_probs = th.nn.functional.log_softmax(old_action_logits, dim=-1)
-        old_log_pac = th.gather(action_probs, dim=3, index=actions).squeeze(3)
+        old_meta_data = compute_logp_entropy(old_action_logits, actions, avail_actions)
+        old_log_pac = old_meta_data['logp']
 
         # joint probability
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
@@ -202,7 +221,7 @@ class DecentralPPOLearner:
         target_kl = 0.2
         if getattr(self.args, "is_advantage_normalized", False):
             # only consider valid advantages
-            flat_mask = mask_expanded.flatten()
+            flat_mask = alive_mask.flatten()
             flat_advantage = advantages.flatten()
             assert flat_mask.shape[0] == flat_advantage.shape[0]
             adv_index = th.nonzero(flat_mask).squeeze()
@@ -225,8 +244,8 @@ class DecentralPPOLearner:
             else:
                 raise NotImplementedError
 
-            log_prob_dist = th.nn.functional.log_softmax(action_logits, dim=-1)
-            log_pac = th.gather(log_prob_dist, dim=3, index=actions).squeeze(-1)
+            meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
+            log_pac = meta_data['logp']
 
             # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
@@ -239,10 +258,7 @@ class DecentralPPOLearner:
                     break
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
-            # consider entropy for only alive agents
-            # log_prob_dist: n_batch * n_timesteps * n_agents * n_actions
-            entropy_all_agents = th.sum(-1.0 * log_prob_dist * th.exp(log_prob_dist), dim=-1)
-            entropy = th.sum( entropy_all_agents * alive_mask ) / th.sum(alive_mask)
+            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
@@ -252,7 +268,7 @@ class DecentralPPOLearner:
                                                 1 - self.args.ppo_policy_clip_param,
                                                 1 + self.args.ppo_policy_clip_param)
 
-            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask_expanded) / th.sum(mask_expanded)
+            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * alive_mask) / th.sum(alive_mask)
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy

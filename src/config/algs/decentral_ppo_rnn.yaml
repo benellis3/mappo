@@ -22,7 +22,6 @@ td_lambda: 0.99
 agent_output_type: "pi_logits"
 learner: "decentral_ppo_learner"
 critic: "decentral_rnn_critic"
-# critic: "agent_specific_central_critic"
 
 mini_epochs_actor: 12
 mini_epochs_critic: 8
