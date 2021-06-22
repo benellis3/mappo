@@ -168,6 +168,9 @@ class DecentralPPOLearner:
                 old_action_logits.append(actor_outs)
             old_action_logits = th.stack(old_action_logits, dim=1)
 
+        elif self.agent_type == "ff":
+            old_action_logits = self.mac.forward_ff(batch)
+
         else:
             raise NotImplementedError
 
@@ -248,6 +251,10 @@ class DecentralPPOLearner:
                     actor_outs = self.mac.forward(batch, t = t, test_mode=False)
                     action_logits.append(actor_outs)
                 action_logits = th.stack(action_logits, dim=1)
+
+            elif self.agent_type == "ff":
+                action_logits = self.mac.forward_ff(batch)
+
             else:
                 raise NotImplementedError
 
