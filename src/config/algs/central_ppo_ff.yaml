@@ -1,0 +1,40 @@
+# --- PPO specific parameters ---
+action_selector: "multinomial"
+mask_before_softmax: True
+
+agent: "ff" # Default rnn agent
+
+runner: "parallel"
+
+buffer_size: 8
+batch_size_run: 8
+batch_size: 8
+
+lr_actor: 0.0005
+lr_critic: 0.001
+tau: 0.995
+td_lambda: 0.99
+
+agent_output_type: "pi_logits"
+learner: "central_ppo_learner"
+critic: "central_critic"
+
+training_iters: 1
+mini_epochs_actor: 5
+mini_epochs_critic: 10
+entropy_loss_coeff: 0.001
+
+# calculating advantage: GAE, TD
+advantage_calc_method: "GAE"
+# advantage_calc_method: "TD"
+
+ppo_policy_clip_param: 0.2
+
+is_advantage_normalized: True
+is_observation_normalized: True
+is_popart: True
+
+obs_agent_id: True
+obs_last_action: False
+
+name: "central_ppo_rnn"

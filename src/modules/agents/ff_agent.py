@@ -12,13 +12,12 @@ class FFAgent(nn.Module):
         self.fc2 = nn.Linear(args.rnn_hidden_dim, args.rnn_hidden_dim)
         self.fc3 = nn.Linear(args.rnn_hidden_dim, args.n_actions)
 
-    def init_hidden(self):
+    def init_hidden(self, batch_size):
         # make hidden states on same device as model
-        return self.fc1.weight.new(1, self.args.rnn_hidden_dim).zero_()
+        return self.fc1.weight.new(batch_size, self.args.rnn_hidden_dim).zero_()
 
-    def forward(self, inputs, hidden_state):
+    def forward(self, inputs):
         x = F.relu(self.fc1(inputs))
-        # h_in = hidden_state.reshape(-1, self.args.rnn_hidden_dim)
         h = F.relu(self.fc2(x))
-        q = self.fc3(h)
-        return q, h
+        logits = self.fc3(h)
+        return logits

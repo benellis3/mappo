@@ -52,6 +52,12 @@ class BasicMAC:
 
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
 
+    def forward_ff(self, ep_batch):
+        bs, max_t = ep_batch.batch_size, ep_batch.max_seq_length-1
+        agent_inputs = self._build_inputs_ff(ep_batch)
+        agent_outs = self.agent(agent_inputs)
+        return agent_outs.view(bs, max_t, self.n_agents, -1)
+
     def init_hidden(self, batch_size):
         self.agent.init_hidden(batch_size * self.n_agents)
 
@@ -72,6 +78,25 @@ class BasicMAC:
 
     def _build_agents(self, input_shape):
         self.agent = agent_REGISTRY[self.args.agent](input_shape, self.args)
+
+    def _build_inputs_ff(self, batch):
+        # Assumes homogenous agents with flat observations.
+        # Other MACs might want to e.g. delegate building inputs to each agent
+        bs, max_t = batch.batch_size, batch.max_seq_length-1
+        inputs = []
+
+        inputs.append(batch['obs'][:, :-1]) # ignore the last entry
+
+        if self.args.obs_last_action:
+            actions_onehot = th.zeros_like(batch['actions_onehot'])
+            actions_onehot[:, 1:] = batch['actions_onehot'][:, :-1]
+            inputs.append(actions_onehot[:, :-1]) # ignore the last entry
+
+        if self.args.obs_agent_id:
+            inputs.append(th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, max_t, -1, -1))
+
+        inputs = th.cat([x.reshape(bs*max_t*self.n_agents, -1) for x in inputs], dim=1)
+        return inputs
 
     def _build_inputs(self, batch, t, enable_norm=False):
         # Assumes homogenous agents with flat observations.
