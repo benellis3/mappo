@@ -23,7 +23,7 @@ agent_output_type: "pi_logits"
 learner: "decentral_ppo_learner"
 critic: "decentral_rnn_critic"
 
-mini_epochs_actor: 12
+mini_epochs_actor: 15
 mini_epochs_critic: 8
 entropy_loss_coeff: 0.001
 
