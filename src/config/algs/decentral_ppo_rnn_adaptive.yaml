@@ -21,10 +21,8 @@ td_lambda: 0.99
 
 agent_output_type: "pi_logits"
 learner: "decentral_ppo_learner"
-critic: "central_critic"
+critic: "decentral_rnn_critic"
 
-mini_epochs_actor: 10
-mini_epochs_critic: 8
 entropy_loss_coeff: 0.001
 
 # calculating advantage: GAE, TD_Error
@@ -34,8 +32,10 @@ ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
 is_observation_normalized: True
+is_popart: True
+
 obs_agent_id: True
 obs_last_action: False
 kl_clipping_mode: 'epoch_adaptive'
 
-name: "decentral_ppo_rnn"
+name: "decentral_ppo_rnn_adaptive"
