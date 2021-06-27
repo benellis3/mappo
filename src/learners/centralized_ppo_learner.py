@@ -221,7 +221,7 @@ class CentralPPOLearner:
         old_log_pac = old_meta_data['logp']
 
         # joint probability
-        central_old_log_pac = th.sum(old_log_pac, dim=-1)
+        central_old_log_pac = th.sum(old_log_pac * alive_mask, dim=-1)
 
         approxkl_lst = [] 
         entropy_lst = [] 
@@ -260,8 +260,9 @@ class CentralPPOLearner:
             log_pac = meta_data['logp']
 
             # joint probability
-            central_log_pac = th.sum(log_pac, dim=-1)
+            central_log_pac = th.sum(log_pac * alive_mask, dim=-1)
 
+            import pdb; pdb.set_trace()
             with th.no_grad():
                 approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / alive_mask.sum()
                 approxkl_lst.append(approxkl)
