@@ -18,8 +18,8 @@ learner: "central_ppo_learner"
 critic: "central_rnn_critic"
 
 training_iters: 1
-mini_epochs_actor: 5
-mini_epochs_critic: 10
+mini_epochs_actor: 12
+mini_epochs_critic: 20
 entropy_loss_coeff: 0.001
 
 # calculating advantage: GAE, TD
@@ -30,7 +30,7 @@ ppo_policy_clip_param: 0.2
 
 is_advantage_normalized: True
 is_observation_normalized: True
-is_popart: True
+is_popart: False
 
 obs_agent_id: True
 obs_last_action: False

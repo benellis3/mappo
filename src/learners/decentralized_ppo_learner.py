@@ -174,6 +174,8 @@ class DecentralPPOLearner:
         else:
             raise NotImplementedError
 
+        critic_mask = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
+
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
         if getattr(self.args, "is_popart", False):
             old_values_before = self.denormalize_value(old_values_before)
@@ -192,12 +194,12 @@ class DecentralPPOLearner:
         ## update the critics
         critic_loss_lst = []
         if getattr(self.args, "is_popart", False):
-            returns = self.normalize_value(returns, alive_mask)
+            returns = self.normalize_value(returns, critic_mask)
 
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
             new_values = new_values[:, :-1]
-            critic_loss = 0.5 * th.sum((new_values - returns)**2 * alive_mask) / th.sum(alive_mask)
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * critic_mask) / th.sum(critic_mask)
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
             critic_loss_lst.append(critic_loss)

@@ -263,12 +263,12 @@ class CentralPPOLearner:
             central_log_pac = th.sum(log_pac, dim=-1)
 
             with th.no_grad():
-                approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2 * mask) / th.sum(mask)
+                approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / alive_mask.sum()
                 approxkl_lst.append(approxkl)
                 if approxkl > 1.5 * target_kl:
                     break
 
-            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # alive_mask.sum(); mask out dead agents
+            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
@@ -278,7 +278,7 @@ class CentralPPOLearner:
                                                 1 - self.args.ppo_policy_clip_param,
                                                 1 + self.args.ppo_policy_clip_param)
 
-            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * mask) / th.sum(mask)
+            pg_loss = th.max(pg_loss_unclipped, pg_loss_clipped).sum() / alive_mask.sum()
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy

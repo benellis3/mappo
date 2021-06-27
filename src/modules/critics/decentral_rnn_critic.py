@@ -11,11 +11,11 @@ class DecentralRNNCritic(nn.Module):
         self.n_actions = args.n_actions
         self.n_agents = args.n_agents
 
-        input_shape = self._get_input_shape(scheme)
+        self.input_shape = self._get_input_shape(scheme)
         self.output_type = "v"
 
         # Set up network layers
-        self.fc1 = nn.Linear(input_shape, args.rnn_hidden_dim)
+        self.fc1 = nn.Linear(self.input_shape, args.rnn_hidden_dim)
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
         self.fc2 = nn.Linear(args.rnn_hidden_dim, 1)
 
@@ -24,9 +24,15 @@ class DecentralRNNCritic(nn.Module):
 
         h_in = self.fc1.weight.new(batch.batch_size * self.n_agents, self.args.rnn_hidden_dim).zero_() 
 
+        # avail_actions = batch['avail_actions'].cuda()
+        # alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
+        # dead_mask = alive_mask.unsqueeze(-1).repeat(1, 1, 1, self.input_shape)
+        # dead_mask[:, :, :, -self.n_agents:] = 1.0
+
         outputs = []
         for t in range(batch.max_seq_length):
             inputs, _, _ = self._build_inputs(batch, t=t)
+            # inputs = inputs * dead_mask[:, t].reshape(batch.batch_size * self.n_agents, self.input_shape)
 
             x = F.relu(self.fc1(inputs))
             h_in = self.rnn(x, h_in)
