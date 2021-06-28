@@ -15,7 +15,7 @@ td_lambda: 0.99
 
 agent_output_type: "pi_logits"
 learner: "central_ppo_learner"
-critic: "central_rnn_critic"
+critic: "central_vdn_rnn_critic"
 
 training_iters: 1
 mini_epochs_actor: 12

@@ -262,7 +262,6 @@ class CentralPPOLearner:
             # joint probability
             central_log_pac = th.sum(log_pac * alive_mask, dim=-1)
 
-            import pdb; pdb.set_trace()
             with th.no_grad():
                 approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / alive_mask.sum()
                 approxkl_lst.append(approxkl)
