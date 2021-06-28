@@ -3,6 +3,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
+from components.popart import PopArt
 
 class CentralRNNCritic(nn.Module):
     def __init__(self, scheme, args):
@@ -12,13 +13,17 @@ class CentralRNNCritic(nn.Module):
         self.n_actions = args.n_actions
         self.n_agents = args.n_agents
 
-        input_shape = self._get_input_shape(scheme)
+        self.input_shape = self._get_input_shape(scheme)
         self.output_type = "v"
 
         # Set up network layers
-        self.fc1 = nn.Linear(input_shape, args.rnn_hidden_dim)
+        self.fc1 = nn.Linear(self.input_shape, args.rnn_hidden_dim)
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
-        self.fc2 = nn.Linear(args.rnn_hidden_dim, 1)
+
+        if getattr(self.args, "is_popart", False):
+            self.v_out = PopArt(args.rnn_hidden_dim, 1)
+        else:
+            self.v_out = nn.Linear(args.rnn_hidden_dim, 1)
 
     def forward(self, batch, t=None):
         h_in = self.fc1.weight.new(batch.batch_size, self.args.rnn_hidden_dim).zero_() 
@@ -29,7 +34,7 @@ class CentralRNNCritic(nn.Module):
 
             x = F.relu(self.fc1(inputs))
             h_in = self.rnn(x, h_in)
-            q = self.fc2(h_in)
+            q = self.v_out(h_in)
             outputs.append(q) # bs * ts
 
         output_tensor = th.stack(outputs, dim=1)

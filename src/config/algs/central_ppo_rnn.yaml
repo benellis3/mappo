@@ -15,7 +15,7 @@ td_lambda: 0.99
 
 agent_output_type: "pi_logits"
 learner: "central_ppo_learner"
-critic: "central_vdn_rnn_critic"
+critic: "central_rnn_critic"
 
 training_iters: 1
 mini_epochs_actor: 12
@@ -31,6 +31,7 @@ ppo_policy_clip_param: 0.2
 is_advantage_normalized: True
 is_observation_normalized: True
 is_popart: False
+is_value_normalized: False
 
 obs_agent_id: True
 obs_last_action: False

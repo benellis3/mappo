@@ -185,37 +185,24 @@ class DecentralPPOLearner:
         terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
 
         if self.advantage_calc_method == "GAE":
-            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
+            returns, advantages = self._compute_returns_advs(old_values_before, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
         else:
             raise NotImplementedError
 
-        ## update the critics
-        critic_loss_lst = []
-        if getattr(self.args, "is_popart", False):
-            returns = self.normalize_value(returns, critic_mask)
-
-        for _ in range(0, self.mini_epochs_critic):
-            new_values = self.critic(batch).squeeze()
-            new_values = new_values[:, :-1]
-            critic_loss = 0.5 * th.sum((new_values - returns)**2 * critic_mask) / th.sum(critic_mask)
-            self.optimiser_critic.zero_grad()
-            critic_loss.backward()
-            critic_loss_lst.append(critic_loss)
-            self.optimiser_critic.step()
-
-        ## compute advantage
-        old_values_after = self.critic(batch).squeeze(dim=-1).detach()
-        if getattr(self.args, "is_popart", False):
-            old_values_after = self.denormalize_value(old_values_after)
-
-        if self.advantage_calc_method == "GAE":
-            _, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
-                                                       self.args.gamma, self.args.tau)
-
-        else:
-            raise NotImplementedError
+        if getattr(self.args, "is_advantage_normalized", False):
+            # only consider valid advantages
+            flat_mask = alive_mask.flatten()
+            flat_advantage = advantages.flatten()
+            assert flat_mask.shape[0] == flat_advantage.shape[0]
+            adv_index = th.nonzero(flat_mask).squeeze()
+            valid_adv = flat_advantage[adv_index]
+            batch_mean = th.mean(valid_adv, dim=0)
+            batch_var = th.var(valid_adv, dim=0)
+            flat_advantage = (flat_advantage - batch_mean) / th.sqrt(batch_var + 1e-6) * flat_mask
+            bs, ts, _ = advantages.shape
+            advantages = flat_advantage.reshape(bs, ts, self.n_agents)
 
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
@@ -231,18 +218,6 @@ class DecentralPPOLearner:
         actor_loss_lst = []
 
         target_kl = 0.2
-        if getattr(self.args, "is_advantage_normalized", False):
-            # only consider valid advantages
-            flat_mask = alive_mask.flatten()
-            flat_advantage = advantages.flatten()
-            assert flat_mask.shape[0] == flat_advantage.shape[0]
-            adv_index = th.nonzero(flat_mask).squeeze()
-            valid_adv = flat_advantage[adv_index]
-            batch_mean = th.mean(valid_adv, dim=0)
-            batch_var = th.var(valid_adv, dim=0)
-            flat_advantage = (flat_advantage - batch_mean) / th.sqrt(batch_var + 1e-6) * flat_mask
-            bs, ts, _ = advantages.shape
-            advantages = flat_advantage.reshape(bs, ts, self.n_agents)
 
         ## update the actor
         for _ in range(0, self.mini_epochs_actor):
@@ -293,6 +268,20 @@ class DecentralPPOLearner:
             self.optimiser_actor.zero_grad()
             actor_loss.backward()
             self.optimiser_actor.step()
+
+        ## update the critics
+        critic_loss_lst = []
+        if getattr(self.args, "is_popart", False):
+            returns = self.normalize_value(returns, critic_mask)
+
+        for _ in range(0, self.mini_epochs_critic):
+            new_values = self.critic(batch).squeeze()
+            new_values = new_values[:, :-1]
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * critic_mask) / th.sum(critic_mask)
+            self.optimiser_critic.zero_grad()
+            critic_loss.backward()
+            critic_loss_lst.append(critic_loss)
+            self.optimiser_critic.step()
 
         # log stuff
         critic_train_stats["rewards"].append(th.mean(rewards).item())
