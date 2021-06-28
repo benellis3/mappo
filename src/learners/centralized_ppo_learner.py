@@ -276,13 +276,13 @@ class CentralPPOLearner:
             new_values = self.critic(batch).squeeze()
             new_values = new_values[:, :-1]
 
-            vf_losses1 = (new_values - returns) ** 2
-            clipped_values = old_values_before[:, :-1] + th.clamp(new_values - old_values_before[:, :-1], \
-                                -self.args.ppo_policy_clip_param, self.args.ppo_policy_clip_param)
-            vf_losses2 = (clipped_values - returns) ** 2
-            vf_loss = th.sum( th.max(vf_losses1, vf_losses2) * mask ) / mask.sum()
+            # vf_losses1 = (new_values - returns) ** 2
+            # clipped_values = old_values_before[:, :-1] + th.clamp(new_values - old_values_before[:, :-1], \
+            #                     -self.args.ppo_policy_clip_param, self.args.ppo_policy_clip_param)
+            # vf_losses2 = (clipped_values - returns) ** 2
+            # vf_loss = th.sum( th.max(vf_losses1, vf_losses2) * mask ) / mask.sum()
 
-            # vf_loss = th.sum( (new_values - returns) ** 2 * mask) / mask.sum()
+            vf_loss = th.sum( (new_values - returns) ** 2 * mask) / mask.sum()
 
             self.optimiser_critic.zero_grad()
             vf_loss.backward()

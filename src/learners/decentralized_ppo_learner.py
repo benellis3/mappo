@@ -158,7 +158,7 @@ class DecentralPPOLearner:
             # NOTE: obs in batch is being updated
             self.normalize_obs(batch, alive_mask)
             # NOTE: state in batch is being updated
-            self.normalize_state(batch, mask)
+            # self.normalize_state(batch, mask)
 
         if self.agent_type == "rnn":
             old_action_logits = []
