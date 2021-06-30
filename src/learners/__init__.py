@@ -4,6 +4,7 @@ from .qtran_learner import QLearner as QTranLearner
 from .ppo_learner import PPOLearner
 from .centralized_ppo_learner import CentralPPOLearner
 from .decentralized_ppo_learner import DecentralPPOLearner
+from .independent_ppo_learner import IndependentPPOLearner
 
 REGISTRY = {}
 
@@ -13,3 +14,4 @@ REGISTRY["coma_learner"] = COMALearner
 REGISTRY["ppo_learner"] = PPOLearner
 REGISTRY["central_ppo_learner"] = CentralPPOLearner
 REGISTRY["decentral_ppo_learner"] = DecentralPPOLearner
+REGISTRY["independent_ppo_learner"] = IndependentPPOLearner

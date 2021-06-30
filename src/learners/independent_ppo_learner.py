@@ -7,6 +7,7 @@ from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
 from components.running_mean_std import RunningMeanStd
 
+
 def compute_logp_entropy(logits, actions, masks):
     masked_logits = th.where(masks, logits, th.tensor(th.finfo(logits.dtype).min).to(logits.device))
     # normalize logits
@@ -25,8 +26,7 @@ def compute_logp_entropy(logits, actions, masks):
     }
     return result
 
-
-class CentralPPOLearner:
+class IndependentPPOLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.n_agents = args.n_agents
@@ -49,14 +49,20 @@ class CentralPPOLearner:
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
 
+        self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
+        assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
+        if self.kl_clipping_mode == 'epoch_adaptive':
+            if self.n_agents < 5:
+                self.mini_epochs_actor = 15
+            elif self.n_agents < 10:
+                self.mini_epochs_actor = 10
+            else:
+                self.mini_epochs_actor = 5
+
+
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
-        self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
-        self.is_popart = getattr(self.args, "is_popart", False)
 
-        if (self.is_value_normalized and self.is_popart):
-            raise ValueError("Either `is_value_normalized` or `is_popart` is specified, but not both.")
-
-        if self.is_value_normalized:
+        if getattr(self.args, "is_popart", False):
             # need to normalize value
             self.value_rms = RunningMeanStd()
 
@@ -72,55 +78,24 @@ class CentralPPOLearner:
         assert flat_returns.shape[0] == flat_mask.shape[0]
         returns_index = th.nonzero(flat_mask).squeeze()
         valid_returns = flat_returns[returns_index]
-
-        if self.is_value_normalized:
-            # update value_rms
-            self.value_rms.update(valid_returns)
-            value_mean = self.value_rms.mean.unsqueeze(0)
-            value_var = self.value_rms.var.unsqueeze(0)
-            value_mean = value_mean.expand(bs, ts)
-            value_var = value_var.expand(bs, ts)
-            normalized_returns = (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
-
-        elif self.is_popart:
-            # update popart
-            self.critic.v_out.update(valid_returns)
-            normalized_returns = self.critic.v_out.normalize(returns)
-
+        # update value_rms
+        self.value_rms.update(valid_returns)
+        value_mean = self.value_rms.mean.unsqueeze(0).unsqueeze(0)
+        value_var = self.value_rms.var.unsqueeze(0).unsqueeze(0)
+        value_mean = value_mean.expand(bs, ts, self.n_agents)
+        value_var = value_var.expand(bs, ts, self.n_agents)
+        normalized_returns = (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
         return normalized_returns
 
     def denormalize_value(self, values):
-        if self.is_value_normalized:
-            bs, ts = values.shape[0], values.shape[1]
-            value_mean = self.value_rms.mean.unsqueeze(0)
-            value_var = self.value_rms.var.unsqueeze(0)
-            value_mean = value_mean.expand(bs, ts)
-            value_var = value_var.expand(bs, ts)
-            denormalized_values = values * th.sqrt(value_var + 1e-6) + value_mean
+        bs, ts = values.shape[0], values.shape[1]
+        value_mean = self.value_rms.mean.unsqueeze(0).unsqueeze(0)
+        value_var = self.value_rms.var.unsqueeze(0).unsqueeze(0)
+        value_mean = value_mean.expand(bs, ts, self.n_agents)
+        value_var = value_var.expand(bs, ts, self.n_agents)
 
-        elif self.is_popart:
-            denormalized_values = self.critic.v_out.denormalize(values)
-
+        denormalized_values = values * th.sqrt(value_var + 1e-6) + value_mean
         return denormalized_values
-
-    def normalize_state(self, batch, mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
-
-        state = batch["state"][:, :-1].cuda()
-        flat_state = state.reshape(-1, state.shape[-1])
-        flat_mask = mask.flatten()
-        # ensure the length matches
-        assert flat_state.shape[0] == flat_mask.shape[0]
-        state_index = th.nonzero(flat_mask).squeeze()
-        valid_state = flat_state[state_index]
-        # update state_rms
-        self.state_rms.update(valid_state)
-        state_mean = self.state_rms.mean.unsqueeze(0).unsqueeze(0)
-        state_var = self.state_rms.var.unsqueeze(0).unsqueeze(0)
-        state_mean = state_mean.expand(bs, ts, -1)
-        state_var = state_var.expand(bs, ts, -1)
-        expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
-        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
 
     def normalize_obs(self, batch, alive_mask):
         bs, ts = batch.batch_size, batch.max_seq_length-1
@@ -136,8 +111,8 @@ class CentralPPOLearner:
         batch.data.transition_data['obs'][:, :-1] = (batch['obs'][:, :-1] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
-        max_t = batch.max_seq_length-1
         critic_train_stats = defaultdict(lambda: [])
+        max_t = batch.max_seq_length-1
 
         # Get the relevant quantities
         rewards = batch["reward"][:, :-1]
@@ -153,17 +128,16 @@ class CentralPPOLearner:
         ## get dead agents
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
+        avail_actions = batch['avail_actions'][:, :-1].cuda()
         alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
         num_alive_agents = th.sum(alive_mask, dim=-1).float()
         avail_actions = avail_actions.byte()
 
-        if self.is_obs_normalized:
+        if getattr(self.args, "is_observation_normalized", False):
             # NOTE: obs normalizer needs to be in basic_controller
             self.mac.update_rms(batch, alive_mask)
             # NOTE: obs in batch is being updated
             self.normalize_obs(batch, alive_mask)
-            # NOTE: state in batch is being updated
-            # self.normalize_state(batch, mask)
 
         if self.agent_type == "rnn":
             old_action_logits = []
@@ -179,47 +153,52 @@ class CentralPPOLearner:
         else:
             raise NotImplementedError
 
+        critic_mask = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
+
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
-        if self.is_value_normalized or self.is_popart:
+        if getattr(self.args, "is_popart", False):
             old_values_before = self.denormalize_value(old_values_before)
 
-        rewards = rewards.squeeze(dim=-1)
+        # expand reward to n_agent copies
+        rewards = rewards.repeat(1, 1, self.n_agents)
+        terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
 
         if self.advantage_calc_method == "GAE":
             returns, advantages = self._compute_returns_advs(old_values_before, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
-        elif self.advantage_calc_method == "TD":
-            returns = rewards + self.args.gamma * (1 - terminated) * old_values_before[:, 1:]
-            advantages = returns - old_values_before[:, :-1]
+
         else:
             raise NotImplementedError
 
         if getattr(self.args, "is_advantage_normalized", False):
             # only consider valid advantages
-            flat_mask = mask.flatten()
+            flat_mask = alive_mask.flatten()
             flat_advantage = advantages.flatten()
             assert flat_mask.shape[0] == flat_advantage.shape[0]
             adv_index = th.nonzero(flat_mask).squeeze()
             valid_adv = flat_advantage[adv_index]
             batch_mean = th.mean(valid_adv, dim=0)
             batch_var = th.var(valid_adv, dim=0)
+            flat_advantage = (flat_advantage - batch_mean) / th.sqrt(batch_var + 1e-6) * flat_mask
+            bs, ts, _ = advantages.shape
+            advantages = flat_advantage.reshape(bs, ts, self.n_agents)
 
-            advantages = (advantages - batch_mean) / th.sqrt(batch_var + 1e-6) * mask
-
-        # action prob
-        old_action_logits = old_action_logits.detach() # detached
+        # no-op (valid only when dead)
+        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
+        old_action_logits =old_action_logits.detach()
         old_meta_data = compute_logp_entropy(old_action_logits, actions, avail_actions)
         old_log_pac = old_meta_data['logp']
 
         # joint probability
-        central_old_log_pac = th.sum(old_log_pac * alive_mask, dim=-1)
+        central_old_log_pac = th.sum(old_log_pac, dim=-1)
 
         approxkl_lst = [] 
         entropy_lst = [] 
         actor_loss_lst = []
 
+        target_kl = 0.2
+
         ## update the actor
-        # target_kl = 0.2
         for _ in range(0, self.mini_epochs_actor):
             if self.agent_type == "rnn":
                 action_logits = []
@@ -239,25 +218,27 @@ class CentralPPOLearner:
             log_pac = meta_data['logp']
 
             # joint probability
-            central_log_pac = th.sum(log_pac * alive_mask, dim=-1)
+            central_log_pac = th.sum(log_pac, dim=-1)
 
             with th.no_grad():
-                approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / alive_mask.sum()
+                # KL divergence for all agents
+                approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2 * mask) / th.sum(mask)
                 approxkl_lst.append(approxkl)
-                # if approxkl > 1.5 * target_kl:
-                #     break
+                if approxkl > 1.5 * target_kl:
+                    break
 
+            # for shared policy, maximize the policy entropy averaged over all agents & episodes
             entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
             entropy_lst.append(entropy)
 
-            prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
+            prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
 
             pg_loss_unclipped = - advantages * prob_ratio
             pg_loss_clipped = - advantages * th.clamp(prob_ratio,
                                                 1 - self.args.ppo_policy_clip_param,
                                                 1 + self.args.ppo_policy_clip_param)
 
-            pg_loss = th.max(pg_loss_unclipped, pg_loss_clipped).sum() / alive_mask.sum()
+            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * alive_mask) / th.sum(alive_mask)
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
@@ -269,25 +250,17 @@ class CentralPPOLearner:
 
         ## update the critics
         critic_loss_lst = []
-        if self.is_value_normalized or self.is_popart:
-            returns = self.normalize_value(returns, mask)
+        if getattr(self.args, "is_popart", False):
+            returns = self.normalize_value(returns, critic_mask)
 
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
             new_values = new_values[:, :-1]
-
-            # vf_losses1 = (new_values - returns) ** 2
-            # clipped_values = old_values_before[:, :-1] + th.clamp(new_values - old_values_before[:, :-1], \
-            #                     -self.args.ppo_policy_clip_param, self.args.ppo_policy_clip_param)
-            # vf_losses2 = (clipped_values - returns) ** 2
-            # vf_loss = th.sum( th.max(vf_losses1, vf_losses2) * mask ) / mask.sum()
-
-            vf_loss = th.sum( (new_values - returns) ** 2 * mask) / mask.sum()
-
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * critic_mask) / th.sum(critic_mask)
             self.optimiser_critic.zero_grad()
-            vf_loss.backward()
+            critic_loss.backward()
+            critic_loss_lst.append(critic_loss)
             self.optimiser_critic.step()
-            critic_loss_lst.append(vf_loss)
 
         # log stuff
         critic_train_stats["rewards"].append(th.mean(rewards).item())
@@ -305,16 +278,17 @@ class CentralPPOLearner:
     def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
         returns = th.zeros_like(_rewards)
         advs = th.zeros_like(_rewards)
-        lastgaelam = th.zeros_like(_rewards[:, 0])
+        lastgaelam = th.zeros_like(_rewards[:, 0]).flatten()
         ts = _rewards.size(1)
 
         for t in reversed(range(ts)):
-            nextnonterminal = 1.0 - _terminated[:, t]
-            nextvalues = _values[:, t+1]
+            nextnonterminal = (1.0 - _terminated[:, t]).flatten()
+            nextvalues = _values[:, t+1].flatten()
 
-            reward_t = _rewards[:, t]
-            delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
-            advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
+            reward_t = _rewards[:, t].flatten()
+            delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t].flatten()
+            lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
+            advs[:, t] = lastgaelam.view(_rewards[:, t].shape)
 
         returns = advs + _values[:, :-1]
 
