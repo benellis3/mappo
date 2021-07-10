@@ -26,7 +26,7 @@ def compute_logp_entropy(logits, actions, masks):
     }
     return result
 
-class AdaptiveKLLearner:
+class FixedKLLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.n_agents = args.n_agents
@@ -45,7 +45,6 @@ class AdaptiveKLLearner:
 
         self.mini_epochs_actor = getattr(self.args, "mini_epochs_actor", 4)
         self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
-        self.target_kl = getattr(self.args, "target_kl", 0.01)
         self.kl_coeff_beta = getattr(self.args, "kl_coeff_beta", 1.0)
 
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
@@ -223,13 +222,6 @@ class AdaptiveKLLearner:
             pg_loss = th.sum(pg_loss * alive_mask) / th.sum(alive_mask)
 
             pg_loss += self.kl_coeff_beta * approxkl
-
-            ## adaptive kl divergence
-            # kl_coeff_beta is updated for the next iteration
-            if approxkl < self.target_kl / 1.5:
-                self.kl_coeff_beta = self.kl_coeff_beta / 2.0
-            elif approxkl > self.target_kl * 1.5:
-                self.kl_coeff_beta = self.kl_coeff_beta * 2.0
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy

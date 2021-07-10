@@ -11,16 +11,13 @@ buffer_size: 8
 batch_size_run: 8
 batch_size: 8
 
-# update the target network every {} training steps
-target_update_interval: 200
-
 lr_actor: 0.0005
 lr_critic: 0.0005
 tau: 0.995
 td_lambda: 0.99
 
 agent_output_type: "pi_logits"
-learner: "adaptive_kl_learner"
+learner: "fixed_kl_learner"
 critic: "independent_rnn_critic"
 
 mini_epochs_actor: 15 
@@ -31,8 +28,7 @@ entropy_loss_coeff: 0.001
 advantage_calc_method: "GAE"
 
 # adaptive kl param
-target_kl: 0.1
-kl_coeff_beta: 1.0
+kl_coeff_beta: 3.0
 
 is_advantage_normalized: True
 is_observation_normalized: True
@@ -42,4 +38,4 @@ is_value_normalized: False
 obs_agent_id: True
 obs_last_action: False
 
-name: "adaptive_kl_rnn"
+name: "fixed_kl_rnn"
