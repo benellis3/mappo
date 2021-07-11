@@ -120,7 +120,6 @@ class IndependentPPOLearner:
         terminated = batch["terminated"][:, :-1].float()
         mask = batch["filled"][:, :-1].float()
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
-        avail_actions = batch["avail_actions"][:, :-1]
 
         mask = mask.squeeze(dim=-1)
         terminated = terminated.squeeze(dim=-1)
