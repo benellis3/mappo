@@ -51,11 +51,6 @@ class IndependentRNNCritic(nn.Module):
         # agent-specific observation
         inputs.append(batch["obs"][:, ts])
 
-        # agent id
-        if getattr(self.args, 'obs_agent_id', None):
-            agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, -1, -1, -1)
-            inputs.append(agent_ids)
-
         # last actions
         if getattr(self.args, 'obs_last_action', None):
             if t == 0:
@@ -67,6 +62,11 @@ class IndependentRNNCritic(nn.Module):
                 last_actions = last_actions.view(bs, max_t, 1, -1)
                 inputs.append(last_actions)
 
+        # agent id
+        if getattr(self.args, 'obs_agent_id', None):
+            agent_ids = th.eye(self.n_agents, device=batch.device).unsqueeze(0).unsqueeze(0).expand(bs, -1, -1, -1)
+            inputs.append(agent_ids)
+
         inputs = th.cat([x.reshape(bs * max_t * self.n_agents, -1) for x in inputs], dim=1)
         return inputs, bs, max_t
 
@@ -77,6 +77,7 @@ class IndependentRNNCritic(nn.Module):
         # last actions
         if getattr(self.args, 'obs_last_action', None):
             input_shape += scheme["actions_onehot"]["vshape"][0]
+
         # agent id
         if getattr(self.args, 'obs_agent_id', None):
             input_shape += self.n_agents

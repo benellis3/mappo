@@ -23,7 +23,7 @@ agent_output_type: "pi_logits"
 learner: "independent_ppo_learner"
 critic: "independent_rnn_critic"
 
-mini_epochs_actor: 10 
+mini_epochs_actor: 10
 mini_epochs_critic: 10
 entropy_loss_coeff: 0.005
 
@@ -38,6 +38,6 @@ is_popart: True
 is_value_normalized: False
 
 obs_agent_id: True
-obs_last_action: True
+obs_last_action: False
 
 name: "independent_ppo_rnn"

@@ -135,6 +135,7 @@ class BasicMAC:
 
         if getattr(self.args, 'obs_last_action', None):
             input_shape += scheme["actions_onehot"]["vshape"][0]
+
         if getattr(self.args, 'obs_agent_id', None):
             input_shape += self.n_agents
 

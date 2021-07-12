@@ -1,6 +1,6 @@
 import numpy as np
 import torch as th
-from torch.optim import Adam
+from torch.optim import RMSprop, Adam
 from collections import defaultdict
 
 from components.episode_buffer import EpisodeBatch
@@ -39,8 +39,14 @@ class IndependentPPOLearner:
 
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
+
         self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor, eps=args.optim_eps)
         self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic, eps=args.optim_eps)
+
+        # self.optimiser_actor = RMSprop(params=self.agent_params, lr=args.lr_actor,
+        #                                alpha=args.optim_alpha, eps=args.optim_eps)
+        # self.optimiser_critic = RMSprop(params=self.critic_params, lr=args.lr_critic,
+        #                                alpha=args.optim_alpha, eps=args.optim_eps)
 
         self.log_stats_t = -self.args.learner_log_interval - 1
 
@@ -152,7 +158,8 @@ class IndependentPPOLearner:
         else:
             raise NotImplementedError
 
-        critic_mask = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
+        # critic_mask = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
+        critic_mask = alive_mask
 
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
         if getattr(self.args, "is_popart", False):
@@ -163,7 +170,32 @@ class IndependentPPOLearner:
         terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
 
         if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values_before, rewards, terminated, 
+            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
+                                                    self.args.gamma, self.args.tau)
+
+        else:
+            raise NotImplementedError
+
+        ## update the critics
+        critic_loss_lst = []
+        if getattr(self.args, "is_popart", False):
+            returns = self.normalize_value(returns, critic_mask)
+
+        for _ in range(0, self.mini_epochs_critic):
+            new_values = self.critic(batch).squeeze()
+            new_values = new_values[:, :-1]
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * critic_mask) / th.sum(critic_mask)
+            self.optimiser_critic.zero_grad()
+            critic_loss.backward()
+            critic_loss_lst.append(critic_loss)
+            self.optimiser_critic.step()
+
+        old_values_after = self.critic(batch).squeeze(dim=-1).detach()
+        if getattr(self.args, "is_popart", False):
+            old_values_after = self.denormalize_value(old_values_after)
+
+        if self.advantage_calc_method == "GAE":
+            returns, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
         else:
@@ -246,20 +278,6 @@ class IndependentPPOLearner:
             self.optimiser_actor.zero_grad()
             actor_loss.backward()
             self.optimiser_actor.step()
-
-        ## update the critics
-        critic_loss_lst = []
-        if getattr(self.args, "is_popart", False):
-            returns = self.normalize_value(returns, critic_mask)
-
-        for _ in range(0, self.mini_epochs_critic):
-            new_values = self.critic(batch).squeeze()
-            new_values = new_values[:, :-1]
-            critic_loss = 0.5 * th.sum((new_values - returns)**2 * critic_mask) / th.sum(critic_mask)
-            self.optimiser_critic.zero_grad()
-            critic_loss.backward()
-            critic_loss_lst.append(critic_loss)
-            self.optimiser_critic.step()
 
         # log stuff
         critic_train_stats["rewards"].append(th.mean(rewards).item())
