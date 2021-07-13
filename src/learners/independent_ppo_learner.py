@@ -158,19 +158,19 @@ class IndependentPPOLearner:
         else:
             raise NotImplementedError
 
-        # critic_mask = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
-        critic_mask = alive_mask
-
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
         if getattr(self.args, "is_popart", False):
             old_values_before = self.denormalize_value(old_values_before)
 
         # expand reward to n_agent copies
         rewards = rewards.repeat(1, 1, self.n_agents)
-        terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
+
+        # critic_mask = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
+        critic_mask = alive_mask
+        import pdb; pdb.set_trace()
 
         if self.advantage_calc_method == "GAE":
-            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
+            returns, _ = self._compute_returns_advs(old_values_before, rewards, critic_mask, 
                                                     self.args.gamma, self.args.tau)
 
         else:
@@ -195,7 +195,7 @@ class IndependentPPOLearner:
             old_values_after = self.denormalize_value(old_values_after)
 
         if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
+            returns, advantages = self._compute_returns_advs(old_values_after, rewards, alive_mask, 
                                                     self.args.gamma, self.args.tau)
 
         else:
@@ -203,7 +203,7 @@ class IndependentPPOLearner:
 
         if getattr(self.args, "is_advantage_normalized", False):
             # only consider valid advantages
-            flat_mask = alive_mask.flatten()
+            flat_mask = critic_mask.flatten()
             flat_advantage = advantages.flatten()
             assert flat_mask.shape[0] == flat_advantage.shape[0]
             adv_index = th.nonzero(flat_mask).squeeze()
@@ -292,14 +292,18 @@ class IndependentPPOLearner:
                 self.logger.log_stat(k, np.mean(np.array(v)), t_env)
             self.log_stats_t = t_env
 
-    def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
+    def _compute_returns_advs(self, _values, _rewards, _alive_mask, gamma, tau):
         returns = th.zeros_like(_rewards)
         advs = th.zeros_like(_rewards)
         lastgaelam = th.zeros_like(_rewards[:, 0]).flatten()
         ts = _rewards.size(1)
 
         for t in reversed(range(ts)):
-            nextnonterminal = (1.0 - _terminated[:, t]).flatten()
+            if t == ts-1: # last entry
+                nextnonterminal = th.zeros_like(_alive_mask[:, t].flatten())
+            else:
+                nextnonterminal = _alive_mask[:, t+1].flatten()
+
             nextvalues = _values[:, t+1].flatten()
 
             reward_t = _rewards[:, t].flatten()
