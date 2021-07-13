@@ -51,8 +51,13 @@ class FixedKLLearner:
         self.agent_type = getattr(self.args, "agent", None)
 
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
+        self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
+        self.is_popart = getattr(self.args, "is_popart", False)
 
-        if getattr(self.args, "is_popart", False):
+        if (self.is_value_normalized and self.is_popart):
+            raise ValueError("Either `is_value_normalized` or `is_popart` is specified, but not both.")
+
+        if self.is_value_normalized:
             # need to normalize value
             self.value_rms = RunningMeanStd()
 
@@ -68,23 +73,35 @@ class FixedKLLearner:
         assert flat_returns.shape[0] == flat_mask.shape[0]
         returns_index = th.nonzero(flat_mask).squeeze()
         valid_returns = flat_returns[returns_index]
-        # update value_rms
-        self.value_rms.update(valid_returns)
-        value_mean = self.value_rms.mean.unsqueeze(0).unsqueeze(0)
-        value_var = self.value_rms.var.unsqueeze(0).unsqueeze(0)
-        value_mean = value_mean.expand(bs, ts, self.n_agents)
-        value_var = value_var.expand(bs, ts, self.n_agents)
-        normalized_returns = (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
+
+        if self.is_value_normalized:
+            # update value_rms
+            self.value_rms.update(valid_returns)
+            value_mean = self.value_rms.mean.unsqueeze(0)
+            value_var = self.value_rms.var.unsqueeze(0)
+            value_mean = value_mean.expand(bs, ts)
+            value_var = value_var.expand(bs, ts)
+            normalized_returns = (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
+
+        elif self.is_popart:
+            # update popart
+            self.critic.v_out.update(valid_returns)
+            normalized_returns = self.critic.v_out.normalize(returns)
+
         return normalized_returns
 
     def denormalize_value(self, values):
-        bs, ts = values.shape[0], values.shape[1]
-        value_mean = self.value_rms.mean.unsqueeze(0).unsqueeze(0)
-        value_var = self.value_rms.var.unsqueeze(0).unsqueeze(0)
-        value_mean = value_mean.expand(bs, ts, self.n_agents)
-        value_var = value_var.expand(bs, ts, self.n_agents)
+        if self.is_value_normalized:
+            bs, ts = values.shape[0], values.shape[1]
+            value_mean = self.value_rms.mean.unsqueeze(0)
+            value_var = self.value_rms.var.unsqueeze(0)
+            value_mean = value_mean.expand(bs, ts)
+            value_var = value_var.expand(bs, ts)
+            denormalized_values = values * th.sqrt(value_var + 1e-6) + value_mean
 
-        denormalized_values = values * th.sqrt(value_var + 1e-6) + value_mean
+        elif self.is_popart:
+            denormalized_values = self.critic.v_out.denormalize(values)
+
         return denormalized_values
 
     def normalize_obs(self, batch, alive_mask):

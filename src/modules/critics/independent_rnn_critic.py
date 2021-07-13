@@ -3,6 +3,8 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
+from components.popart import PopArt
+
 class IndependentRNNCritic(nn.Module):
     def __init__(self, scheme, args):
         super(IndependentRNNCritic, self).__init__()
@@ -17,7 +19,11 @@ class IndependentRNNCritic(nn.Module):
         # Set up network layers
         self.fc1 = nn.Linear(self.input_shape, args.rnn_hidden_dim)
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
-        self.fc2 = nn.Linear(args.rnn_hidden_dim, 1)
+
+        if getattr(self.args, "is_popart", False):
+            self.v_out = PopArt(args.rnn_hidden_dim, 1)
+        else:
+            self.v_out = nn.Linear(args.rnn_hidden_dim, 1)
 
     def forward(self, batch, t=None):
         bs, max_t = batch.batch_size, batch.max_seq_length
@@ -36,7 +42,7 @@ class IndependentRNNCritic(nn.Module):
 
             x = F.relu(self.fc1(inputs))
             h_in = self.rnn(x, h_in)
-            q = self.fc2(h_in)
+            q = self.v_out(h_in)
             outputs.append(q.view(bs, self.n_agents)) # bs * ts * n_agents
 
         output_tensor = th.stack(outputs, dim=1)
