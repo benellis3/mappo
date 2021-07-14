@@ -6,6 +6,8 @@ from .centralized_ppo_learner import CentralPPOLearner
 from .decentralized_ppo_learner import DecentralPPOLearner
 from .independent_ppo_learner import IndependentPPOLearner
 from .independent_ac_learner import IndependentACLearner
+from .adaptive_kl_learner import AdaptiveKLLearner
+from .fixed_kl_learner import FixedKLLearner
 
 REGISTRY = {}
 
@@ -17,3 +19,5 @@ REGISTRY["central_ppo_learner"] = CentralPPOLearner
 REGISTRY["decentral_ppo_learner"] = DecentralPPOLearner
 REGISTRY["independent_ppo_learner"] = IndependentPPOLearner
 REGISTRY["independent_ac_learner"] = IndependentACLearner
+REGISTRY["adaptive_kl_learner"] = AdaptiveKLLearner
+REGISTRY["fixed_kl_learner"] = FixedKLLearner

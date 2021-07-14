@@ -15,29 +15,31 @@ batch_size: 8
 target_update_interval: 200
 
 lr_actor: 0.0005
-lr_critic: 0.001
+lr_critic: 0.0005
 tau: 0.995
 td_lambda: 0.99
 
 agent_output_type: "pi_logits"
-learner: "independent_ppo_learner"
+learner: "adaptive_kl_learner"
 critic: "independent_rnn_critic"
 
-mini_epochs_actor: 10
+mini_epochs_actor: 15 
 mini_epochs_critic: 10
-entropy_loss_coeff: 0.000
+entropy_loss_coeff: 0.001
 
 # calculating advantage: GAE, TD_Error
 advantage_calc_method: "GAE"
 
-ppo_policy_clip_param: 0.2
+# adaptive kl param
+target_kl: 0.1
+kl_coeff_beta: 1.0
 
 is_advantage_normalized: True
 is_observation_normalized: True
-is_popart: False
+is_popart: True
 is_value_normalized: False
 
 obs_agent_id: True
 obs_last_action: False
 
-name: "independent_ppo_rnn"
+name: "adaptive_kl_rnn"

@@ -1,4 +1,3 @@
-from math import exp
 import numpy as np
 import torch as th
 from torch.optim import Adam
@@ -27,7 +26,7 @@ def compute_logp_entropy(logits, actions, masks):
     }
     return result
 
-class IndependentPPOLearner:
+class AdaptiveKLLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.n_agents = args.n_agents
@@ -36,11 +35,9 @@ class IndependentPPOLearner:
 
         self.mac = mac
         self.agent_params = list(mac.parameters())
-        self.ppo_policy_clip_params = args.ppo_policy_clip_param
 
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
-
         self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor, eps=args.optim_eps)
         self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic, eps=args.optim_eps)
 
@@ -48,18 +45,11 @@ class IndependentPPOLearner:
 
         self.mini_epochs_actor = getattr(self.args, "mini_epochs_actor", 4)
         self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
+        self.target_kl = getattr(self.args, "target_kl", 0.01)
+        self.kl_coeff_beta = getattr(self.args, "kl_coeff_beta", 1.0)
+
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
-
-        self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
-        assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
-        if self.kl_clipping_mode == 'epoch_adaptive':
-            if self.n_agents < 5:
-                self.mini_epochs_actor = 15
-            elif self.n_agents < 10:
-                self.mini_epochs_actor = 10
-            else:
-                self.mini_epochs_actor = 5
 
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
         self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
@@ -138,12 +128,16 @@ class IndependentPPOLearner:
         terminated = batch["terminated"][:, :-1].float()
         mask = batch["filled"][:, :-1].float()
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
+        avail_actions = batch["avail_actions"][:, :-1]
+
+        mask = mask.squeeze(dim=-1)
+        terminated = terminated.squeeze(dim=-1)
 
         ## get dead agents
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
         avail_actions = batch['avail_actions'][:, :-1].cuda()
-        alive_mask = ( (avail_actions[:, :, :, 0] < 1.0) * (th.sum(avail_actions, dim=-1) > 0.0) ).float()
+        alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
         num_alive_agents = th.sum(alive_mask, dim=-1).float()
         avail_actions = avail_actions.byte()
 
@@ -167,42 +161,18 @@ class IndependentPPOLearner:
         else:
             raise NotImplementedError
 
+        critic_mask = mask.unsqueeze(-1).repeat(1, 1, self.n_agents)
+
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
         if getattr(self.args, "is_popart", False):
             old_values_before = self.denormalize_value(old_values_before)
 
-        # expand reward/mask to n_agent copies
+        # expand reward to n_agent copies
         rewards = rewards.repeat(1, 1, self.n_agents)
-        terminated = terminated.repeat(1, 1, self.n_agents)
-        expanded_mask = mask.repeat(1, 1, self.n_agents)
+        terminated = terminated.unsqueeze(dim=-1).repeat(1, 1, self.n_agents)
 
         if self.advantage_calc_method == "GAE":
-            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
-                                                    self.args.gamma, self.args.tau)
-
-        else:
-            raise NotImplementedError
-
-        ## update the critics
-        critic_loss_lst = []
-        if getattr(self.args, "is_popart", False):
-            returns = self.normalize_value(returns, mask)
-
-        for _ in range(0, self.mini_epochs_critic):
-            new_values = self.critic(batch).squeeze()
-            new_values = new_values[:, :-1]
-            critic_loss = 0.5 * ((new_values - returns)**2 * expanded_mask).sum() / expanded_mask.sum()
-            self.optimiser_critic.zero_grad()
-            critic_loss.backward()
-            critic_loss_lst.append(critic_loss)
-            self.optimiser_critic.step()
-
-        old_values_after = self.critic(batch).squeeze(dim=-1).detach()
-        if getattr(self.args, "is_popart", False):
-            old_values_after = self.denormalize_value(old_values_after)
-
-        if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
+            returns, advantages = self._compute_returns_advs(old_values_before, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
 
         else:
@@ -234,10 +204,6 @@ class IndependentPPOLearner:
         entropy_lst = [] 
         actor_loss_lst = []
 
-        target_kl = 0.2
-
-        mask = mask.squeeze(dim=-1)
-
         ## update the actor
         for _ in range(0, self.mini_epochs_actor):
             if self.agent_type == "rnn":
@@ -260,25 +226,27 @@ class IndependentPPOLearner:
             # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
 
-            with th.no_grad():
-                # KL divergence for all agents
-                approxkl = 0.5 * ((central_log_pac - central_old_log_pac)**2 * mask).sum() / mask.sum()
-                approxkl_lst.append(approxkl)
-                if approxkl > 1.5 * target_kl:
-                    break
+            # KL divergence for all agents
+            approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2 * mask) / th.sum(mask)
+            approxkl_lst.append(approxkl)
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
-            entropy = (meta_data['entropy'] * alive_mask).sum() / alive_mask.sum() 
+            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
 
-            pg_loss_unclipped = - advantages * prob_ratio
-            pg_loss_clipped = - advantages * th.clamp(prob_ratio,
-                                                1 - self.args.ppo_policy_clip_param,
-                                                1 + self.args.ppo_policy_clip_param)
+            pg_loss = -advantages * prob_ratio
+            pg_loss = th.sum(pg_loss * alive_mask) / th.sum(alive_mask)
 
-            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * alive_mask) / alive_mask.sum()
+            pg_loss += self.kl_coeff_beta * approxkl
+
+            ## adaptive kl divergence
+            # kl_coeff_beta is updated for the next iteration
+            if approxkl < self.target_kl / 1.5:
+                self.kl_coeff_beta = self.kl_coeff_beta / 2.0
+            elif approxkl > self.target_kl * 1.5:
+                self.kl_coeff_beta = self.kl_coeff_beta * 2.0
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
@@ -287,6 +255,20 @@ class IndependentPPOLearner:
             self.optimiser_actor.zero_grad()
             actor_loss.backward()
             self.optimiser_actor.step()
+
+        ## update the critics
+        critic_loss_lst = []
+        if getattr(self.args, "is_popart", False):
+            returns = self.normalize_value(returns, critic_mask)
+
+        for _ in range(0, self.mini_epochs_critic):
+            new_values = self.critic(batch).squeeze()
+            new_values = new_values[:, :-1]
+            critic_loss = 0.5 * th.sum((new_values - returns)**2 * critic_mask) / th.sum(critic_mask)
+            self.optimiser_critic.zero_grad()
+            critic_loss.backward()
+            critic_loss_lst.append(critic_loss)
+            self.optimiser_critic.step()
 
         # log stuff
         critic_train_stats["rewards"].append(th.mean(rewards).item())
@@ -308,7 +290,7 @@ class IndependentPPOLearner:
         ts = _rewards.size(1)
 
         for t in reversed(range(ts)):
-            nextnonterminal = (1 - _terminated[:, t]).flatten()
+            nextnonterminal = (1.0 - _terminated[:, t]).flatten()
             nextvalues = _values[:, t+1].flatten()
 
             reward_t = _rewards[:, t].flatten()
