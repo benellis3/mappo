@@ -1,5 +1,4 @@
-# --- PPO specific parameters ---
-
+# --- Fixed KL specific parameters ---
 action_selector: "multinomial"
 epsilon_start: .5
 epsilon_finish: .01
@@ -15,36 +14,31 @@ batch_size: 8
 # update the target network every {} training steps
 target_update_interval: 200
 
-
 lr_actor: 0.0005
-lr_critic: 0.0005
+lr_critic: 0.001
 tau: 0.995
 td_lambda: 0.99
 
-# use COMA
 agent_output_type: "pi_logits"
-learner: "ppo_learner"
-critic: "cnn"
-agent: "cnn" 
-num_frames: 4
+learner: "trust_region_learner"
+critic: "centralV_rnn_critic"
 
-mini_epochs_actor: 4
-mini_epochs_critic: 8
+mini_epochs_actor: 10
+mini_epochs_critic: 10
 entropy_loss_coeff: 0.000
 
 # calculating advantage: GAE, TD_Error
 advantage_calc_method: "GAE"
-# advantage_calc_method: "TD_Error"
 
-ppo_policy_clip_param: 0.2
+trust_region: 'fixed_kl'
+kl_coeff_beta: 3.0
 
 is_advantage_normalized: True
-is_observation_normalized: False
-is_central_value: False
-actor_critic_mode: False
-obs_agent_id: False
+is_observation_normalized: True
+is_popart: False
+is_value_normalized: False
+
+obs_agent_id: True
 obs_last_action: False
-clip_loss: True
 
-name: "ppo_rnn"
-
+name: "fixed_kl_rnn_central_V"
