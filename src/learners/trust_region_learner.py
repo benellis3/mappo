@@ -53,6 +53,8 @@ class TrustRegionLearner:
 
         self.target_kl = getattr(self.args, "target_kl", 0.01)
         self.kl_coeff_beta = getattr(self.args, "kl_coeff_beta", 1.0)
+        self.divergence_mode = getattr(self.args, "divergence_mode", 'mean')
+        assert self.divergence_mode in ['mean', 'max']
 
         self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
         assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
@@ -282,8 +284,12 @@ class TrustRegionLearner:
             # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
 
-            # KL divergence for all agents
-            approxkl = 0.5 * ((central_log_pac - central_old_log_pac)**2 * mask).sum() / mask.sum()
+            ## KL divergence for all agents; actually total variation distance
+            if self.divergence_mode == 'mean':
+                approxkl = 0.5 * ((central_log_pac - central_old_log_pac)**2 * mask).sum() / mask.sum()
+            elif self.divergence_mode == 'max':
+                approxkl = 0.5 * th.max( (central_log_pac - central_old_log_pac)**2 )
+
             approxkl_lst.append(approxkl)
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
