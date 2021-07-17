@@ -32,6 +32,7 @@ advantage_calc_method: "GAE"
 
 trust_region: 'fixed_kl'
 kl_coeff_beta: 3.0
+divergence_mode: 'mean'
 
 is_advantage_normalized: True
 is_observation_normalized: True

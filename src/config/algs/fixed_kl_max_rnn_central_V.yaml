@@ -31,7 +31,7 @@ entropy_loss_coeff: 0.000
 advantage_calc_method: "GAE"
 
 trust_region: 'fixed_kl'
-kl_coeff_beta: 1.0
+kl_coeff_beta: 3.0
 divergence_mode: 'max'
 
 is_advantage_normalized: True
