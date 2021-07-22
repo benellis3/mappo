@@ -27,7 +27,7 @@ def compute_logp_entropy(logits, actions, masks):
     }
     return result
 
-class TrustRegionLearner:
+class DeterministicLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.n_agents = args.n_agents
@@ -37,8 +37,6 @@ class TrustRegionLearner:
         self.mac = mac
         self.agent_params = list(mac.parameters())
         
-        self.ppo_policy_clip_params = getattr(self.args, "ppo_policy_clip_param", 0.2)
-
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
 
@@ -52,21 +50,6 @@ class TrustRegionLearner:
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
         self.env_id = getattr(self.args, "env", None)
-
-        self.target_kl = getattr(self.args, "target_kl", 0.01)
-        self.kl_coeff_beta = getattr(self.args, "kl_coeff_beta", 1.0)
-        self.divergence_mode = getattr(self.args, "divergence_mode", 'mean')
-        assert self.divergence_mode in ['mean', 'max', 'max-tv']
-
-        self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
-        assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
-        if self.kl_clipping_mode == 'epoch_adaptive':
-            if self.n_agents < 5:
-                self.mini_epochs_actor = 15
-            elif self.n_agents < 10:
-                self.mini_epochs_actor = 10
-            else:
-                self.mini_epochs_actor = 5
 
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
         self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
@@ -263,7 +246,6 @@ class TrustRegionLearner:
         old_log_p, old_log_pac = old_meta_data['logp'], old_meta_data['logpac']
 
         # joint probability
-        central_old_log_p = th.sum(old_log_p, dim=-1)
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
 
         approxkl_lst = [] 
@@ -296,58 +278,14 @@ class TrustRegionLearner:
             central_log_pac = th.sum(log_pac, dim=-1)
 
             ## KL divergence for all agents; actually total variation distance
-            if self.divergence_mode == 'mean':
-                approxkl = 0.5 * ((central_log_pac - central_old_log_pac)**2 * mask).sum() / mask.sum()
-            elif self.divergence_mode == 'max':
-                approxkl = 0.5 * th.max( (central_log_pac - central_old_log_pac)**2 )
-            elif self.divergence_mode == 'max-tv':
-                ## actually total variation
-                prob_diff = th.exp(central_log_p) - th.exp(central_old_log_p)
-                approxkl = ( th.abs(prob_diff).sum(dim=-1).max() )**2
-            else: 
-                raise NotImplementedError
-
+            approxkl = 0.5 * ((central_log_pac - central_old_log_pac)**2 * mask).sum() / mask.sum()
             approxkl_lst.append(approxkl)
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
             entropy = (meta_data['entropy'] * alive_mask).sum() / alive_mask.sum() 
             entropy_lst.append(entropy)
 
-            prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
-            pg_loss_unclipped = - advantages * prob_ratio
-
-            trust_region = getattr(self.args, "trust_region", False)
-
-            if trust_region == 'ppo_clipping':
-                ## clipped 
-                pg_loss_clipped = - advantages * th.clamp(prob_ratio,
-                                                    1 - self.args.ppo_policy_clip_param,
-                                                    1 + self.args.ppo_policy_clip_param)
-
-                pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * alive_mask) / alive_mask.sum()
-
-            elif trust_region == 'fixed_kl':
-                ## fixed kl divergence penalty
-                pg_loss = th.sum(pg_loss_unclipped * alive_mask) / alive_mask.sum()
-                pg_loss += self.kl_coeff_beta * approxkl
-            
-            elif trust_region == 'adaptive_kl':
-                ## adaptive kl divergence penalty
-                pg_loss = th.sum(pg_loss_unclipped * alive_mask) / alive_mask.sum()
-
-                if approxkl < self.target_kl / 1.5:
-                    self.kl_coeff_beta = self.kl_coeff_beta / 2.0
-                elif approxkl > self.target_kl * 1.5:
-                    self.kl_coeff_beta = self.kl_coeff_beta * 2.0
-
-                pg_loss += self.kl_coeff_beta * approxkl
-
-            elif trust_region == 'none':
-                ## independent actor-critic
-                pg_loss = th.sum(pg_loss_unclipped * alive_mask) / alive_mask.sum()
-
-            else:
-                raise NotImplementedError
+            pg_loss = - th.sum( advantages * th.exp(log_pac) * alive_mask)
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy

@@ -18,9 +18,9 @@ class Matrixgame(MultiAgentEnv):
         self.episode_limit = 1
 
         self.payoff_matrix = np.array([
-            [8, -12, -12],
-            [-12, 0, 0],
-            [-12, 0, 0]
+            [ 11, -30,  0],
+            [-30,   7,  6],
+            [  0,   0,  5]
         ])
 
         self.state = np.ones(5)
