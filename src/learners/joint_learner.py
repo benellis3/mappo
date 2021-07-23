@@ -18,16 +18,16 @@ def compute_logp_entropy(logits, actions, masks):
     p_log_p = th.where(masks, p_log_p, th.tensor(0.0).to(p_log_p.device))
     entropy = -p_log_p.sum(-1)
 
-    logpac = th.gather(masked_logits, dim=-1, index=actions)
+    logp = th.gather(masked_logits, dim=-1, index=actions)
 
     result = {
-        'logp' : th.squeeze(masked_logits),
-        'logpac' : th.squeeze(logpac),
+        'logp' : th.squeeze(logp),
         'entropy' : th.squeeze(entropy),
     }
     return result
 
-class DeterministicLearner:
+
+class JointLearner:
     def __init__(self, mac, scheme, logger, args):
         self.args = args
         self.n_agents = args.n_agents
@@ -36,10 +36,10 @@ class DeterministicLearner:
 
         self.mac = mac
         self.agent_params = list(mac.parameters())
-        
+        self.ppo_policy_clip_params = args.ppo_policy_clip_param
+
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
-
         self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor, eps=args.optim_eps)
         self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic, eps=args.optim_eps)
 
@@ -49,7 +49,6 @@ class DeterministicLearner:
         self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
-        self.env_id = getattr(self.args, "env", None)
 
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
         self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
@@ -121,7 +120,7 @@ class DeterministicLearner:
         state_var = self.state_rms.var.unsqueeze(0).unsqueeze(0)
         state_mean = state_mean.expand(bs, ts, -1)
         state_var = state_var.expand(bs, ts, -1)
-        expanded_mask = mask.expand(-1, -1, state_mean.shape[-1])
+        expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
         batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
 
     def normalize_obs(self, batch, alive_mask):
@@ -138,8 +137,8 @@ class DeterministicLearner:
         batch.data.transition_data['obs'][:, :-1] = (batch['obs'][:, :-1] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
-        critic_train_stats = defaultdict(lambda: [])
         max_t = batch.max_seq_length-1
+        critic_train_stats = defaultdict(lambda: [])
 
         # Get the relevant quantities
         rewards = batch["reward"][:, :-1]
@@ -147,23 +146,18 @@ class DeterministicLearner:
         terminated = batch["terminated"][:, :-1].float()
         mask = batch["filled"][:, :-1].float()
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
+        avail_actions = batch["avail_actions"][:, :-1]
+
+        mask = mask.squeeze(dim=-1)
+        terminated = terminated.squeeze(dim=-1)
 
         ## get dead agents
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        avail_actions = batch['avail_actions'][:, :-1].cuda()
-
-        if self.env_id == 'matrix_game':
-            alive_mask = ( th.sum(avail_actions, dim=-1)>0.0 ).float()
-        elif self.env_id == 'sc2':
-            alive_mask = ( (avail_actions[:, :, :, 0] < 1.0) * (th.sum(avail_actions, dim=-1) > 0.0) ).float()
-        else: 
-            raise NotImplementedError
-
-        num_alive_agents = th.sum(alive_mask, dim=-1).float()
+        alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
         avail_actions = avail_actions.byte()
 
-        if getattr(self.args, "is_observation_normalized", False):
+        if self.is_obs_normalized:
             # NOTE: obs normalizer needs to be in basic_controller
             self.mac.update_rms(batch, alive_mask)
             # NOTE: obs in batch is being updated
@@ -186,64 +180,63 @@ class DeterministicLearner:
             raise NotImplementedError
 
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
-        if getattr(self.args, "is_popart", False):
+        if self.is_value_normalized or self.is_popart:
             old_values_before = self.denormalize_value(old_values_before)
 
-        # expand reward/mask to n_agent copies
-        rewards = rewards.repeat(1, 1, self.n_agents)
-        terminated = terminated.repeat(1, 1, self.n_agents)
-        expanded_mask = mask.repeat(1, 1, self.n_agents)
+        rewards = rewards.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
             returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
-
+        elif self.advantage_calc_method == "TD":
+            returns = rewards + self.args.gamma * (1 - terminated) * old_values_before[:, 1:]
         else:
             raise NotImplementedError
 
         ## update the critics
         critic_loss_lst = []
-        if getattr(self.args, "is_popart", False):
+        if self.is_value_normalized or self.is_popart:
             returns = self.normalize_value(returns, mask)
 
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
             new_values = new_values[:, :-1]
-            critic_loss = 0.5 * ((new_values - returns)**2 * expanded_mask).sum() / expanded_mask.sum()
+
+            vf_loss = th.sum( (new_values - returns) ** 2 * mask) / mask.sum()
             self.optimiser_critic.zero_grad()
-            critic_loss.backward()
-            critic_loss_lst.append(critic_loss)
+            vf_loss.backward()
             self.optimiser_critic.step()
+            critic_loss_lst.append(vf_loss)
 
         old_values_after = self.critic(batch).squeeze(dim=-1).detach()
-        if getattr(self.args, "is_popart", False):
+        if self.is_value_normalized or self.is_popart:
             old_values_after = self.denormalize_value(old_values_after)
 
         if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
+            _, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
                                                     self.args.gamma, self.args.tau)
-
+        elif self.advantage_calc_method == "TD":
+            returns = rewards + self.args.gamma * (1 - terminated) * old_values_after[:, 1:]
+            advantages = returns - old_values_after[:, :-1]
         else:
             raise NotImplementedError
 
         if getattr(self.args, "is_advantage_normalized", False):
             # only consider valid advantages
-            flat_mask = alive_mask.flatten()
+            flat_mask = mask.flatten()
             flat_advantage = advantages.flatten()
             assert flat_mask.shape[0] == flat_advantage.shape[0]
             adv_index = th.nonzero(flat_mask).squeeze()
             valid_adv = flat_advantage[adv_index]
             batch_mean = th.mean(valid_adv, dim=0)
             batch_var = th.var(valid_adv, dim=0)
-            flat_advantage = (flat_advantage - batch_mean) / th.sqrt(batch_var + 1e-6) * flat_mask
-            bs, ts, _ = advantages.shape
-            advantages = flat_advantage.reshape(bs, ts, self.n_agents)
 
-        # no-op (valid only when dead)
-        # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        old_action_logits =old_action_logits.detach()
+            advantages = (advantages - batch_mean) / th.sqrt(batch_var + 1e-6) * mask
+
+        # action prob
+        old_action_logits = old_action_logits.detach() # detached
         old_meta_data = compute_logp_entropy(old_action_logits, actions, avail_actions)
-        old_log_p, old_log_pac = old_meta_data['logp'], old_meta_data['logpac']
+        old_log_pac = old_meta_data['logp']
 
         # joint probability
         central_old_log_pac = th.sum(old_log_pac, dim=-1)
@@ -251,8 +244,6 @@ class DeterministicLearner:
         approxkl_lst = [] 
         entropy_lst = [] 
         actor_loss_lst = []
-
-        mask = mask.squeeze(dim=-1)
 
         ## update the actor
         for _ in range(0, self.mini_epochs_actor):
@@ -271,21 +262,26 @@ class DeterministicLearner:
                 raise NotImplementedError
 
             meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
-            log_p, log_pac = meta_data['logp'], meta_data['logpac']
+            log_pac = meta_data['logp']
 
             # joint probability
-            central_log_p = th.sum(log_p, dim=-1)
             central_log_pac = th.sum(log_pac, dim=-1)
 
-            ## KL divergence for all agents; actually total variation distance
-            approxkl = 0.5 * ((central_log_pac - central_old_log_pac)**2 * mask).sum() / mask.sum()
-            approxkl_lst.append(approxkl)
+            with th.no_grad():
+                approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / mask.sum()
+                approxkl_lst.append(approxkl)
 
-            # for shared policy, maximize the policy entropy averaged over all agents & episodes
-            entropy = (meta_data['entropy'] * alive_mask).sum() / alive_mask.sum() 
+            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
             entropy_lst.append(entropy)
 
-            pg_loss = - th.sum( advantages * th.exp(log_pac) * alive_mask)
+            prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
+
+            pg_loss_unclipped = - advantages * prob_ratio
+            pg_loss_clipped = - advantages * th.clamp(prob_ratio,
+                                                1 - self.args.ppo_policy_clip_param,
+                                                1 + self.args.ppo_policy_clip_param)
+
+            pg_loss = th.max(pg_loss_unclipped, pg_loss_clipped).sum() / mask.sum()
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
@@ -311,17 +307,16 @@ class DeterministicLearner:
     def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
         returns = th.zeros_like(_rewards)
         advs = th.zeros_like(_rewards)
-        lastgaelam = th.zeros_like(_rewards[:, 0]).flatten()
+        lastgaelam = th.zeros_like(_rewards[:, 0])
         ts = _rewards.size(1)
 
         for t in reversed(range(ts)):
-            nextnonterminal = (1 - _terminated[:, t]).flatten()
-            nextvalues = _values[:, t+1].flatten()
+            nextnonterminal = 1.0 - _terminated[:, t]
+            nextvalues = _values[:, t+1]
 
-            reward_t = _rewards[:, t].flatten()
-            delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t].flatten()
-            lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
-            advs[:, t] = lastgaelam.view(_rewards[:, t].shape)
+            reward_t = _rewards[:, t]
+            delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
+            advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
 
         returns = advs + _values[:, :-1]
 
