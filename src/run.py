@@ -95,6 +95,7 @@ def run_sequential(args, logger):
     framestack_num = args.env_args.get("framestack_num", 1)
     # Default/Base scheme
     scheme = {
+        "hidden": {"vshape": (args.rnn_hidden_dim,) * framestack_num, "group": "agents"},
         "state": {"vshape": env_info["state_shape"] * framestack_num},
         "obs": {"vshape": env_info["obs_shape"] * framestack_num, "group": "agents"},
         "actions": {"vshape": (1,), "group": "agents", "dtype": th.long},

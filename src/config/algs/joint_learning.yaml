@@ -17,6 +17,9 @@ agent_output_type: "pi_logits"
 learner: "joint_learner"
 critic: "joint_rnn_critic"
 
+detach_every: null
+replace_every: null
+
 training_iters: 1
 mini_epochs_actor: 10
 mini_epochs_critic: 10

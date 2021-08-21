@@ -79,12 +79,19 @@ class ParallelRunner:
             "avail_actions": [],
             "obs": []
         }
+
         # Get the obs, state and avail_actions back
         for parent_conn in self.parent_conns:
             data = parent_conn.recv()
             pre_transition_data["state"].append(data["state"])
             pre_transition_data["avail_actions"].append(data["avail_actions"])
             pre_transition_data["obs"].append(data["obs"])
+
+        if hasattr(self.mac.agent, "h_in"):
+            hidden = self.mac.agent.h_in.detach()
+            num_a = len(data['obs'])
+            hidden = hidden.reshape((self.batch_size, num_a, -1))
+            pre_transition_data["hidden"] = hidden
 
         self.batch.update(pre_transition_data, ts=0)
 
@@ -142,6 +149,12 @@ class ParallelRunner:
             if all_terminated:
                 break
 
+            if hasattr(self.mac.agent, "h_in"):
+                hidden = self.mac.agent.h_in.detach()
+                num_a = actions.shape[1]
+                hidden = hidden.reshape((self.batch_size, num_a, -1))
+                pre_transition_data["hidden"] = hidden[envs_not_terminated]
+
             # Receive data back for each unterminated env
             for idx, parent_conn in enumerate(self.parent_conns):
                 if not terminated[idx]:
@@ -174,7 +187,6 @@ class ParallelRunner:
             self.t += 1
 
             # Add the pre-transition data
-
             self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
 
 

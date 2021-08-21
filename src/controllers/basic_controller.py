@@ -14,6 +14,8 @@ class BasicMAC:
         self._build_agents(input_shape)
         self.agent_output_type = args.agent_output_type
         self.need_agent_logits = getattr(args, "need_agent_logits", False)
+        self.detach_every = getattr(args, "detach_every", None)
+        self.replace_every = getattr(args, "replace_every", None) 
 
         self.action_selector = action_REGISTRY[args.action_selector](args)
 
@@ -48,6 +50,16 @@ class BasicMAC:
     def forward(self, ep_batch, t, test_mode=False, enable_norm=False):
         # For training: obs normalization has already been done in learner
         agent_inputs = self._build_inputs(ep_batch, t, enable_norm=enable_norm)
+
+        if self.detach_every and  ((t % self.detach_every) == 0):
+            self.agent.detach_hidden()
+            assert self.agent.h_in.is_leaf, self.agent.h_in
+        elif t != 0:
+            assert not self.agent.h_in.is_leaf, self.agent.h_in
+
+        if self.replace_every and  ((t % self.replace_every) == 0):
+            self.agent.replace_hidden(ep_batch["hidden"][:,t].reshape((ep_batch.batch_size*self.n_agents, -1)))
+
         agent_outs = self.agent(agent_inputs)
 
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
