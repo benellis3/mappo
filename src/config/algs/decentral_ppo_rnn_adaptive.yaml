@@ -23,6 +23,9 @@ agent_output_type: "pi_logits"
 learner: "decentral_ppo_learner"
 critic: "decentral_rnn_critic"
 
+detach_every: null
+replace_every: null
+
 entropy_loss_coeff: 0.001
 
 # calculating advantage: GAE, TD_Error

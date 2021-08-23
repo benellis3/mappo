@@ -26,6 +26,8 @@ class CentralVRNNCritic(nn.Module):
         else:
             self.v_out = nn.Linear(args.rnn_hidden_dim, 1)
 
+        self.detach_every = getattr(args, "detach_every", None)
+
     def forward(self, batch, t=None):
         bs, max_t = batch.batch_size, batch.max_seq_length
 
@@ -40,6 +42,9 @@ class CentralVRNNCritic(nn.Module):
         for t in range(batch.max_seq_length):
             inputs, _, _ = self._build_inputs(batch, t=t)
             # inputs = inputs * dead_mask[:, t].reshape(batch.batch_size * self.n_agents, self.input_shape)
+
+            if self.detach_every and  ((t % self.detach_every) == 0):
+                h_in = h_in.detach()
 
             x = F.relu(self.fc1(inputs))
             h_in = self.rnn(x, h_in)
