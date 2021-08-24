@@ -105,9 +105,9 @@ class JointLearner:
         return denormalized_values
 
     def normalize_state(self, batch, mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
+        bs, ts = batch.batch_size, batch.max_seq_length
 
-        state = batch["state"][:, :-1].cuda()
+        state = batch["state"][:, :].cuda()
         flat_state = state.reshape(-1, state.shape[-1])
         flat_mask = mask.flatten()
         # ensure the length matches
@@ -121,10 +121,10 @@ class JointLearner:
         state_mean = state_mean.expand(bs, ts, -1)
         state_var = state_var.expand(bs, ts, -1)
         expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
-        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
+        batch.data.transition_data['state'][:, :] = (batch['state'][:, :] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
 
     def normalize_obs(self, batch, alive_mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
+        bs, ts = batch.batch_size, batch.max_seq_length
         obs_mean = self.mac.obs_rms.mean.unsqueeze(0).unsqueeze(0).unsqueeze(0)
         obs_var = self.mac.obs_rms.var.unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
@@ -134,19 +134,19 @@ class JointLearner:
         expanded_alive_mask = alive_mask.unsqueeze(-1).expand(-1, -1, -1, obs_mean.shape[-1])
 
         # update obs directly in batch
-        batch.data.transition_data['obs'][:, :-1] = (batch['obs'][:, :-1] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
+        batch.data.transition_data['obs'][:, :] = (batch['obs'][:, :] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
-        max_t = batch.max_seq_length-1
+        max_t = batch.max_seq_length
         critic_train_stats = defaultdict(lambda: [])
 
         # Get the relevant quantities
-        rewards = batch["reward"][:, :-1]
-        actions = batch["actions"][:, :-1]
-        terminated = batch["terminated"][:, :-1].float()
-        mask = batch["filled"][:, :-1].float()
-        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
-        avail_actions = batch["avail_actions"][:, :-1]
+        rewards = batch["reward"][:, :]
+        actions = batch["actions"][:, :]
+        terminated = batch["terminated"][:, :].float()
+        mask = batch["filled"][:, :].float()
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # also mask if next state terminates
+        avail_actions = batch["avail_actions"][:, :]
 
         mask = mask.squeeze(dim=-1)
         terminated = terminated.squeeze(dim=-1)
@@ -180,6 +180,9 @@ class JointLearner:
             raise NotImplementedError
 
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
+        # append 0's for terminal state value. (Simplifies operations below.)
+        old_values_before = th.cat((old_values_before, th.zeros_like(old_values_before[:, 0:1, ...]),), dim=1)
+        assert old_values_before.shape[1] == max_t+1, (old_values_before.shape, max_t)
         if self.is_value_normalized or self.is_popart:
             old_values_before = self.denormalize_value(old_values_before)
 
@@ -200,7 +203,6 @@ class JointLearner:
 
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
-            new_values = new_values[:, :-1]
 
             vf_loss = th.sum( (new_values - returns) ** 2 * mask) / mask.sum()
             self.optimiser_critic.zero_grad()
@@ -209,6 +211,8 @@ class JointLearner:
             critic_loss_lst.append(vf_loss)
 
         old_values_after = self.critic(batch).squeeze(dim=-1).detach()
+        # append 0's for terminal state value. (Simplifies operations below.)
+        old_values_after = th.cat((old_values_after, th.zeros_like(old_values_after[:, 0:1, ...]),), dim=1)
         if self.is_value_normalized or self.is_popart:
             old_values_after = self.denormalize_value(old_values_after)
 

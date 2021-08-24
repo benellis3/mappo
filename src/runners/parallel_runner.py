@@ -175,7 +175,8 @@ class ParallelRunner:
                     env_terminated = False
                     if data["terminated"]:
                         final_env_infos.append(data["info"])
-                    if data["terminated"] and not data["info"].get("episode_limit", False):
+                    # terminate if env terminates, env says it passes the episode limit, or we know env passes limit
+                    if data["terminated"] or data["info"].get("episode_limit", False) or self.t > self.episode_limit:
                         env_terminated = True
                     terminated[idx] = data["terminated"]
                     post_transition_data["terminated"].append((env_terminated,))
@@ -188,11 +189,12 @@ class ParallelRunner:
             # Add post_transiton data into the batch
             self.batch.update(post_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=False)
 
-            # Move onto the next timestep
-            self.t += 1
-
-            # Add the pre-transition data
-            self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
+            # I not all terminated, move onto next transition
+            if not all(terminated):
+                # Move onto the next timestep
+                self.t += 1
+                # Add the pre-transition data
+                self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
 
 
         if not test_mode:
