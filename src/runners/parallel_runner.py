@@ -67,6 +67,17 @@ class ParallelRunner:
         for parent_conn in self.parent_conns:
             parent_conn.send(("close", None))
 
+    def set_hidden_data(self, transition_data, num_agents, agents_alive=None):
+        # Save rnn hidden state if used
+        if hasattr(self.mac.agent, "h_in"):
+            hidden = self.mac.agent.h_in.detach()
+            hidden = hidden.reshape((self.batch_size, num_agents, -1))
+            if agents_alive is None:
+                transition_data["hidden"] = hidden # assume all agents alive by default
+            else:
+                transition_data["hidden"] = hidden[agents_alive] # save for agents alive
+
+
     def reset(self):
         self.batch = self.new_batch()
 
@@ -79,12 +90,16 @@ class ParallelRunner:
             "avail_actions": [],
             "obs": []
         }
+
         # Get the obs, state and avail_actions back
         for parent_conn in self.parent_conns:
             data = parent_conn.recv()
             pre_transition_data["state"].append(data["state"])
             pre_transition_data["avail_actions"].append(data["avail_actions"])
             pre_transition_data["obs"].append(data["obs"])
+
+        # Save rnn hidden state if used
+        self.set_hidden_data(pre_transition_data, len(data['obs']))
 
         self.batch.update(pre_transition_data, ts=0)
 
@@ -142,6 +157,9 @@ class ParallelRunner:
             if all_terminated:
                 break
 
+            # Save rnn hidden state if used
+            self.set_hidden_data(pre_transition_data, actions.shape[1], agents_alive=envs_not_terminated)
+
             # Receive data back for each unterminated env
             for idx, parent_conn in enumerate(self.parent_conns):
                 if not terminated[idx]:
@@ -174,7 +192,6 @@ class ParallelRunner:
             self.t += 1
 
             # Add the pre-transition data
-
             self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
 
 

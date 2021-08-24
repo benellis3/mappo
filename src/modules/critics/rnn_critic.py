@@ -25,6 +25,8 @@ class RNNCritic(nn.Module):
         self.rnn = nn.GRUCell(args.rnn_hidden_dim, args.rnn_hidden_dim)
         self.fc2 = nn.Linear(args.rnn_hidden_dim, 1)
 
+        self.detach_every = getattr(args, "detach_every", None)
+
     def init_hidden(self):
         # make hidden states on same device as model
         return self.fc1.weight.new(1, self.args.rnn_hidden_dim).zero_()
@@ -40,6 +42,9 @@ class RNNCritic(nn.Module):
 
             if self.is_obs_normalized: 
                 inputs = (inputs - self.obs_rms.mean) / th.sqrt(self.obs_rms.var)
+
+            if self.detach_every and  ((t % self.detach_every) == 0):
+                h_in = h_in.detach()
 
             x = F.relu(self.fc1(inputs))
             h_in = hidden_states.reshape(-1, self.args.rnn_hidden_dim)

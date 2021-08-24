@@ -14,6 +14,12 @@ class RNNAgent(nn.Module):
         # make hidden states on same device as model
         self.h_in = self.fc1.weight.new(bs, self.args.rnn_hidden_dim).zero_()
 
+    def detach_hidden(self):
+        self.h_in = self.h_in.detach()
+
+    def replace_hidden(self, h):
+        self.h_in = h
+
     def forward(self, inputs):
         x = F.relu(self.fc1(inputs))
         self.h_in = self.rnn(x, self.h_in)

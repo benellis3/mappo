@@ -23,6 +23,9 @@ agent_output_type: "pi_logits"
 learner: "trust_region_learner"
 critic: "independent_rnn_critic"
 
+detach_every: null
+replace_every: null
+
 mini_epochs_actor: 10
 mini_epochs_critic: 10
 entropy_loss_coeff: 0.000
