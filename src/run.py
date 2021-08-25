@@ -102,6 +102,7 @@ def run_sequential(args, logger):
         "avail_actions": {"vshape": (env_info["n_actions"],), "group": "agents", "dtype": th.int},
         "reward": {"vshape": (1,)},
         "terminated": {"vshape": (1,), "dtype": th.uint8},
+        "timed_out": {"vshape": (1,), "dtype": th.uint8},
     }
 
     groups = {

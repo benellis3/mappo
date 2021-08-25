@@ -142,7 +142,8 @@ class ParallelRunner:
             post_transition_data = {
                 # "actions": actions.unsqueeze(1),
                 "reward": [],
-                "terminated": []
+                "terminated": [],
+                "timed_out": []
             }
             # Data for the next step we will insert in order to select an action
             pre_transition_data = {
@@ -176,10 +177,13 @@ class ParallelRunner:
                     if data["terminated"]:
                         final_env_infos.append(data["info"])
                     # terminate if env terminates, env says it passes the episode limit, or we know env passes limit
-                    if data["terminated"] or data["info"].get("episode_limit", False) or self.t > self.episode_limit:
+                    # Note: t starts at 0, so episode_limit of 1 means 1 transition (stops at t=1 with 2 states stored)
+                    timed_out = data["info"].get("episode_limit", False) or self.t >= self.episode_limit
+                    if data["terminated"] or timed_out:
                         env_terminated = True
                     terminated[idx] = data["terminated"]
                     post_transition_data["terminated"].append((env_terminated,))
+                    post_transition_data["timed_out"].append((timed_out,))
 
                     # Data for the next timestep needed to select an action
                     pre_transition_data["state"].append(data["state"])

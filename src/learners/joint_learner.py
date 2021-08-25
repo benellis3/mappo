@@ -54,6 +54,8 @@ class JointLearner:
         self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
         self.is_popart = getattr(self.args, "is_popart", False)
 
+        self.bootstrap_timeouts = getattr(self.args, "bootstrap_timeouts", False)
+
         if (self.is_value_normalized and self.is_popart):
             raise ValueError("Either `is_value_normalized` or `is_popart` is specified, but not both.")
 
@@ -144,12 +146,21 @@ class JointLearner:
         rewards = batch["reward"][:, :]
         actions = batch["actions"][:, :]
         terminated = batch["terminated"][:, :].float()
+        timed_out = batch["timed_out"][:, :].float()
         mask = batch["filled"][:, :].float()
-        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # also mask if next state terminates
+        mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1]) # also mask if prior state terminated
+        if self.bootstrap_timeouts: 
+            # Do not train on states that timeout, or else their value target will be calculated as terminal without bootstrap
+            # Note: The environment could still mess this up if it terminates itself at timeout without setting episode_limit=true 
+            mask = mask * (1 - timed_out)
+            # make sure it is not the case you have a timeout out flag without terminated
+            # in logical form: assert all(not (batch["timed_out"] and not batch["terminated"])):
+            assert th.all(1 - ((batch["timed_out"] * (1-batch["terminated"]))) )
         avail_actions = batch["avail_actions"][:, :]
 
         mask = mask.squeeze(dim=-1)
         terminated = terminated.squeeze(dim=-1)
+        timed_out = timed_out.squeeze(dim=-1)
 
         ## get dead agents
         # no-op (valid only when dead)
@@ -179,22 +190,26 @@ class JointLearner:
         else:
             raise NotImplementedError
 
+        #### TODO: If kept, this block of code should be abstracted into a function, since similar code used below: ####
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
-        # append 0's for terminal state value. (Simplifies operations below.)
-        old_values_before = th.cat((old_values_before, th.zeros_like(old_values_before[:, 0:1, ...]),), dim=1)
+        # append 0's for value of state after terminal state. (Simplifies operations below. Any value works, but 0 is safer.)
+        old_values_before = th.cat((old_values_before, th.zeros_like(old_values_before[:, 0:1, ...]),), dim=1) # extend trajectory by 1
+        old_values_before[:, 1:] = old_values_before[:, 1:] * (1 - terminated) # make sure 0 at end of trajectory, for safety
         assert old_values_before.shape[1] == max_t+1, (old_values_before.shape, max_t)
+        
         if self.is_value_normalized or self.is_popart:
             old_values_before = self.denormalize_value(old_values_before)
 
         rewards = rewards.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
-            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
+            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, timed_out,
                                                     self.args.gamma, self.args.tau)
         elif self.advantage_calc_method == "TD":
             returns = rewards + self.args.gamma * (1 - terminated) * old_values_before[:, 1:]
         else:
             raise NotImplementedError
+        ######
 
         ## update the critics
         critic_loss_lst = []
@@ -210,20 +225,24 @@ class JointLearner:
             self.optimiser_critic.step()
             critic_loss_lst.append(vf_loss)
 
+        #### TODO: If kept, this block of code should be abstracted into a function, since similar code used above: ####
         old_values_after = self.critic(batch).squeeze(dim=-1).detach()
-        # append 0's for terminal state value. (Simplifies operations below.)
-        old_values_after = th.cat((old_values_after, th.zeros_like(old_values_after[:, 0:1, ...]),), dim=1)
+        # append 0's for value of state after terminal state. (Simplifies operations below. Any value works, but 0 is safer.)
+        old_values_after = th.cat((old_values_after, th.zeros_like(old_values_after[:, 0:1, ...]),), dim=1) # extend trajectory by 1
+        old_values_after[:, 1:] = old_values_after[:, 1:] * (1 - terminated) # make sure 0 at end of trajectory, for safety
+        
         if self.is_value_normalized or self.is_popart:
             old_values_after = self.denormalize_value(old_values_after)
 
         if self.advantage_calc_method == "GAE":
-            _, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
+            _, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, timed_out,
                                                     self.args.gamma, self.args.tau)
         elif self.advantage_calc_method == "TD":
             returns = rewards + self.args.gamma * (1 - terminated) * old_values_after[:, 1:]
             advantages = returns - old_values_after[:, :-1]
         else:
             raise NotImplementedError
+        ######
 
         if getattr(self.args, "is_advantage_normalized", False):
             # only consider valid advantages
@@ -308,19 +327,28 @@ class JointLearner:
                 self.logger.log_stat(k, np.mean(np.array(v)), t_env)
             self.log_stats_t = t_env
 
-    def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
+    def _compute_returns_advs(self, _values, _rewards, _terminated, _timed_out, gamma, tau):
         returns = th.zeros_like(_rewards)
         advs = th.zeros_like(_rewards)
         lastgaelam = th.zeros_like(_rewards[:, 0])
         ts = _rewards.size(1)
+
+        bad_mask = (1.0 - _timed_out)
 
         for t in reversed(range(ts)):
             nextnonterminal = 1.0 - _terminated[:, t]
             nextvalues = _values[:, t+1]
 
             reward_t = _rewards[:, t]
+
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
-            advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
+            lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
+            if self.bootstrap_timeouts:
+                # lastgaelam must be set to 0 for states that timeout so that prior state computes advs[:, t] = delta + 0
+                # Note that this will still calculate an invalid (0) return/adv in advs[:, t] for the states that timeout, but
+                #   this will be masked off anyway.
+                lastgaelam = bad_mask[:, t] * lastgaelam 
+            advs[:, t] = lastgaelam
 
         returns = advs + _values[:, :-1]
 
