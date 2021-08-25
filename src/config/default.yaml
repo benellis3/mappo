@@ -36,6 +36,7 @@ optim_alpha: 0.99 # RMSProp alpha
 optim_eps: 0.00001 # RMSProp epsilon
 grad_norm_clip: 10 # Reduce magnitude of gradients above this L2 norm
 gated: False
+bootstrap_timeouts: False # Whether to bootstrap the value on states that time out
 
 training_iters: 1
 

@@ -28,6 +28,7 @@ entropy_loss_coeff: 0.000
 # calculating advantage: GAE, TD
 advantage_calc_method: "GAE"
 # advantage_calc_method: "TD"
+bootstrap_timeouts: False
 
 ppo_policy_clip_param: 0.1
 
