@@ -37,8 +37,6 @@ class TrustRegionLearner:
         self.mac = mac
         self.agent_params = list(mac.parameters())
         
-        self.ppo_policy_clip_params = getattr(self.args, "ppo_policy_clip_param", 0.2)
-
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
 
@@ -51,7 +49,7 @@ class TrustRegionLearner:
         self.mini_epochs_critic = getattr(self.args, "mini_epochs_critic", 4)
         self.advantage_calc_method = getattr(self.args, "advantage_calc_method", "GAE")
         self.agent_type = getattr(self.args, "agent", None)
-        self.env_id = getattr(self.args, "env", None)
+        self.env_type = getattr(self.args, "env", None)
 
         self.target_kl = getattr(self.args, "target_kl", 0.01)
         self.kl_coeff_beta = getattr(self.args, "kl_coeff_beta", 1.0)
@@ -71,6 +69,8 @@ class TrustRegionLearner:
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
         self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
         self.is_popart = getattr(self.args, "is_popart", False)
+
+        self.bootstrap_timeouts = getattr(self.args, "bootstrap_timeouts", False)
 
         if (self.is_value_normalized and self.is_popart):
             raise ValueError("Either `is_value_normalized` or `is_popart` is specified, but not both.")
@@ -123,9 +123,9 @@ class TrustRegionLearner:
         return denormalized_values
 
     def normalize_state(self, batch, mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
+        bs, ts = batch.batch_size, batch.max_seq_length
 
-        state = batch["state"][:, :-1].cuda()
+        state = batch["state"][:, :].cuda()
         flat_state = state.reshape(-1, state.shape[-1])
         flat_mask = mask.flatten()
         # ensure the length matches
@@ -139,10 +139,10 @@ class TrustRegionLearner:
         state_mean = state_mean.expand(bs, ts, -1)
         state_var = state_var.expand(bs, ts, -1)
         expanded_mask = mask.expand(-1, -1, state_mean.shape[-1])
-        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
+        batch.data.transition_data['state'][:, :] = (batch['state'][:, :] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
 
     def normalize_obs(self, batch, alive_mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
+        bs, ts = batch.batch_size, batch.max_seq_length
         obs_mean = self.mac.obs_rms.mean.unsqueeze(0).unsqueeze(0).unsqueeze(0)
         obs_var = self.mac.obs_rms.var.unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
@@ -152,27 +152,35 @@ class TrustRegionLearner:
         expanded_alive_mask = alive_mask.unsqueeze(-1).expand(-1, -1, -1, obs_mean.shape[-1])
 
         # update obs directly in batch
-        batch.data.transition_data['obs'][:, :-1] = (batch['obs'][:, :-1] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
+        batch.data.transition_data['obs'][:, :] = (batch['obs'][:, :] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
         critic_train_stats = defaultdict(lambda: [])
-        max_t = batch.max_seq_length-1
+        max_t = batch.max_seq_length
 
         # Get the relevant quantities
-        rewards = batch["reward"][:, :-1]
-        actions = batch["actions"][:, :-1]
-        terminated = batch["terminated"][:, :-1].float()
-        mask = batch["filled"][:, :-1].float()
+        rewards = batch["reward"][:, :]
+        actions = batch["actions"][:, :]
+        terminated = batch["terminated"][:, :].float()
+        timed_out = batch["timed_out"][:, :].float()
+        mask = batch["filled"][:, :].float()
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
 
+        if self.bootstrap_timeouts: 
+            # Do not train on states that timeout, or else their value target will be calculated as terminal without bootstrap
+            # Note: The environment could still mess this up if it terminates itself at timeout without setting episode_limit=true 
+            mask = mask * (1 - timed_out)
+            # make sure it is not the case you have a timeout out flag without terminated
+            # in logical form: assert all(not (batch["timed_out"] and not batch["terminated"])):
+            assert th.all(1 - ((batch["timed_out"] * (1-batch["terminated"]))) )
         ## get dead agents
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        avail_actions = batch['avail_actions'][:, :-1].cuda()
+        avail_actions = batch['avail_actions'][:, :].cuda()
 
-        if self.env_id == 'matrix_game':
+        if self.env_type == 'matrix_game':
             alive_mask = ( th.sum(avail_actions, dim=-1)>0.0 ).float()
-        elif self.env_id == 'sc2':
+        elif self.env_type == 'sc2':
             alive_mask = ( (avail_actions[:, :, :, 0] < 1.0) * (th.sum(avail_actions, dim=-1) > 0.0) ).float()
         else: 
             raise NotImplementedError
@@ -203,16 +211,20 @@ class TrustRegionLearner:
             raise NotImplementedError
 
         old_values_before = self.critic(batch).squeeze(dim=-1).detach()
+        # append 0's for terminal state value. (Simplifies operations below.)
+        old_values_before = th.cat((old_values_before, th.zeros_like(old_values_before[:, 0:1, ...]),), dim=1)
+        assert old_values_before.shape[1] == max_t+1, (old_values_before.shape, max_t)
         if getattr(self.args, "is_popart", False):
             old_values_before = self.denormalize_value(old_values_before)
 
         # expand reward/mask to n_agent copies
         rewards = rewards.repeat(1, 1, self.n_agents)
         terminated = terminated.repeat(1, 1, self.n_agents)
+        timed_out = timed_out.repeat(1, 1, self.n_agents)
         expanded_mask = mask.repeat(1, 1, self.n_agents)
 
         if self.advantage_calc_method == "GAE":
-            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, 
+            returns, _ = self._compute_returns_advs(old_values_before, rewards, terminated, timed_out,
                                                     self.args.gamma, self.args.tau)
 
         else:
@@ -225,7 +237,6 @@ class TrustRegionLearner:
 
         for _ in range(0, self.mini_epochs_critic):
             new_values = self.critic(batch).squeeze()
-            new_values = new_values[:, :-1]
             critic_loss = 0.5 * ((new_values - returns)**2 * expanded_mask).sum() / expanded_mask.sum()
             self.optimiser_critic.zero_grad()
             critic_loss.backward()
@@ -233,11 +244,12 @@ class TrustRegionLearner:
             self.optimiser_critic.step()
 
         old_values_after = self.critic(batch).squeeze(dim=-1).detach()
+        old_values_after = th.cat((old_values_after, th.zeros_like(old_values_after[:, 0:1, ...]),), dim=1)
         if getattr(self.args, "is_popart", False):
             old_values_after = self.denormalize_value(old_values_after)
 
         if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, 
+            returns, advantages = self._compute_returns_advs(old_values_after, rewards, terminated, timed_out,
                                                     self.args.gamma, self.args.tau)
 
         else:
@@ -316,25 +328,23 @@ class TrustRegionLearner:
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
             pg_loss_unclipped = - advantages * prob_ratio
 
-            trust_region = getattr(self.args, "trust_region", False)
+            trust_region_constraint = getattr(self.args, "trust_region_constraint", 'none')
+            surrogate_clipped = getattr(self.args, "surrogate_clipped", False)
 
-            if trust_region == 'ppo_clipping':
+            if surrogate_clipped:
                 ## clipped 
-                pg_loss_clipped = - advantages * th.clamp(prob_ratio,
-                                                    1 - self.args.ppo_policy_clip_param,
-                                                    1 + self.args.ppo_policy_clip_param)
-
+                clip_range = getattr(self.args, "clip_range", 0.1)
+                pg_loss_clipped = - advantages * th.clamp(prob_ratio, 1 - clip_range, 1 + clip_range)
                 pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * alive_mask) / alive_mask.sum()
-
-            elif trust_region == 'fixed_kl':
-                ## fixed kl divergence penalty
+            else:
                 pg_loss = th.sum(pg_loss_unclipped * alive_mask) / alive_mask.sum()
+
+            if trust_region_constraint == 'fixed_kl':
+                ## fixed kl divergence penalty
                 pg_loss += self.kl_coeff_beta * approxkl
             
-            elif trust_region == 'adaptive_kl':
+            elif trust_region_constraint == 'adaptive_kl':
                 ## adaptive kl divergence penalty
-                pg_loss = th.sum(pg_loss_unclipped * alive_mask) / alive_mask.sum()
-
                 if approxkl < self.target_kl / 1.5:
                     self.kl_coeff_beta = self.kl_coeff_beta / 2.0
                 elif approxkl > self.target_kl * 1.5:
@@ -342,9 +352,8 @@ class TrustRegionLearner:
 
                 pg_loss += self.kl_coeff_beta * approxkl
 
-            elif trust_region == 'none':
-                ## independent actor-critic
-                pg_loss = th.sum(pg_loss_unclipped * alive_mask) / alive_mask.sum()
+            elif trust_region_constraint == 'none':
+                pass # do nothing
 
             else:
                 raise NotImplementedError
@@ -370,11 +379,13 @@ class TrustRegionLearner:
                 self.logger.log_stat(k, np.mean(np.array(v)), t_env)
             self.log_stats_t = t_env
 
-    def _compute_returns_advs(self, _values, _rewards, _terminated, gamma, tau):
+    def _compute_returns_advs(self, _values, _rewards, _terminated, _timed_out, gamma, tau):
         returns = th.zeros_like(_rewards)
         advs = th.zeros_like(_rewards)
         lastgaelam = th.zeros_like(_rewards[:, 0]).flatten()
         ts = _rewards.size(1)
+
+        bad_mask = (1.0 - _timed_out)
 
         for t in reversed(range(ts)):
             nextnonterminal = (1 - _terminated[:, t]).flatten()
@@ -383,6 +394,13 @@ class TrustRegionLearner:
             reward_t = _rewards[:, t].flatten()
             delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t].flatten()
             lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
+
+            if self.bootstrap_timeouts:
+                # lastgaelam must be set to 0 for states that timeout so that prior state computes advs[:, t] = delta + 0
+                # Note that this will still calculate an invalid (0) return/adv in advs[:, t] for the states that timeout, but
+                #   this will be masked off anyway.
+                lastgaelam = bad_mask[:, t] * lastgaelam 
+
             advs[:, t] = lastgaelam.view(_rewards[:, t].shape)
 
         returns = advs + _values[:, :-1]

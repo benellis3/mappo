@@ -36,6 +36,7 @@ class RNNCritic(nn.Module):
         hidden_states = self.init_hidden().unsqueeze(0).expand(batch.batch_size, self.n_agents, -1)  # bav
 
         outputs = []
+        h_in = hidden_states.reshape(-1, self.args.rnn_hidden_dim)
 
         for t in range(batch.max_seq_length):
             inputs = self._build_inputs(batch, t)
@@ -47,10 +48,8 @@ class RNNCritic(nn.Module):
                 h_in = h_in.detach()
 
             x = F.relu(self.fc1(inputs))
-            h_in = hidden_states.reshape(-1, self.args.rnn_hidden_dim)
-            hidden_states = h_in
-            h = self.rnn(x, h_in)
-            q = self.fc2(h)
+            h_in = self.rnn(x, h_in)
+            q = self.fc2(h_in)
             outputs.append(q.reshape(bs, 1, self.n_agents)) # bs * ts * n_agents
 
         output_tensor = th.stack(outputs, dim=1)
