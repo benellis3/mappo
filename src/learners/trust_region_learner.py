@@ -316,6 +316,9 @@ class TrustRegionLearner:
             self.optimiser_actor.step()
 
             extra_logger.record_tabular('approx_TV', approxtv.item())
+            ratios = prob_ratio.detach().cpu().numpy().flatten()
+            ratios_str = " ".join(str(x) for x in np.round(ratios, 3))
+            extra_logger.record_tabular('ratios', ratios_str)
             extra_logger.record_tabular('ratios_max', th.max(prob_ratio.detach()).item())
             extra_logger.record_tabular('ratios_min', th.min(prob_ratio.detach()).item())
             extra_logger.record_tabular('ratios_mean', th.mean(prob_ratio.detach()).item())
