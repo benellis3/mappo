@@ -33,9 +33,7 @@ entropy_loss_coeff: 0.000
 # calculating advantage: GAE, TD_Error
 advantage_calc_method: "GAE"
 
-surrogate_clipped: True
 clip_range: 0.1
-trust_region_constraint: 'none'
 
 is_advantage_normalized: True
 is_observation_normalized: True

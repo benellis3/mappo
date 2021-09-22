@@ -21,17 +21,21 @@ td_lambda: 0.99
 
 agent_output_type: "pi_logits"
 learner: "trust_region_learner"
-critic: "independent_rnn_critic"
+critic: "centralV_rnn_critic"
 
-mini_epochs_actor: 10
+# for rnn training
+detach_every: 20
+replace_every: null
+
+mini_epochs_actor: 8
 mini_epochs_critic: 10
 entropy_loss_coeff: 0.000
 
 # calculating advantage: GAE, TD_Error
 advantage_calc_method: "GAE"
+bootstrap_timeouts: False
 
-trust_region: "ppo_clipping"
-ppo_policy_clip_param: 0.2
+clip_range: 0.1
 
 is_advantage_normalized: True
 is_observation_normalized: True
@@ -41,4 +45,4 @@ is_value_normalized: False
 obs_agent_id: True
 obs_last_action: False
 
-name: "ppo_rnn_decentral_critic"
+name: "ppo_central_V"

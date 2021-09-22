@@ -7,6 +7,7 @@ from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
 from components.running_mean_std import RunningMeanStd
 
+from utils import extra_logger
 
 def compute_logp_entropy(logits, actions, masks):
     masked_logits = th.where(masks, logits, th.tensor(th.finfo(logits.dtype).min).to(logits.device))
@@ -51,24 +52,10 @@ class TrustRegionLearner:
         self.agent_type = getattr(self.args, "agent", None)
         self.env_type = getattr(self.args, "env", None)
 
-        self.target_kl = getattr(self.args, "target_kl", 0.01)
-        self.kl_coeff_beta = getattr(self.args, "kl_coeff_beta", 1.0)
-        self.divergence_mode = getattr(self.args, "divergence_mode", 'mean')
-        assert self.divergence_mode in ['mean', 'max', 'max-tv']
-
-        self.kl_clipping_mode = getattr(self.args, "kl_clipping_mode", "default")
-        assert self.kl_clipping_mode in ['default', 'epoch_adaptive']
-        if self.kl_clipping_mode == 'epoch_adaptive':
-            if self.n_agents < 5:
-                self.mini_epochs_actor = 15
-            elif self.n_agents < 10:
-                self.mini_epochs_actor = 10
-            else:
-                self.mini_epochs_actor = 5
-
         self.is_obs_normalized = getattr(self.args, "is_observation_normalized", False)
         self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
         self.is_popart = getattr(self.args, "is_popart", False)
+        self.clip_range = getattr(self.args, "clip_range", 0.1)
 
         self.bootstrap_timeouts = getattr(self.args, "bootstrap_timeouts", False)
 
@@ -255,6 +242,7 @@ class TrustRegionLearner:
         else:
             raise NotImplementedError
 
+        original_advantages = advantages[...]
         if getattr(self.args, "is_advantage_normalized", False):
             # only consider valid advantages
             flat_mask = alive_mask.flatten()
@@ -274,18 +262,18 @@ class TrustRegionLearner:
         old_meta_data = compute_logp_entropy(old_action_logits, actions, avail_actions)
         old_log_p, old_log_pac = old_meta_data['logp'], old_meta_data['logpac']
 
-        # joint probability
-        central_old_log_p = th.sum(old_log_p, dim=-1)
-        central_old_log_pac = th.sum(old_log_pac, dim=-1)
-
-        approxkl_lst = [] 
         entropy_lst = [] 
         actor_loss_lst = []
 
         mask = mask.squeeze(dim=-1)
 
+        # logging analytical results
+        extra_logger.configure(
+            dir="analytical_results/agents_%d_clip_%.2f_lr_%f_%d"
+            %(self.n_agents, self.clip_range, self.args.lr_actor, self.args.seed))
+
         ## update the actor
-        for _ in range(0, self.mini_epochs_actor):
+        for num_epoch in range(0, self.mini_epochs_actor):
             if self.agent_type == "rnn":
                 action_logits = []
                 self.mac.init_hidden(batch.batch_size)
@@ -303,23 +291,9 @@ class TrustRegionLearner:
             meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
             log_p, log_pac = meta_data['logp'], meta_data['logpac']
 
-            # joint probability
-            central_log_p = th.sum(log_p, dim=-1)
-            central_log_pac = th.sum(log_pac, dim=-1)
-
-            ## KL divergence for all agents; actually total variation distance
-            if self.divergence_mode == 'mean':
-                approxkl = 0.5 * ((central_log_pac - central_old_log_pac)**2 * mask).sum() / mask.sum()
-            elif self.divergence_mode == 'max':
-                approxkl = 0.5 * th.max( (central_log_pac - central_old_log_pac)**2 )
-            elif self.divergence_mode == 'max-tv':
-                ## actually total variation
-                prob_diff = th.exp(central_log_p) - th.exp(central_old_log_p)
-                approxkl = ( th.abs(prob_diff).sum(dim=-1).max() )**2
-            else: 
-                raise NotImplementedError
-
-            approxkl_lst.append(approxkl)
+            ## TV divergence for all agents
+            prob_diff = th.exp(log_p) - th.exp(old_log_p)
+            approxtv = th.max( ( 0.5 * th.abs(prob_diff).sum(dim=-1) ).sum(dim=-1) ).detach()
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
             entropy = (meta_data['entropy'] * alive_mask).sum() / alive_mask.sum() 
@@ -328,35 +302,10 @@ class TrustRegionLearner:
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
             pg_loss_unclipped = - advantages * prob_ratio
 
-            trust_region_constraint = getattr(self.args, "trust_region_constraint", 'none')
-            surrogate_clipped = getattr(self.args, "surrogate_clipped", False)
+            pg_loss_clipped = - advantages * th.clamp(prob_ratio, 1 - self.clip_range, 1 + self.clip_range)
 
-            if surrogate_clipped:
-                ## clipped 
-                clip_range = getattr(self.args, "clip_range", 0.1)
-                pg_loss_clipped = - advantages * th.clamp(prob_ratio, 1 - clip_range, 1 + clip_range)
-                pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * alive_mask) / alive_mask.sum()
-            else:
-                pg_loss = th.sum(pg_loss_unclipped * alive_mask) / alive_mask.sum()
-
-            if trust_region_constraint == 'fixed_kl':
-                ## fixed kl divergence penalty
-                pg_loss += self.kl_coeff_beta * approxkl
-            
-            elif trust_region_constraint == 'adaptive_kl':
-                ## adaptive kl divergence penalty
-                if approxkl < self.target_kl / 1.5:
-                    self.kl_coeff_beta = self.kl_coeff_beta / 2.0
-                elif approxkl > self.target_kl * 1.5:
-                    self.kl_coeff_beta = self.kl_coeff_beta * 2.0
-
-                pg_loss += self.kl_coeff_beta * approxkl
-
-            elif trust_region_constraint == 'none':
-                pass # do nothing
-
-            else:
-                raise NotImplementedError
+            pg_loss = th.sum(th.max(pg_loss_unclipped, pg_loss_clipped) * alive_mask) / alive_mask.sum()
+            surr_objective = th.sum(original_advantages * prob_ratio * alive_mask) / alive_mask.sum()
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
@@ -366,13 +315,31 @@ class TrustRegionLearner:
             actor_loss.backward()
             self.optimiser_actor.step()
 
+            extra_logger.record_tabular('approx_TV', approxtv.item())
+            extra_logger.record_tabular('ratios_max', th.max(prob_ratio.detach()).item())
+            extra_logger.record_tabular('ratios_min', th.min(prob_ratio.detach()).item())
+            extra_logger.record_tabular('ratios_mean', th.mean(prob_ratio.detach()).item())
+            extra_logger.record_tabular('learning_rate', self.args.lr_actor)
+            extra_logger.record_tabular('clip_range', self.clip_range)
+            extra_logger.record_tabular('num_agents', self.n_agents)
+            extra_logger.record_tabular('num_epochs', num_epoch)
+            extra_logger.dump_tabular()
+
         # log stuff
+        import sys
+        sys.exit(0)
         critic_train_stats["rewards"].append(th.mean(rewards).item())
         critic_train_stats["returns"].append((th.mean(returns)).item())
-        critic_train_stats["approx_KL"].append(th.mean(th.tensor(approxkl_lst)).item())
+        critic_train_stats["approx_TV"].append(approxtv.item())
         critic_train_stats["entropy"].append(th.mean(th.tensor(entropy_lst)).item())
         critic_train_stats["critic_loss"].append(th.mean(th.tensor(critic_loss_lst)).item())
         critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
+
+        critic_train_stats["surr_objective"].append(surr_objective.item())
+
+        critic_train_stats["ratios_max"].append(th.max(prob_ratio.detach()).item())
+        critic_train_stats["ratios_min"].append(th.min(prob_ratio.detach()).item())
+        critic_train_stats["ratios_mean"].append(th.mean(prob_ratio.detach()).item())
 
         if t_env - self.log_stats_t >= self.args.learner_log_interval:
             for k,v in critic_train_stats.items():
