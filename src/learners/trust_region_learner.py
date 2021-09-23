@@ -293,7 +293,8 @@ class TrustRegionLearner:
 
             ## TV divergence for all agents
             prob_diff = th.exp(log_p) - th.exp(old_log_p)
-            approxtv = th.max( ( 0.5 * th.abs(prob_diff).sum(dim=-1) ).sum(dim=-1) ).detach()
+            indepent_approxtv = th.max( 0.5 * th.abs(prob_diff).sum(dim=-1) ).detach()
+            joint_approxtv = th.max( ( 0.5 * th.abs(prob_diff).sum(dim=-1) ).sum(dim=-1) ).detach()
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
             entropy = (meta_data['entropy'] * alive_mask).sum() / alive_mask.sum() 
@@ -315,13 +316,19 @@ class TrustRegionLearner:
             actor_loss.backward()
             self.optimiser_actor.step()
 
-            extra_logger.record_tabular('approx_TV', approxtv.item())
-            ratios = prob_ratio.detach().cpu().numpy().flatten()
-            ratios_str = " ".join(str(x) for x in np.round(ratios, 3))
+            extra_logger.record_tabular('independent_approx_TV', indepent_approxtv.item())
+            extra_logger.record_tabular('joint_approx_TV', joint_approxtv.item())
+            ratios = prob_ratio.detach().cpu().numpy()
+            epsilon = np.abs(ratios - 1.0)
+            epsilon_sum = np.sum( np.amax(epsilon, axis=(0, 1)) )
+            epsilon_max = np.max(epsilon)
+            ratios_str = " ".join(str(x) for x in np.round(ratios.flatten(), 3))
             extra_logger.record_tabular('ratios', ratios_str)
-            extra_logger.record_tabular('ratios_max', th.max(prob_ratio.detach()).item())
-            extra_logger.record_tabular('ratios_min', th.min(prob_ratio.detach()).item())
-            extra_logger.record_tabular('ratios_mean', th.mean(prob_ratio.detach()).item())
+            extra_logger.record_tabular('epsilon_sum', epsilon_sum)
+            extra_logger.record_tabular('epsilon_max', epsilon_max)
+            extra_logger.record_tabular('ratios_max', np.max(ratios))
+            extra_logger.record_tabular('ratios_min', np.min(ratios))
+            extra_logger.record_tabular('ratios_mean', np.mean(ratios))
             extra_logger.record_tabular('learning_rate', self.args.lr_actor)
             extra_logger.record_tabular('clip_range', self.clip_range)
             extra_logger.record_tabular('num_agents', self.n_agents)
