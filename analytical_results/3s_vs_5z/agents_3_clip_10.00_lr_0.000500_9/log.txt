@@ -1,0 +1,1401 @@
+Logging to analytical_results/3s_vs_5z/agents_3_clip_10.00_lr_0.000500_9
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.0                     |
+| epsilon_sum           | 0.0                     |
+| independent_approx_TV | 0                       |
+| joint_approx_TV       | 0                       |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 0                       |
+| ratios                | 1.0 1.0 1.0 1.0 1.0 ... |
+| ratios_max            | 1.0                     |
+| ratios_mean           | 1.0                     |
+| ratios_min            | 1.0                     |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.024691343             |
+| epsilon_sum           | 0.059913874             |
+| independent_approx_TV | 0.0064                  |
+| joint_approx_TV       | 0.0122                  |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 1                       |
+| ratios                | 1.006 1.006 1.007 1.... |
+| ratios_max            | 1.0181185               |
+| ratios_mean           | 0.99950916              |
+| ratios_min            | 0.97530866              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.05052054              |
+| epsilon_sum           | 0.12358117              |
+| independent_approx_TV | 0.0133                  |
+| joint_approx_TV       | 0.0255                  |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 2                       |
+| ratios                | 1.012 1.012 1.015 1.... |
+| ratios_max            | 1.037806                |
+| ratios_mean           | 0.99898756              |
+| ratios_min            | 0.94947946              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.07649684              |
+| epsilon_sum           | 0.18898124              |
+| independent_approx_TV | 0.0204                  |
+| joint_approx_TV       | 0.0393                  |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 3                       |
+| ratios                | 1.018 1.019 1.023 1.... |
+| ratios_max            | 1.05858                 |
+| ratios_mean           | 0.9984549               |
+| ratios_min            | 0.92350316              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.10226053              |
+| epsilon_sum           | 0.25597757              |
+| independent_approx_TV | 0.0277                  |
+| joint_approx_TV       | 0.0535                  |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 4                       |
+| ratios                | 1.024 1.025 1.032 1.... |
+| ratios_max            | 1.0802447               |
+| ratios_mean           | 0.99791425              |
+| ratios_min            | 0.89773947              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.1276375               |
+| epsilon_sum           | 0.32404518              |
+| independent_approx_TV | 0.0351                  |
+| joint_approx_TV       | 0.0681                  |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 5                       |
+| ratios                | 1.031 1.032 1.041 1.... |
+| ratios_max            | 1.1026108               |
+| ratios_mean           | 0.99737126              |
+| ratios_min            | 0.8723625               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.15252405              |
+| epsilon_sum           | 0.3928545               |
+| independent_approx_TV | 0.0427                  |
+| joint_approx_TV       | 0.0829                  |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 6                       |
+| ratios                | 1.038 1.04 1.05 1.05... |
+| ratios_max            | 1.1256813               |
+| ratios_mean           | 0.996832                |
+| ratios_min            | 0.84747595              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.1768027               |
+| epsilon_sum           | 0.46224385              |
+| independent_approx_TV | 0.0504                  |
+| joint_approx_TV       | 0.0979                  |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 7                       |
+| ratios                | 1.045 1.047 1.059 1.... |
+| ratios_max            | 1.1494101               |
+| ratios_mean           | 0.9962943               |
+| ratios_min            | 0.8231973               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.20053273              |
+| epsilon_sum           | 0.53238434              |
+| independent_approx_TV | 0.0582                  |
+| joint_approx_TV       | 0.113                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 8                       |
+| ratios                | 1.052 1.055 1.069 1.... |
+| ratios_max            | 1.1739035               |
+| ratios_mean           | 0.99575824              |
+| ratios_min            | 0.79946727              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.22375411              |
+| epsilon_sum           | 0.6033421               |
+| independent_approx_TV | 0.0661                  |
+| joint_approx_TV       | 0.129                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 9                       |
+| ratios                | 1.06 1.063 1.078 1.0... |
+| ratios_max            | 1.1991352               |
+| ratios_mean           | 0.9952256               |
+| ratios_min            | 0.7762459               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.24654216              |
+| epsilon_sum           | 0.67524785              |
+| independent_approx_TV | 0.0741                  |
+| joint_approx_TV       | 0.144                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 10                      |
+| ratios                | 1.068 1.071 1.088 1.... |
+| ratios_max            | 1.2251482               |
+| ratios_mean           | 0.9946957               |
+| ratios_min            | 0.75345784              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.26898384              |
+| epsilon_sum           | 0.74832964              |
+| independent_approx_TV | 0.0823                  |
+| joint_approx_TV       | 0.16                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 11                      |
+| ratios                | 1.076 1.078 1.098 1.... |
+| ratios_max            | 1.2520218               |
+| ratios_mean           | 0.9941677               |
+| ratios_min            | 0.73101616              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.2910059               |
+| epsilon_sum           | 0.82275075              |
+| independent_approx_TV | 0.0905                  |
+| joint_approx_TV       | 0.176                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 12                      |
+| ratios                | 1.084 1.086 1.108 1.... |
+| ratios_max            | 1.2797978               |
+| ratios_mean           | 0.99364007              |
+| ratios_min            | 0.7089941               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.31266993              |
+| epsilon_sum           | 0.8985955               |
+| independent_approx_TV | 0.0989                  |
+| joint_approx_TV       | 0.193                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 13                      |
+| ratios                | 1.093 1.094 1.119 1.... |
+| ratios_max            | 1.3085018               |
+| ratios_mean           | 0.9931112               |
+| ratios_min            | 0.68733007              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.33826494              |
+| epsilon_sum           | 0.9759283               |
+| independent_approx_TV | 0.107                   |
+| joint_approx_TV       | 0.209                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 14                      |
+| ratios                | 1.102 1.103 1.13 1.1... |
+| ratios_max            | 1.338265                |
+| ratios_mean           | 0.9925834               |
+| ratios_min            | 0.66599                 |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.369187                |
+| epsilon_sum           | 1.0550816               |
+| independent_approx_TV | 0.116                   |
+| joint_approx_TV       | 0.226                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 15                      |
+| ratios                | 1.111 1.112 1.141 1.... |
+| ratios_max            | 1.369187                |
+| ratios_mean           | 0.992055                |
+| ratios_min            | 0.6449376               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.40139127              |
+| epsilon_sum           | 1.1361687               |
+| independent_approx_TV | 0.125                   |
+| joint_approx_TV       | 0.243                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 16                      |
+| ratios                | 1.121 1.121 1.152 1.... |
+| ratios_max            | 1.4013913               |
+| ratios_mean           | 0.9915265               |
+| ratios_min            | 0.6241393               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.4349835               |
+| epsilon_sum           | 1.2193356               |
+| independent_approx_TV | 0.134                   |
+| joint_approx_TV       | 0.261                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 17                      |
+| ratios                | 1.131 1.13 1.164 1.1... |
+| ratios_max            | 1.4349835               |
+| ratios_mean           | 0.9909942               |
+| ratios_min            | 0.60354966              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.47006965              |
+| epsilon_sum           | 1.3090076               |
+| independent_approx_TV | 0.143                   |
+| joint_approx_TV       | 0.278                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 18                      |
+| ratios                | 1.142 1.14 1.176 1.2... |
+| ratios_max            | 1.4700696               |
+| ratios_mean           | 0.99045944              |
+| ratios_min            | 0.58321136              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.5068251               |
+| epsilon_sum           | 1.4129925               |
+| independent_approx_TV | 0.152                   |
+| joint_approx_TV       | 0.297                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 19                      |
+| ratios                | 1.153 1.15 1.188 1.2... |
+| ratios_max            | 1.5068251               |
+| ratios_mean           | 0.98992133              |
+| ratios_min            | 0.5630865               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.5454135               |
+| epsilon_sum           | 1.523515                |
+| independent_approx_TV | 0.162                   |
+| joint_approx_TV       | 0.315                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 20                      |
+| ratios                | 1.164 1.16 1.2 1.243... |
+| ratios_max            | 1.5454135               |
+| ratios_mean           | 0.98938                 |
+| ratios_min            | 0.54316765              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.5859715               |
+| epsilon_sum           | 1.6400638               |
+| independent_approx_TV | 0.171                   |
+| joint_approx_TV       | 0.334                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 21                      |
+| ratios                | 1.176 1.171 1.213 1.... |
+| ratios_max            | 1.5859715               |
+| ratios_mean           | 0.9888329               |
+| ratios_min            | 0.52339804              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.62866056              |
+| epsilon_sum           | 1.7704018               |
+| independent_approx_TV | 0.181                   |
+| joint_approx_TV       | 0.353                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 22                      |
+| ratios                | 1.189 1.183 1.226 1.... |
+| ratios_max            | 1.6286606               |
+| ratios_mean           | 0.98828125              |
+| ratios_min            | 0.50384915              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.6736728               |
+| epsilon_sum           | 1.9105814               |
+| independent_approx_TV | 0.19                    |
+| joint_approx_TV       | 0.373                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 23                      |
+| ratios                | 1.202 1.195 1.24 1.3... |
+| ratios_max            | 1.6736728               |
+| ratios_mean           | 0.9877233               |
+| ratios_min            | 0.4844974               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.7211031               |
+| epsilon_sum           | 2.0600815               |
+| independent_approx_TV | 0.2                     |
+| joint_approx_TV       | 0.393                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 24                      |
+| ratios                | 1.216 1.207 1.254 1.... |
+| ratios_max            | 1.7211031               |
+| ratios_mean           | 0.98716027              |
+| ratios_min            | 0.46525833              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.7711121               |
+| epsilon_sum           | 2.2196264               |
+| independent_approx_TV | 0.21                    |
+| joint_approx_TV       | 0.414                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 25                      |
+| ratios                | 1.23 1.22 1.269 1.34... |
+| ratios_max            | 1.7711121               |
+| ratios_mean           | 0.9865911               |
+| ratios_min            | 0.44614065              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.82394946              |
+| epsilon_sum           | 2.390281                |
+| independent_approx_TV | 0.221                   |
+| joint_approx_TV       | 0.435                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 26                      |
+| ratios                | 1.245 1.234 1.285 1.... |
+| ratios_max            | 1.8239495               |
+| ratios_mean           | 0.98601985              |
+| ratios_min            | 0.42716923              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.8797432               |
+| epsilon_sum           | 2.5731125               |
+| independent_approx_TV | 0.231                   |
+| joint_approx_TV       | 0.456                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 27                      |
+| ratios                | 1.26 1.249 1.301 1.3... |
+| ratios_max            | 1.8797432               |
+| ratios_mean           | 0.98544645              |
+| ratios_min            | 0.40831065              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 0.93978643              |
+| epsilon_sum           | 2.7692003               |
+| independent_approx_TV | 0.242                   |
+| joint_approx_TV       | 0.478                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 28                      |
+| ratios                | 1.276 1.264 1.318 1.... |
+| ratios_max            | 1.9397864               |
+| ratios_mean           | 0.9848715               |
+| ratios_min            | 0.38966572              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.0152743               |
+| epsilon_sum           | 2.9795108               |
+| independent_approx_TV | 0.254                   |
+| joint_approx_TV       | 0.501                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 29                      |
+| ratios                | 1.293 1.28 1.335 1.4... |
+| ratios_max            | 2.0152743               |
+| ratios_mean           | 0.9842981               |
+| ratios_min            | 0.371226                |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.096864                |
+| epsilon_sum           | 3.205047                |
+| independent_approx_TV | 0.266                   |
+| joint_approx_TV       | 0.523                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 30                      |
+| ratios                | 1.311 1.297 1.353 1.... |
+| ratios_max            | 2.096864                |
+| ratios_mean           | 0.9837253               |
+| ratios_min            | 0.3529438               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.1851649               |
+| epsilon_sum           | 3.4469101               |
+| independent_approx_TV | 0.279                   |
+| joint_approx_TV       | 0.547                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 31                      |
+| ratios                | 1.33 1.315 1.372 1.5... |
+| ratios_max            | 2.185165                |
+| ratios_mean           | 0.98315346              |
+| ratios_min            | 0.33490804              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.2807636               |
+| epsilon_sum           | 3.707328                |
+| independent_approx_TV | 0.291                   |
+| joint_approx_TV       | 0.571                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 32                      |
+| ratios                | 1.349 1.333 1.391 1.... |
+| ratios_max            | 2.2807636               |
+| ratios_mean           | 0.98258984              |
+| ratios_min            | 0.31708783              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.384527                |
+| epsilon_sum           | 3.9877748               |
+| independent_approx_TV | 0.304                   |
+| joint_approx_TV       | 0.595                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 33                      |
+| ratios                | 1.37 1.353 1.412 1.5... |
+| ratios_max            | 2.384527                |
+| ratios_mean           | 0.98203665              |
+| ratios_min            | 0.29951257              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.4969804               |
+| epsilon_sum           | 4.2892437               |
+| independent_approx_TV | 0.316                   |
+| joint_approx_TV       | 0.62                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 34                      |
+| ratios                | 1.391 1.372 1.433 1.... |
+| ratios_max            | 2.4969804               |
+| ratios_mean           | 0.98149294              |
+| ratios_min            | 0.28221765              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.6191449               |
+| epsilon_sum           | 4.613798                |
+| independent_approx_TV | 0.329                   |
+| joint_approx_TV       | 0.646                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 35                      |
+| ratios                | 1.414 1.392 1.455 1.... |
+| ratios_max            | 2.619145                |
+| ratios_mean           | 0.98096424              |
+| ratios_min            | 0.26519406              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.7518759               |
+| epsilon_sum           | 4.963213                |
+| independent_approx_TV | 0.341                   |
+| joint_approx_TV       | 0.678                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 36                      |
+| ratios                | 1.437 1.413 1.478 1.... |
+| ratios_max            | 2.7518759               |
+| ratios_mean           | 0.9804558               |
+| ratios_min            | 0.24849842              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 1.896179                |
+| epsilon_sum           | 5.3440075               |
+| independent_approx_TV | 0.354                   |
+| joint_approx_TV       | 0.715                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 37                      |
+| ratios                | 1.46 1.435 1.503 1.7... |
+| ratios_max            | 2.896179                |
+| ratios_mean           | 0.97996914              |
+| ratios_min            | 0.23215938              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 2.0527282               |
+| epsilon_sum           | 5.755118                |
+| independent_approx_TV | 0.366                   |
+| joint_approx_TV       | 0.755                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 38                      |
+| ratios                | 1.485 1.458 1.528 1.... |
+| ratios_max            | 3.0527282               |
+| ratios_mean           | 0.97951657              |
+| ratios_min            | 0.21627028              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 2.2216833               |
+| epsilon_sum           | 6.1961327               |
+| independent_approx_TV | 0.378                   |
+| joint_approx_TV       | 0.796                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 39                      |
+| ratios                | 1.511 1.483 1.555 1.... |
+| ratios_max            | 3.2216833               |
+| ratios_mean           | 0.97910047              |
+| ratios_min            | 0.20087954              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 2.403564                |
+| epsilon_sum           | 6.6682773               |
+| independent_approx_TV | 0.39                    |
+| joint_approx_TV       | 0.842                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 40                      |
+| ratios                | 1.538 1.508 1.583 1.... |
+| ratios_max            | 3.403564                |
+| ratios_mean           | 0.97872454              |
+| ratios_min            | 0.18601726              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 2.5987027               |
+| epsilon_sum           | 7.1726265               |
+| independent_approx_TV | 0.402                   |
+| joint_approx_TV       | 0.89                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 41                      |
+| ratios                | 1.567 1.535 1.612 1.... |
+| ratios_max            | 3.5987027               |
+| ratios_mean           | 0.9783949               |
+| ratios_min            | 0.17175925              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 2.8071918               |
+| epsilon_sum           | 7.73886                 |
+| independent_approx_TV | 0.413                   |
+| joint_approx_TV       | 0.939                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 42                      |
+| ratios                | 1.597 1.564 1.643 1.... |
+| ratios_max            | 3.8071918               |
+| ratios_mean           | 0.9781183               |
+| ratios_min            | 0.15819857              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 3.0289397               |
+| epsilon_sum           | 8.398216                |
+| independent_approx_TV | 0.424                   |
+| joint_approx_TV       | 0.991                   |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 43                      |
+| ratios                | 1.629 1.594 1.676 2.... |
+| ratios_max            | 4.0289397               |
+| ratios_mean           | 0.97789615              |
+| ratios_min            | 0.14521219              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 3.2634025               |
+| epsilon_sum           | 9.106844                |
+| independent_approx_TV | 0.435                   |
+| joint_approx_TV       | 1.04                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 44                      |
+| ratios                | 1.662 1.626 1.71 2.0... |
+| ratios_max            | 4.2634025               |
+| ratios_mean           | 0.9777289               |
+| ratios_min            | 0.13243285              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 3.518506                |
+| epsilon_sum           | 9.873162                |
+| independent_approx_TV | 0.457                   |
+| joint_approx_TV       | 1.1                     |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 45                      |
+| ratios                | 1.697 1.659 1.745 2.... |
+| ratios_max            | 4.518506                |
+| ratios_mean           | 0.9776097               |
+| ratios_min            | 0.120484225             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 3.8112893               |
+| epsilon_sum           | 10.714354               |
+| independent_approx_TV | 0.483                   |
+| joint_approx_TV       | 1.16                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 46                      |
+| ratios                | 1.734 1.694 1.781 2.... |
+| ratios_max            | 4.8112893               |
+| ratios_mean           | 0.9775402               |
+| ratios_min            | 0.10938951              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 4.1200547               |
+| epsilon_sum           | 11.607863               |
+| independent_approx_TV | 0.509                   |
+| joint_approx_TV       | 1.24                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 47                      |
+| ratios                | 1.773 1.731 1.82 2.2... |
+| ratios_max            | 5.1200547               |
+| ratios_mean           | 0.97751534              |
+| ratios_min            | 0.0991478               |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 4.442619                |
+| epsilon_sum           | 12.548931               |
+| independent_approx_TV | 0.535                   |
+| joint_approx_TV       | 1.32                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 48                      |
+| ratios                | 1.812 1.769 1.86 2.3... |
+| ratios_max            | 5.442619                |
+| ratios_mean           | 0.9775192               |
+| ratios_min            | 0.08975745              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 4.7761874               |
+| epsilon_sum           | 13.531336               |
+| independent_approx_TV | 0.56                    |
+| joint_approx_TV       | 1.4                     |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 49                      |
+| ratios                | 1.854 1.81 1.902 2.3... |
+| ratios_max            | 5.7761874               |
+| ratios_mean           | 0.97753084              |
+| ratios_min            | 0.08119305              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 5.1172533               |
+| epsilon_sum           | 14.54672                |
+| independent_approx_TV | 0.585                   |
+| joint_approx_TV       | 1.48                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 50                      |
+| ratios                | 1.897 1.853 1.946 2.... |
+| ratios_max            | 6.1172533               |
+| ratios_mean           | 0.97753215              |
+| ratios_min            | 0.073402025             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 5.4609246               |
+| epsilon_sum           | 15.581455               |
+| independent_approx_TV | 0.608                   |
+| joint_approx_TV       | 1.57                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 51                      |
+| ratios                | 1.942 1.897 1.992 2.... |
+| ratios_max            | 6.4609246               |
+| ratios_mean           | 0.9774983               |
+| ratios_min            | 0.06635328              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 5.802229                |
+| epsilon_sum           | 16.621681               |
+| independent_approx_TV | 0.631                   |
+| joint_approx_TV       | 1.65                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 52                      |
+| ratios                | 1.989 1.943 2.04 2.6... |
+| ratios_max            | 6.802229                |
+| ratios_mean           | 0.9774051               |
+| ratios_min            | 0.05999515              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 6.1362495               |
+| epsilon_sum           | 17.652605               |
+| independent_approx_TV | 0.654                   |
+| joint_approx_TV       | 1.73                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 53                      |
+| ratios                | 2.038 1.992 2.089 2.... |
+| ratios_max            | 7.1362495               |
+| ratios_mean           | 0.9772191               |
+| ratios_min            | 0.054285806             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 6.458148                |
+| epsilon_sum           | 18.65873                |
+| independent_approx_TV | 0.675                   |
+| joint_approx_TV       | 1.81                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 54                      |
+| ratios                | 2.088 2.041 2.14 2.7... |
+| ratios_max            | 7.458148                |
+| ratios_mean           | 0.97690886              |
+| ratios_min            | 0.049173877             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 6.7638125               |
+| epsilon_sum           | 19.627102               |
+| independent_approx_TV | 0.694                   |
+| joint_approx_TV       | 1.88                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 55                      |
+| ratios                | 2.14 2.092 2.193 2.8... |
+| ratios_max            | 7.7638125               |
+| ratios_mean           | 0.9764563               |
+| ratios_min            | 0.04461251              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 7.0499735               |
+| epsilon_sum           | 20.544682               |
+| independent_approx_TV | 0.711                   |
+| joint_approx_TV       | 1.95                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 56                      |
+| ratios                | 2.193 2.144 2.247 2.... |
+| ratios_max            | 8.0499735               |
+| ratios_mean           | 0.9758491               |
+| ratios_min            | 0.04055495              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 7.314375                |
+| epsilon_sum           | 21.401943               |
+| independent_approx_TV | 0.726                   |
+| joint_approx_TV       | 2.02                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 57                      |
+| ratios                | 2.248 2.197 2.303 3.... |
+| ratios_max            | 8.314375                |
+| ratios_mean           | 0.97507614              |
+| ratios_min            | 0.036956124             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 7.5558376               |
+| epsilon_sum           | 22.192108               |
+| independent_approx_TV | 0.74                    |
+| joint_approx_TV       | 2.08                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 58                      |
+| ratios                | 2.303 2.251 2.359 3.... |
+| ratios_max            | 8.555838                |
+| ratios_mean           | 0.97414017              |
+| ratios_min            | 0.033771694             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 7.7740517               |
+| epsilon_sum           | 22.912071               |
+| independent_approx_TV | 0.751                   |
+| joint_approx_TV       | 2.13                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 59                      |
+| ratios                | 2.36 2.306 2.417 3.1... |
+| ratios_max            | 8.774052                |
+| ratios_mean           | 0.9730457               |
+| ratios_min            | 0.030957578             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 7.9696245               |
+| epsilon_sum           | 23.561876               |
+| independent_approx_TV | 0.761                   |
+| joint_approx_TV       | 2.17                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 60                      |
+| ratios                | 2.418 2.362 2.475 3.... |
+| ratios_max            | 8.9696245               |
+| ratios_mean           | 0.9718056               |
+| ratios_min            | 0.028475972             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 8.143713                |
+| epsilon_sum           | 24.14372                |
+| independent_approx_TV | 0.769                   |
+| joint_approx_TV       | 2.21                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 61                      |
+| ratios                | 2.477 2.419 2.535 3.... |
+| ratios_max            | 9.143713                |
+| ratios_mean           | 0.97043425              |
+| ratios_min            | 0.026298534             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 8.2978735               |
+| epsilon_sum           | 24.661198               |
+| independent_approx_TV | 0.776                   |
+| joint_approx_TV       | 2.25                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 62                      |
+| ratios                | 2.536 2.476 2.595 3.... |
+| ratios_max            | 9.2978735               |
+| ratios_mean           | 0.9689522               |
+| ratios_min            | 0.024382703             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 8.4503                  |
+| epsilon_sum           | 25.119085               |
+| independent_approx_TV | 0.785                   |
+| joint_approx_TV       | 2.29                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 63                      |
+| ratios                | 2.595 2.534 2.656 3.... |
+| ratios_max            | 9.4503                  |
+| ratios_mean           | 0.9673822               |
+| ratios_min            | 0.022665836             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 8.600728                |
+| epsilon_sum           | 25.522717               |
+| independent_approx_TV | 0.795                   |
+| joint_approx_TV       | 2.33                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 64                      |
+| ratios                | 2.655 2.592 2.717 3.... |
+| ratios_max            | 9.600728                |
+| ratios_mean           | 0.9657495               |
+| ratios_min            | 0.021074835             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 8.732316                |
+| epsilon_sum           | 25.877392               |
+| independent_approx_TV | 0.804                   |
+| joint_approx_TV       | 2.36                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 65                      |
+| ratios                | 2.714 2.65 2.778 3.6... |
+| ratios_max            | 9.732316                |
+| ratios_mean           | 0.9640756               |
+| ratios_min            | 0.019668631             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 8.847198                |
+| epsilon_sum           | 26.188452               |
+| independent_approx_TV | 0.812                   |
+| joint_approx_TV       | 2.39                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 66                      |
+| ratios                | 2.774 2.707 2.838 3.... |
+| ratios_max            | 9.847198                |
+| ratios_mean           | 0.9623828               |
+| ratios_min            | 0.01842282              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 8.947256                |
+| epsilon_sum           | 26.460926               |
+| independent_approx_TV | 0.82                    |
+| joint_approx_TV       | 2.41                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 67                      |
+| ratios                | 2.832 2.764 2.897 3.... |
+| ratios_max            | 9.947256                |
+| ratios_mean           | 0.96068865              |
+| ratios_min            | 0.01731586              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.034145                |
+| epsilon_sum           | 26.699219               |
+| independent_approx_TV | 0.826                   |
+| joint_approx_TV       | 2.43                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 68                      |
+| ratios                | 2.889 2.82 2.954 3.8... |
+| ratios_max            | 10.034145               |
+| ratios_mean           | 0.9590056               |
+| ratios_min            | 0.016328841             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.109484                |
+| epsilon_sum           | 26.907446               |
+| independent_approx_TV | 0.832                   |
+| joint_approx_TV       | 2.45                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 69                      |
+| ratios                | 2.945 2.874 3.01 3.9... |
+| ratios_max            | 10.109484               |
+| ratios_mean           | 0.95734715              |
+| ratios_min            | 0.015445186             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.174602                |
+| epsilon_sum           | 27.089191               |
+| independent_approx_TV | 0.837                   |
+| joint_approx_TV       | 2.47                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 70                      |
+| ratios                | 2.999 2.927 3.063 3.... |
+| ratios_max            | 10.174602               |
+| ratios_mean           | 0.9557235               |
+| ratios_min            | 0.014649967             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.230856                |
+| epsilon_sum           | 27.247772               |
+| independent_approx_TV | 0.841                   |
+| joint_approx_TV       | 2.48                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 71                      |
+| ratios                | 3.051 2.977 3.115 4.... |
+| ratios_max            | 10.230856               |
+| ratios_mean           | 0.95414436              |
+| ratios_min            | 0.013930056             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.279212                |
+| epsilon_sum           | 27.386139               |
+| independent_approx_TV | 0.845                   |
+| joint_approx_TV       | 2.49                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 72                      |
+| ratios                | 3.101 3.026 3.164 4.... |
+| ratios_max            | 10.279212               |
+| ratios_mean           | 0.9526109               |
+| ratios_min            | 0.013272798             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.320641                |
+| epsilon_sum           | 27.506878               |
+| independent_approx_TV | 0.848                   |
+| joint_approx_TV       | 2.5                     |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 73                      |
+| ratios                | 3.149 3.073 3.21 4.0... |
+| ratios_max            | 10.320641               |
+| ratios_mean           | 0.9511259               |
+| ratios_min            | 0.012668266             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.356015                |
+| epsilon_sum           | 27.612404               |
+| independent_approx_TV | 0.851                   |
+| joint_approx_TV       | 2.51                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 74                      |
+| ratios                | 3.195 3.117 3.253 4.... |
+| ratios_max            | 10.356015               |
+| ratios_mean           | 0.9496921               |
+| ratios_min            | 0.01210748              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.386073                |
+| epsilon_sum           | 27.706787               |
+| independent_approx_TV | 0.854                   |
+| joint_approx_TV       | 2.52                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 75                      |
+| ratios                | 3.238 3.158 3.293 4.... |
+| ratios_max            | 10.386073               |
+| ratios_mean           | 0.9483048               |
+| ratios_min            | 0.01158342              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.411466                |
+| epsilon_sum           | 27.790459               |
+| independent_approx_TV | 0.856                   |
+| joint_approx_TV       | 2.53                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 76                      |
+| ratios                | 3.278 3.196 3.329 4.... |
+| ratios_max            | 10.411466               |
+| ratios_mean           | 0.9469597               |
+| ratios_min            | 0.011089912             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.432731                |
+| epsilon_sum           | 27.864574               |
+| independent_approx_TV | 0.858                   |
+| joint_approx_TV       | 2.53                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 77                      |
+| ratios                | 3.316 3.232 3.363 4.... |
+| ratios_max            | 10.432731               |
+| ratios_mean           | 0.9456499               |
+| ratios_min            | 0.010621458             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.450745                |
+| epsilon_sum           | 27.930977               |
+| independent_approx_TV | 0.86                    |
+| joint_approx_TV       | 2.54                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 78                      |
+| ratios                | 3.351 3.264 3.392 4.... |
+| ratios_max            | 10.450745               |
+| ratios_mean           | 0.9443762               |
+| ratios_min            | 0.010174433             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.466229                |
+| epsilon_sum           | 27.991556               |
+| independent_approx_TV | 0.862                   |
+| joint_approx_TV       | 2.54                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 79                      |
+| ratios                | 3.382 3.292 3.417 4.... |
+| ratios_max            | 10.466229               |
+| ratios_mean           | 0.94314593              |
+| ratios_min            | 0.009752321             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.479923                |
+| epsilon_sum           | 28.04789                |
+| independent_approx_TV | 0.863                   |
+| joint_approx_TV       | 2.55                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 80                      |
+| ratios                | 3.41 3.318 3.439 4.2... |
+| ratios_max            | 10.479923               |
+| ratios_mean           | 0.9419713               |
+| ratios_min            | 0.009349326             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.492568                |
+| epsilon_sum           | 28.101576               |
+| independent_approx_TV | 0.865                   |
+| joint_approx_TV       | 2.55                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 81                      |
+| ratios                | 3.435 3.34 3.458 4.2... |
+| ratios_max            | 10.492568               |
+| ratios_mean           | 0.9408775               |
+| ratios_min            | 0.00896113              |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.505044                |
+| epsilon_sum           | 28.154207               |
+| independent_approx_TV | 0.867                   |
+| joint_approx_TV       | 2.56                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 82                      |
+| ratios                | 3.456 3.36 3.473 4.2... |
+| ratios_max            | 10.505044               |
+| ratios_mean           | 0.9398813               |
+| ratios_min            | 0.008585595             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.518291                |
+| epsilon_sum           | 28.207272               |
+| independent_approx_TV | 0.868                   |
+| joint_approx_TV       | 2.56                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 83                      |
+| ratios                | 3.475 3.377 3.485 4.... |
+| ratios_max            | 10.518291               |
+| ratios_mean           | 0.9389869               |
+| ratios_min            | 0.0082186395            |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.533454                |
+| epsilon_sum           | 28.262238               |
+| independent_approx_TV | 0.87                    |
+| joint_approx_TV       | 2.57                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 84                      |
+| ratios                | 3.492 3.392 3.494 4.... |
+| ratios_max            | 10.533454               |
+| ratios_mean           | 0.9382235               |
+| ratios_min            | 0.007774805             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.551456                |
+| epsilon_sum           | 28.320034               |
+| independent_approx_TV | 0.871                   |
+| joint_approx_TV       | 2.58                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 85                      |
+| ratios                | 3.507 3.405 3.501 4.... |
+| ratios_max            | 10.551456               |
+| ratios_mean           | 0.9376084               |
+| ratios_min            | 0.007351693             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.572498                |
+| epsilon_sum           | 28.380611               |
+| independent_approx_TV | 0.873                   |
+| joint_approx_TV       | 2.58                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 86                      |
+| ratios                | 3.522 3.417 3.506 4.... |
+| ratios_max            | 10.572498               |
+| ratios_mean           | 0.937152                |
+| ratios_min            | 0.006949851             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.596305                |
+| epsilon_sum           | 28.443214               |
+| independent_approx_TV | 0.875                   |
+| joint_approx_TV       | 2.59                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 87                      |
+| ratios                | 3.535 3.428 3.509 4.... |
+| ratios_max            | 10.596305               |
+| ratios_mean           | 0.9368593               |
+| ratios_min            | 0.0065704104            |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.622034                |
+| epsilon_sum           | 28.50642                |
+| independent_approx_TV | 0.876                   |
+| joint_approx_TV       | 2.6                     |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 88                      |
+| ratios                | 3.548 3.438 3.512 4.... |
+| ratios_max            | 10.622034               |
+| ratios_mean           | 0.9367339               |
+| ratios_min            | 0.006215462             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.648638                |
+| epsilon_sum           | 28.568567               |
+| independent_approx_TV | 0.878                   |
+| joint_approx_TV       | 2.6                     |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 89                      |
+| ratios                | 3.561 3.448 3.513 4.... |
+| ratios_max            | 10.648638               |
+| ratios_mean           | 0.93676573              |
+| ratios_min            | 0.005885265             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.674902                |
+| epsilon_sum           | 28.62798                |
+| independent_approx_TV | 0.879                   |
+| joint_approx_TV       | 2.61                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 90                      |
+| ratios                | 3.575 3.458 3.514 4.... |
+| ratios_max            | 10.674902               |
+| ratios_mean           | 0.936939                |
+| ratios_min            | 0.005582104             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.699899                |
+| epsilon_sum           | 28.706059               |
+| independent_approx_TV | 0.881                   |
+| joint_approx_TV       | 2.62                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 91                      |
+| ratios                | 3.589 3.47 3.516 4.3... |
+| ratios_max            | 10.699899               |
+| ratios_mean           | 0.93721956              |
+| ratios_min            | 0.005306894             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.722857                |
+| epsilon_sum           | 28.79086                |
+| independent_approx_TV | 0.882                   |
+| joint_approx_TV       | 2.62                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 92                      |
+| ratios                | 3.605 3.483 3.519 4.... |
+| ratios_max            | 10.722857               |
+| ratios_mean           | 0.9375835               |
+| ratios_min            | 0.005059529             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.743349                |
+| epsilon_sum           | 28.86729                |
+| independent_approx_TV | 0.883                   |
+| joint_approx_TV       | 2.63                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 93                      |
+| ratios                | 3.623 3.497 3.523 4.... |
+| ratios_max            | 10.743349               |
+| ratios_mean           | 0.93799406              |
+| ratios_min            | 0.0048394576            |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.761027                |
+| epsilon_sum           | 28.93428                |
+| independent_approx_TV | 0.884                   |
+| joint_approx_TV       | 2.63                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 94                      |
+| ratios                | 3.643 3.514 3.529 4.... |
+| ratios_max            | 10.761027               |
+| ratios_mean           | 0.9384239               |
+| ratios_min            | 0.004645813             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.775769                |
+| epsilon_sum           | 28.991295               |
+| independent_approx_TV | 0.885                   |
+| joint_approx_TV       | 2.64                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 95                      |
+| ratios                | 3.666 3.534 3.538 4.... |
+| ratios_max            | 10.775769               |
+| ratios_mean           | 0.9388594               |
+| ratios_min            | 0.004477167             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.78762                 |
+| epsilon_sum           | 29.038713               |
+| independent_approx_TV | 0.886                   |
+| joint_approx_TV       | 2.64                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 96                      |
+| ratios                | 3.693 3.558 3.551 4.... |
+| ratios_max            | 10.78762                |
+| ratios_mean           | 0.93929106              |
+| ratios_min            | 0.0043316954            |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.796719                |
+| epsilon_sum           | 29.077377               |
+| independent_approx_TV | 0.887                   |
+| joint_approx_TV       | 2.64                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 97                      |
+| ratios                | 3.723 3.586 3.568 4.... |
+| ratios_max            | 10.796719               |
+| ratios_mean           | 0.9397223               |
+| ratios_min            | 0.0042075417            |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.803104                |
+| epsilon_sum           | 29.10783                |
+| independent_approx_TV | 0.887                   |
+| joint_approx_TV       | 2.64                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 98                      |
+| ratios                | 3.756 3.617 3.59 4.4... |
+| ratios_max            | 10.803104               |
+| ratios_mean           | 0.9401541               |
+| ratios_min            | 0.004103448             |
+---------------------------------------------------
+---------------------------------------------------
+| clip_range            | 10                      |
+| epsilon_max           | 9.806839                |
+| epsilon_sum           | 29.130733               |
+| independent_approx_TV | 0.888                   |
+| joint_approx_TV       | 2.64                    |
+| learning_rate         | 0.0005                  |
+| num_agents            | 3                       |
+| num_epochs            | 99                      |
+| ratios                | 3.793 3.653 3.616 4.... |
+| ratios_max            | 10.806839               |
+| ratios_mean           | 0.94058573              |
+| ratios_min            | 0.004018086             |
+---------------------------------------------------
