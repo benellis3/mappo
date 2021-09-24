@@ -7,6 +7,8 @@ from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
 from components.running_mean_std import RunningMeanStd
 
+from utils import extra_logger
+
 def compute_logp_entropy(logits, actions, masks):
     masked_logits = th.where(masks, logits, th.tensor(th.finfo(logits.dtype).min).to(logits.device))
     # normalize logits
@@ -265,8 +267,14 @@ class TrustRegionLearner:
 
         mask = mask.squeeze(dim=-1)
 
+        # logging analytical results
+        map_name = self.args.env_args['map_name']
+        extra_logger.configure(
+            dir="analytical_results/%s/agents_%d_clip_%.2f_lr_%f_%d"
+            %(map_name, self.n_agents, self.clip_range, self.args.lr_actor, self.args.seed))
+
         ## update the actor
-        for _ in range(0, self.mini_epochs_actor):
+        for num_epoch in range(0, self.mini_epochs_actor):
             if self.agent_type == "rnn":
                 action_logits = []
                 self.mac.init_hidden(batch.batch_size)
@@ -310,26 +318,40 @@ class TrustRegionLearner:
             actor_loss.backward()
             self.optimiser_actor.step()
 
-        ratios = prob_ratio.detach().cpu().numpy()
-        epsilon = np.abs(ratios - 1.0)
-        epsilon_sum = np.sum( np.amax(epsilon, axis=(0, 1)) )
-        epsilon_max = np.max(epsilon)
+            extra_logger.record_tabular('independent_approx_TV', indepent_approxtv.item())
+            extra_logger.record_tabular('joint_approx_TV', joint_approxtv.item())
+            ratios = prob_ratio.detach().cpu().numpy()
+            epsilon = np.abs(ratios - 1.0)
+            epsilon_sum = np.sum( np.amax(epsilon, axis=(0, 1)) )
+            epsilon_max = np.max(epsilon)
+            ratios_str = " ".join(str(x) for x in np.round(ratios.flatten(), 3))
+            extra_logger.record_tabular('ratios', ratios_str)
+            extra_logger.record_tabular('epsilon_sum', epsilon_sum)
+            extra_logger.record_tabular('epsilon_max', epsilon_max)
+            extra_logger.record_tabular('ratios_max', np.max(ratios))
+            extra_logger.record_tabular('ratios_min', np.min(ratios))
+            extra_logger.record_tabular('ratios_mean', np.mean(ratios))
+            extra_logger.record_tabular('learning_rate', self.args.lr_actor)
+            extra_logger.record_tabular('clip_range', self.clip_range)
+            extra_logger.record_tabular('num_agents', self.n_agents)
+            extra_logger.record_tabular('num_epochs', num_epoch)
+            extra_logger.dump_tabular()
 
         # log stuff
+        import sys
+        sys.exit(0)
         critic_train_stats["rewards"].append(th.mean(rewards).item())
         critic_train_stats["returns"].append((th.mean(returns)).item())
-        critic_train_stats["independent_approx_TV"].append(indepent_approxtv.item())
-        critic_train_stats["joint_approx_TV"].append(joint_approxtv.item())
-        critic_train_stats["epsilon_sum"].append(epsilon_sum)
-        critic_train_stats["epsilon_max"].append(epsilon_max)
-        critic_train_stats["ratios_max"].append(np.max(ratios))
-        critic_train_stats["ratios_min"].append(np.min(ratios))
-        critic_train_stats["ratios_mean"].append(np.mean(ratios))
+        critic_train_stats["approx_TV"].append(approxtv.item())
         critic_train_stats["entropy"].append(th.mean(th.tensor(entropy_lst)).item())
         critic_train_stats["critic_loss"].append(th.mean(th.tensor(critic_loss_lst)).item())
         critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
 
         critic_train_stats["surr_objective"].append(surr_objective.item())
+
+        critic_train_stats["ratios_max"].append(th.max(prob_ratio.detach()).item())
+        critic_train_stats["ratios_min"].append(th.min(prob_ratio.detach()).item())
+        critic_train_stats["ratios_mean"].append(th.mean(prob_ratio.detach()).item())
 
         if t_env - self.log_stats_t >= self.args.learner_log_interval:
             for k,v in critic_train_stats.items():
