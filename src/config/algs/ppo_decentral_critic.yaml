@@ -14,7 +14,6 @@ batch_size: 8
 # update the target network every {} training steps
 target_update_interval: 200
 
-seed: 0
 lr_actor: 0.0005
 lr_critic: 0.001
 tau: 0.995
@@ -27,14 +26,15 @@ critic: "independent_rnn_critic"
 detach_every: null
 replace_every: null
 
-mini_epochs_actor: 100
+mini_epochs_actor: 8
 mini_epochs_critic: 10
 entropy_loss_coeff: 0.000
 
 # calculating advantage: GAE, TD_Error
 advantage_calc_method: "GAE"
+bootstrap_timeouts: False
 
-clip_range: 0.1
+clip_range: 0.05
 
 is_advantage_normalized: True
 is_observation_normalized: True
