@@ -290,6 +290,10 @@ class JointLearner:
             # joint probability
             central_log_pac = th.sum(log_pac, dim=-1)
 
+            ## TV divergence for all agents
+            prob_diff = th.exp(central_log_pac) - th.exp(central_old_log_pac)
+            joint_approxtv = th.max( ( 0.5 * th.abs(prob_diff) ).sum(dim=-1) ).detach()
+
             with th.no_grad():
                 approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / mask.sum()
                 approxkl_lst.append(approxkl)
@@ -314,10 +318,20 @@ class JointLearner:
             actor_loss.backward()
             self.optimiser_actor.step()
 
+        ratios = prob_ratio.detach().cpu().numpy()
+        epsilon = np.abs(ratios - 1.0)
+        epsilon_sum = np.sum( np.amax(epsilon, axis=(0, 1)) )
+        epsilon_max = np.max(epsilon)
+
         # log stuff
         critic_train_stats["rewards"].append(th.mean(rewards).item())
         critic_train_stats["returns"].append((th.mean(returns)).item())
-        critic_train_stats["approx_KL"].append(th.mean(th.tensor(approxkl_lst)).item())
+        critic_train_stats["joint_approx_TV"].append(joint_approxtv.item())
+        critic_train_stats["epsilon_sum"].append(epsilon_sum)
+        critic_train_stats["epsilon_max"].append(epsilon_max)
+        critic_train_stats["ratios_max"].append(np.max(ratios))
+        critic_train_stats["ratios_min"].append(np.min(ratios))
+        critic_train_stats["ratios_mean"].append(np.mean(ratios))
         critic_train_stats["entropy"].append(th.mean(th.tensor(entropy_lst)).item())
         critic_train_stats["critic_loss"].append(th.mean(th.tensor(critic_loss_lst)).item())
         critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
