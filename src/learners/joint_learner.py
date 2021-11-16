@@ -291,8 +291,9 @@ class JointLearner:
             central_log_pac = th.sum(log_pac, dim=-1)
 
             ## TV divergence for all agents
-            prob_diff = th.exp(central_log_pac) - th.exp(central_old_log_pac)
-            joint_approxtv = th.max( ( 0.5 * th.abs(prob_diff) ).sum(dim=-1) ).detach()
+            prob_diff = th.exp(log_pac) - th.exp(old_log_pac)
+            indepent_approxtv = th.max( 0.5 * th.abs(prob_diff).sum(dim=-1) ).detach()
+            joint_approxtv = th.max( ( 0.5 * th.abs(prob_diff).sum(dim=-1) ).sum(dim=-1) ).detach()
 
             with th.no_grad():
                 approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / mask.sum()
@@ -326,6 +327,7 @@ class JointLearner:
         # log stuff
         critic_train_stats["rewards"].append(th.mean(rewards).item())
         critic_train_stats["returns"].append((th.mean(returns)).item())
+        critic_train_stats["independent_approx_TV"].append(indepent_approxtv.item())
         critic_train_stats["joint_approx_TV"].append(joint_approxtv.item())
         critic_train_stats["epsilon_sum"].append(epsilon_sum)
         critic_train_stats["epsilon_max"].append(epsilon_max)

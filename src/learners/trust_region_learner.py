@@ -287,7 +287,6 @@ class TrustRegionLearner:
             ## TV divergence for all agents
             prob_diff = th.exp(log_p) - th.exp(old_log_p)
             indepent_approxtv = th.max( 0.5 * th.abs(prob_diff).sum(dim=-1) ).detach()
-
             joint_approxtv = th.max( ( 0.5 * th.abs(prob_diff).sum(dim=-1) ).sum(dim=-1) ).detach()
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
