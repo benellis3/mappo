@@ -4,6 +4,7 @@ from math import ceil
 import numpy as np
 import os
 import pprint
+import uuid
 import time
 import threading
 import torch as th
@@ -19,6 +20,10 @@ from components.episode_buffer import ReplayBuffer
 from components.transforms import OneHot
 
 
+def generate_tag(algo_name, map_name):
+    return algo_name + "-" + map_name + "-" + uuid.uuid4().hex[:6]
+
+
 def run(_run, _config, _log, pymongo_client):
 
     # check args sanity
@@ -26,7 +31,7 @@ def run(_run, _config, _log, pymongo_client):
 
     args = SN(**_config)
     args.device = "cuda" if args.use_cuda else "cpu"
-
+    args.tag = generate_tag(args.name, args.env_args["map_name"])
     # setup loggers
     logger = Logger(_log)
 
