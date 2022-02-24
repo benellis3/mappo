@@ -13,10 +13,10 @@ function onCtrlC () {
 
 config=$1  # qmix
 tag=$2
-maps=${3:-8m,3m,10m_vs_11m,8m_vs_9m,5m_vs_6m,27m_vs_30m}   # MMM2 left out
-threads=${4:-21} # 2
+maps=${3:-2s3z,2s_vs_1sc,1c3s5z,3s5z,10m_vs_11m,8m_vs_9m,5m_vs_6m,3s_vs_5z,5m_vs_6m,bane_vs_bane,2c_vs_64zg,corridor,3s5z_vs_3s6z,27m_vs_30m,6h_vs_8z}   # MMM2 left out
+threads=${4:-28} # 2
 args=${5:-}    # ""
-gpus=${6:-1,2,3,4,5,6,7}    # 0,1
+gpus=${6:-0,1,2,3,4,5,6,7}    # 0,1
 times=${7:-3}   # 5
 
 maps=(${maps//,/ })
