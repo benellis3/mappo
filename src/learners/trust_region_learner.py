@@ -1,6 +1,7 @@
 import numpy as np
 import torch as th
 from torch.optim import Adam
+from torch.optim.lr_scheduler import LambdaLR
 from collections import defaultdict
 
 from components.episode_buffer import EpisodeBatch
@@ -35,13 +36,14 @@ class TrustRegionLearner:
 
         self.mac = mac
         self.agent_params = list(mac.parameters())
-        
+
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
 
         self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor, eps=args.optim_eps)
         self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic, eps=args.optim_eps)
-
+        self.t = 0
+        self.scheduler_actor = LambdaLR(optimizer=self.optimiser_actor, lr_lambda=lambda epoch: 1.0 - (self.t / args.t_max))
         self.log_stats_t = -self.args.learner_log_interval - 1
 
         self.mini_epochs_actor = getattr(self.args, "mini_epochs_actor", 4)
@@ -140,6 +142,7 @@ class TrustRegionLearner:
         batch.data.transition_data['obs'][:, :] = (batch['obs'][:, :] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
+        self.t = t_env
         critic_train_stats = defaultdict(lambda: [])
         max_t = batch.max_seq_length
 
@@ -151,9 +154,9 @@ class TrustRegionLearner:
         mask = batch["filled"][:, :].float()
         mask[:, 1:] = mask[:, 1:] * (1 - terminated[:, :-1])
 
-        if self.bootstrap_timeouts: 
+        if self.bootstrap_timeouts:
             # Do not train on states that timeout, or else their value target will be calculated as terminal without bootstrap
-            # Note: The environment could still mess this up if it terminates itself at timeout without setting episode_limit=true 
+            # Note: The environment could still mess this up if it terminates itself at timeout without setting episode_limit=true
             mask = mask * (1 - timed_out)
             # make sure it is not the case you have a timeout out flag without terminated
             # in logical form: assert all(not (batch["timed_out"] and not batch["terminated"])):
@@ -167,7 +170,7 @@ class TrustRegionLearner:
             alive_mask = ( th.sum(avail_actions, dim=-1)>0.0 ).float()
         elif self.env_type == 'sc2':
             alive_mask = ( (avail_actions[:, :, :, 0] < 1.0) * (th.sum(avail_actions, dim=-1) > 0.0) ).float()
-        else: 
+        else:
             raise NotImplementedError
 
         num_alive_agents = th.sum(alive_mask, dim=-1).float()
@@ -260,7 +263,7 @@ class TrustRegionLearner:
         old_meta_data = compute_logp_entropy(old_action_logits, actions, avail_actions)
         old_log_p, old_log_pac = old_meta_data['logp'], old_meta_data['logpac']
 
-        entropy_lst = [] 
+        entropy_lst = []
         actor_loss_lst = []
 
         mask = mask.squeeze(dim=-1)
@@ -290,7 +293,7 @@ class TrustRegionLearner:
             joint_approxtv = th.max( ( 0.5 * th.abs(prob_diff).sum(dim=-1) ).sum(dim=-1) ).detach()
 
             # for shared policy, maximize the policy entropy averaged over all agents & episodes
-            entropy = (meta_data['entropy'] * alive_mask).sum() / alive_mask.sum() 
+            entropy = (meta_data['entropy'] * alive_mask).sum() / alive_mask.sum()
             entropy_lst.append(entropy)
 
             prob_ratio = th.clamp(th.exp(log_pac - old_log_pac), 0.0, 16.0)
@@ -329,6 +332,8 @@ class TrustRegionLearner:
         critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
 
         critic_train_stats["surr_objective"].append(surr_objective.item())
+        critic_train_stats["lr"].append(self.optimiser_actor.param_groups[0]["lr"])
+        self.scheduler_actor.step()
 
         if t_env - self.log_stats_t >= self.args.learner_log_interval:
             for k,v in critic_train_stats.items():
@@ -355,7 +360,7 @@ class TrustRegionLearner:
                 # lastgaelam must be set to 0 for states that timeout so that prior state computes advs[:, t] = delta + 0
                 # Note that this will still calculate an invalid (0) return/adv in advs[:, t] for the states that timeout, but
                 #   this will be masked off anyway.
-                lastgaelam = bad_mask[:, t] * lastgaelam 
+                lastgaelam = bad_mask[:, t] * lastgaelam
 
             advs[:, t] = lastgaelam.view(_rewards[:, t].shape)
 
