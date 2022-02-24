@@ -1,14 +1,18 @@
 import numpy as np
 import torch as th
 from torch.optim import Adam
+from torch.optim.lr_scheduler import MultiplicativeLR
 from collections import defaultdict
 
 from components.episode_buffer import EpisodeBatch
 from modules.critics import critic_REGISTRY
 from components.running_mean_std import RunningMeanStd
 
+
 def compute_logp_entropy(logits, actions, masks):
-    masked_logits = th.where(masks, logits, th.tensor(th.finfo(logits.dtype).min).to(logits.device))
+    masked_logits = th.where(
+        masks, logits, th.tensor(th.finfo(logits.dtype).min).to(logits.device)
+    )
     # normalize logits
     masked_logits = masked_logits - masked_logits.logsumexp(dim=-1, keepdim=True)
 
@@ -20,8 +24,8 @@ def compute_logp_entropy(logits, actions, masks):
     logp = th.gather(masked_logits, dim=-1, index=actions)
 
     result = {
-        'logp' : th.squeeze(logp),
-        'entropy' : th.squeeze(entropy),
+        "logp": th.squeeze(logp),
+        "entropy": th.squeeze(entropy),
     }
     return result
 
@@ -39,8 +43,17 @@ class CentralPPOLearner:
 
         self.critic = critic_REGISTRY[self.args.critic](scheme, args)
         self.critic_params = list(self.critic.parameters())
-        self.optimiser_actor = Adam(params=self.agent_params, lr=args.lr_actor, eps=args.optim_eps)
-        self.optimiser_critic = Adam(params=self.critic_params, lr=args.lr_critic, eps=args.optim_eps)
+        self.optimiser_actor = Adam(
+            params=self.agent_params, lr=args.lr_actor, eps=args.optim_eps
+        )
+        self.t = 0
+        self.scheduler_actor = MultiplicativeLR(
+            optimizer=self.optimiser_actor,
+            lr_lambda=lambda epoch: 1.0 - (self.t / args.t_max),
+        )
+        self.optimiser_critic = Adam(
+            params=self.critic_params, lr=args.lr_critic, eps=args.optim_eps
+        )
 
         self.log_stats_t = -self.args.learner_log_interval - 1
 
@@ -53,8 +66,10 @@ class CentralPPOLearner:
         self.is_value_normalized = getattr(self.args, "is_value_normalized", False)
         self.is_popart = getattr(self.args, "is_popart", False)
 
-        if (self.is_value_normalized and self.is_popart):
-            raise ValueError("Either `is_value_normalized` or `is_popart` is specified, but not both.")
+        if self.is_value_normalized and self.is_popart:
+            raise ValueError(
+                "Either `is_value_normalized` or `is_popart` is specified, but not both."
+            )
 
         if self.is_value_normalized:
             # need to normalize value
@@ -80,7 +95,9 @@ class CentralPPOLearner:
             value_var = self.value_rms.var.unsqueeze(0)
             value_mean = value_mean.expand(bs, ts)
             value_var = value_var.expand(bs, ts)
-            normalized_returns = (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
+            normalized_returns = (
+                (returns - value_mean) / th.sqrt(value_var + 1e-6) * mask
+            )
 
         elif self.is_popart:
             # update popart
@@ -104,7 +121,7 @@ class CentralPPOLearner:
         return denormalized_values
 
     def normalize_state(self, batch, mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
+        bs, ts = batch.batch_size, batch.max_seq_length - 1
 
         state = batch["state"][:, :-1].cuda()
         flat_state = state.reshape(-1, state.shape[-1])
@@ -120,23 +137,34 @@ class CentralPPOLearner:
         state_mean = state_mean.expand(bs, ts, -1)
         state_var = state_var.expand(bs, ts, -1)
         expanded_mask = mask.unsqueeze(-1).expand(-1, -1, state_mean.shape[-1])
-        batch.data.transition_data['state'][:, :-1] = (batch['state'][:, :-1] - state_mean) / th.sqrt(state_var + 1e-6) * expanded_mask
+        batch.data.transition_data["state"][:, :-1] = (
+            (batch["state"][:, :-1] - state_mean)
+            / th.sqrt(state_var + 1e-6)
+            * expanded_mask
+        )
 
     def normalize_obs(self, batch, alive_mask):
-        bs, ts = batch.batch_size, batch.max_seq_length-1
+        bs, ts = batch.batch_size, batch.max_seq_length - 1
         obs_mean = self.mac.obs_rms.mean.unsqueeze(0).unsqueeze(0).unsqueeze(0)
         obs_var = self.mac.obs_rms.var.unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
         obs_mean = obs_mean.expand(bs, ts, self.n_agents, -1)
         obs_var = obs_var.expand(bs, ts, self.n_agents, -1)
 
-        expanded_alive_mask = alive_mask.unsqueeze(-1).expand(-1, -1, -1, obs_mean.shape[-1])
+        expanded_alive_mask = alive_mask.unsqueeze(-1).expand(
+            -1, -1, -1, obs_mean.shape[-1]
+        )
 
         # update obs directly in batch
-        batch.data.transition_data['obs'][:, :-1] = (batch['obs'][:, :-1] - obs_mean) / th.sqrt(obs_var + 1e-6 ) * expanded_alive_mask
+        batch.data.transition_data["obs"][:, :-1] = (
+            (batch["obs"][:, :-1] - obs_mean)
+            / th.sqrt(obs_var + 1e-6)
+            * expanded_alive_mask
+        )
 
     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
-        max_t = batch.max_seq_length-1
+        self.t = t_env
+        max_t = batch.max_seq_length - 1
         critic_train_stats = defaultdict(lambda: [])
 
         # Get the relevant quantities
@@ -153,7 +181,9 @@ class CentralPPOLearner:
         ## get dead agents
         # no-op (valid only when dead)
         # https://github.com/oxwhirl/smac/blob/013cf27001024b4ce47f9506f2541eca0b247c95/smac/env/starcraft2/starcraft2.py#L499
-        alive_mask = ( (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0) ).float()
+        alive_mask = (
+            (avail_actions[:, :, :, 0] != 1.0) * (th.sum(avail_actions, dim=-1) != 0.0)
+        ).float()
         num_alive_agents = th.sum(alive_mask, dim=-1).float()
         avail_actions = avail_actions.byte()
 
@@ -169,7 +199,7 @@ class CentralPPOLearner:
             old_action_logits = []
             self.mac.init_hidden(batch.batch_size)
             for t in range(max_t):
-                actor_outs = self.mac.forward(batch, t = t, test_mode=False)
+                actor_outs = self.mac.forward(batch, t=t, test_mode=False)
                 old_action_logits.append(actor_outs)
             old_action_logits = th.stack(old_action_logits, dim=1)
 
@@ -186,10 +216,13 @@ class CentralPPOLearner:
         rewards = rewards.squeeze(dim=-1)
 
         if self.advantage_calc_method == "GAE":
-            returns, advantages = self._compute_returns_advs(old_values_before, rewards, terminated, 
-                                                    self.args.gamma, self.args.tau)
+            returns, advantages = self._compute_returns_advs(
+                old_values_before, rewards, terminated, self.args.gamma, self.args.tau
+            )
         elif self.advantage_calc_method == "TD":
-            returns = rewards + self.args.gamma * (1 - terminated) * old_values_before[:, 1:]
+            returns = (
+                rewards + self.args.gamma * (1 - terminated) * old_values_before[:, 1:]
+            )
             advantages = returns - old_values_before[:, :-1]
         else:
             raise NotImplementedError
@@ -207,15 +240,15 @@ class CentralPPOLearner:
             advantages = (advantages - batch_mean) / th.sqrt(batch_var + 1e-6) * mask
 
         # action prob
-        old_action_logits = old_action_logits.detach() # detached
+        old_action_logits = old_action_logits.detach()  # detached
         old_meta_data = compute_logp_entropy(old_action_logits, actions, avail_actions)
-        old_log_pac = old_meta_data['logp']
+        old_log_pac = old_meta_data["logp"]
 
         # joint probability
         central_old_log_pac = th.sum(old_log_pac * alive_mask, dim=-1)
 
-        approxkl_lst = [] 
-        entropy_lst = [] 
+        approxkl_lst = []
+        entropy_lst = []
         actor_loss_lst = []
 
         ## update the actor
@@ -225,7 +258,7 @@ class CentralPPOLearner:
                 action_logits = []
                 self.mac.init_hidden(batch.batch_size)
                 for t in range(max_t):
-                    actor_outs = self.mac.forward(batch, t = t, test_mode=False)
+                    actor_outs = self.mac.forward(batch, t=t, test_mode=False)
                     action_logits.append(actor_outs)
                 action_logits = th.stack(action_logits, dim=1)
 
@@ -236,28 +269,40 @@ class CentralPPOLearner:
                 raise NotImplementedError
 
             meta_data = compute_logp_entropy(action_logits, actions, avail_actions)
-            log_pac = meta_data['logp']
+            log_pac = meta_data["logp"]
 
             # joint probability
             central_log_pac = th.sum(log_pac * alive_mask, dim=-1)
 
             with th.no_grad():
-                approxkl = 0.5 * th.sum((central_log_pac - central_old_log_pac)**2) / alive_mask.sum()
+                approxkl = (
+                    0.5
+                    * th.sum((central_log_pac - central_old_log_pac) ** 2)
+                    / alive_mask.sum()
+                )
                 approxkl_lst.append(approxkl)
                 # if approxkl > 1.5 * target_kl:
                 #     break
 
-            entropy = th.sum(meta_data['entropy'] * alive_mask) / alive_mask.sum() # mask out dead agents
+            entropy = (
+                th.sum(meta_data["entropy"] * alive_mask) / alive_mask.sum()
+            )  # mask out dead agents
             entropy_lst.append(entropy)
 
-            prob_ratio = th.clamp(th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0)
+            prob_ratio = th.clamp(
+                th.exp(central_log_pac - central_old_log_pac), 0.0, 16.0
+            )
 
-            pg_loss_unclipped = - advantages * prob_ratio
-            pg_loss_clipped = - advantages * th.clamp(prob_ratio,
-                                                1 - self.args.ppo_policy_clip_param,
-                                                1 + self.args.ppo_policy_clip_param)
+            pg_loss_unclipped = -advantages * prob_ratio
+            pg_loss_clipped = -advantages * th.clamp(
+                prob_ratio,
+                1 - self.args.ppo_policy_clip_param,
+                1 + self.args.ppo_policy_clip_param,
+            )
 
-            pg_loss = th.max(pg_loss_unclipped, pg_loss_clipped).sum() / alive_mask.sum()
+            pg_loss = (
+                th.max(pg_loss_unclipped, pg_loss_clipped).sum() / alive_mask.sum()
+            )
 
             # Construct overall loss
             actor_loss = pg_loss - self.args.entropy_loss_coeff * entropy
@@ -282,7 +327,7 @@ class CentralPPOLearner:
             # vf_losses2 = (clipped_values - returns) ** 2
             # vf_loss = th.sum( th.max(vf_losses1, vf_losses2) * mask ) / mask.sum()
 
-            vf_loss = th.sum( (new_values - returns) ** 2 * mask) / mask.sum()
+            vf_loss = th.sum((new_values - returns) ** 2 * mask) / mask.sum()
 
             self.optimiser_critic.zero_grad()
             vf_loss.backward()
@@ -294,11 +339,16 @@ class CentralPPOLearner:
         critic_train_stats["returns"].append((th.mean(returns)).item())
         critic_train_stats["approx_KL"].append(th.mean(th.tensor(approxkl_lst)).item())
         critic_train_stats["entropy"].append(th.mean(th.tensor(entropy_lst)).item())
-        critic_train_stats["critic_loss"].append(th.mean(th.tensor(critic_loss_lst)).item())
-        critic_train_stats["actor_loss"].append(th.mean(th.tensor(actor_loss_lst)).item())
+        critic_train_stats["critic_loss"].append(
+            th.mean(th.tensor(critic_loss_lst)).item()
+        )
+        critic_train_stats["actor_loss"].append(
+            th.mean(th.tensor(actor_loss_lst)).item()
+        )
+        self.scheduler_actor.step()
 
         if t_env - self.log_stats_t >= self.args.learner_log_interval:
-            for k,v in critic_train_stats.items():
+            for k, v in critic_train_stats.items():
                 self.logger.log_stat(k, np.mean(np.array(v)), t_env)
             self.log_stats_t = t_env
 
@@ -310,10 +360,10 @@ class CentralPPOLearner:
 
         for t in reversed(range(ts)):
             nextnonterminal = 1.0 - _terminated[:, t]
-            nextvalues = _values[:, t+1]
+            nextvalues = _values[:, t + 1]
 
             reward_t = _rewards[:, t]
-            delta = reward_t + gamma * nextvalues * nextnonterminal  - _values[:, t]
+            delta = reward_t + gamma * nextvalues * nextnonterminal - _values[:, t]
             advs[:, t] = lastgaelam = delta + gamma * tau * nextnonterminal * lastgaelam
 
         returns = advs + _values[:, :-1]
@@ -333,7 +383,11 @@ class CentralPPOLearner:
 
     def load_models(self, path):
         self.mac.load_models(path)
-        self.mac.critic.load_state_dict(th.load("{}/critic.th".format(path), map_location=lambda storage, loc: storage))
+        self.mac.critic.load_state_dict(
+            th.load(
+                "{}/critic.th".format(path), map_location=lambda storage, loc: storage
+            )
+        )
         # Not quite right but I don't want to save target networks
         if hasattr(self, "target_critic"):
             self.target_critic.load_state_dict(self.critic.state_dict())
