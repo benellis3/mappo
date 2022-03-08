@@ -29,6 +29,7 @@ class Logger:
             group=config.group,
             name=config.tag,
             job_type=config.env_args["map_name"],
+            config=config.__dict__,
         )
         wandb.config = config
         # setup a custom step metric so that we can track
