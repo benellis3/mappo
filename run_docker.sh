@@ -1,6 +1,7 @@
 #!/bin/bash
+set -x
 HASH=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 4 | head -n 1)
-WANDB_API_KEY=$(cat $WAND_API_KEY_FILE | grep 'password' | awk '{print $2}')
+WANDB_API_KEY=$(cat $WANDB_API_KEY_FILE)
 GPU=$1
 name=${USER}_pymarl_GPU_${GPU}_${HASH}
 
@@ -15,10 +16,9 @@ fi
 
 NV_GPU="$GPU" ${cmd} run \
     -e WANDB_API_KEY=$WANDB_API_KEY \
-    -e WANDB_CONFIG_DIR=/source/ \
     --name $name \
     --user $(id -u) \
     --memory 100g \
-    -v $(pwd):/source \
-    -t pymarl:ben_smac \
+    -v $(pwd):/home/minsun/pymarl \
+    -t pymarl:smacv2 \
     ${@:2}

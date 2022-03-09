@@ -1,4 +1,4 @@
 #!/bin/bash
 
 echo 'Building Dockerfile with image name pymarl'
-nohup docker build --build-arg UID=$UID -t pymarl:ppo . & 
+docker build --no-cache --build-arg UID=$UID -t pymarl:smacv2 .
