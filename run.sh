@@ -48,7 +48,7 @@ for map in "${maps[@]}"; do
         for unit in "${units[@]}"; do
             gpu=${gpus[$(($count % ${#gpus[@]}))]}  
             group="${config}-${tag}"
-            $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.n_units=$unit group="$group" "${args[@]}" &
+            $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.enemy_mask.n_enemies=$unit group="$group" "${args[@]}" &
 
             count=$(($count + 1))     
             if [ $(($count % $threads)) -eq 0 ]; then

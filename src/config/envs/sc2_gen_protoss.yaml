@@ -1,4 +1,4 @@
-env: sc2
+env: sc2wrapped
 
 env_args:
   continuing_episode: False
@@ -23,14 +23,19 @@ env_args:
   reward_win: 200
   replay_dir: ""
   replay_prefix: ""
-  replace_teammates: True
-  ally_unit_types: ["stalker", "zealot", "colossus"]
-  n_units: 5
-  show_capabilities: True
-  zero_pad_unit_types: False
-  teammate_train_distribution: "all"
-  teammate_test_distribution: "all"
-  mask_enemies: True
+  capability_config:
+    n_units: 5
+    team_gen:
+      dist_type: "all_teams"
+      unit_types: 
+        - "stalker"
+        - "zealot"
+        - "colossus"
+      observe: True
+    enemy_mask:
+      dist_type: "mask"
+      mask_probability: 0.5
+      n_enemies: 5
   state_last_action: True
   state_timestep_number: False
   step_mul: 8
@@ -43,4 +48,4 @@ test_interval: 10000
 log_interval: 2000
 runner_log_interval: 2000
 learner_log_interval: 2000
-t_max: 10000000
+t_max: 10050000

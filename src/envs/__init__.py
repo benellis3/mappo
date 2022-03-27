@@ -8,7 +8,7 @@ from .test import IntegrationTestEnv
 from .multiagentenv import MultiAgentEnv
 from .stag_hunt import StagHunt
 #from .starcraft2 import StarCraft2Env
-from smac.env import MultiAgentEnv, StarCraft2Env
+from smac.env import MultiAgentEnv, StarCraft2Env, StarCraftCapabilityEnvWrapper
 try:
     from smac.env import StarCraft2CustomEnv
 except Exception as e:
@@ -39,6 +39,7 @@ REGISTRY["box_push"] = partial(env_fn, env=CoopBoxPushing)
 REGISTRY["stag_hunt"] = partial(env_fn, env=StagHunt)
 REGISTRY["sc2"] = partial(env_fn, env=StarCraft2Env)
 REGISTRY["sc2framestack"] = partial(env_fn, env=FrameStackStartCraft2Env)
+REGISTRY["sc2wrapped"] = partial(env_fn, env=StarCraftCapabilityEnvWrapper)
 try:
     REGISTRY["sc2custom"] = partial(env_fn, env=StarCraft2CustomEnv)
 except Exception as e:
