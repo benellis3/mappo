@@ -1,6 +1,7 @@
 FROM pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
 MAINTAINER Christian Schroeder de Witt
 
+RUN pip install --upgrade pip
 RUN pip install numpy scipy pyyaml matplotlib imageio pygame tensorboard-logger ruamel.base ryd wandb
 
 RUN mkdir /install
