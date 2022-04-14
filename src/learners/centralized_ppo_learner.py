@@ -1,7 +1,7 @@
 import numpy as np
 import torch as th
 from torch.optim import Adam
-from torch.optim.lr_scheduler import MultiplicativeLR
+# from torch.optim.lr_scheduler import MultiplicativeLR
 from collections import defaultdict
 
 from components.episode_buffer import EpisodeBatch
