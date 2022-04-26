@@ -54,7 +54,7 @@ for lr in "${lrs[@]}"; do
                 for unit in "${units[@]}"; do
                     gpu=${gpus[$(($count % ${#gpus[@]}))]}  
                     group="${config}-${tag}"
-                    $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=False "${args[@]}" &
+                    $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.start_positions.n_enemies=$unit group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=False "${args[@]}" &
 
                     count=$(($count + 1))     
                     if [ $(($count % $threads)) -eq 0 ]; then
