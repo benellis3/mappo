@@ -168,7 +168,7 @@ class TrustRegionLearner:
 
         if self.env_type == 'matrix_game':
             alive_mask = ( th.sum(avail_actions, dim=-1)>0.0 ).float()
-        elif self.env_type == 'sc2':
+        elif self.env_type == 'sc2' or self.env_type == 'sc2wrapped':
             alive_mask = ( (avail_actions[:, :, :, 0] < 1.0) * (th.sum(avail_actions, dim=-1) > 0.0) ).float()
         else:
             raise NotImplementedError
