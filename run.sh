@@ -15,11 +15,11 @@ function onCtrlC () {
 
 config=$1  # qmix
 tag=$2
-units=${3:-5,15,50}   # MMM2 left out
-clipping_range=${9:-0.05,0.1,0.2}
+units=${3:-15}   # MMM2 left out
+clipping_range=${9:-0.1}
 lr=${10:-0.0005,0.001,0.0015}
 maps=${8:-sc2_gen_protoss,sc2_gen_zerg,sc2_gen_terran}
-threads=${4:-24} # 2
+threads=${4:-27} # 2
 args=${5:-}    # ""
 gpus=${6:-0,1,2,3,4,5,6,7}    # 0,1,2
 times=${7:-3}   # 5
@@ -54,14 +54,14 @@ for lr in "${lrs[@]}"; do
                 for unit in "${units[@]}"; do
                     gpu=${gpus[$(($count % ${#gpus[@]}))]}  
                     group="${config}-${tag}"
-                    $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.start_positions.n_enemies=$unit group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=True "${args[@]}" &
+                    $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.start_positions.n_enemies=$unit group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=True save_model=True "${args[@]}" &
 
                     count=$(($count + 1))     
                     if [ $(($count % $threads)) -eq 0 ]; then
                         wait
                     fi
                     # for random seeds
-                    sleep $((RANDOM % 3 + 10))
+                    sleep $((RANDOM % 3 + 3))
         	done 
             done
         done
