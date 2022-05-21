@@ -24,15 +24,20 @@ env_args:
   replay_dir: ""
   replay_prefix: ""
   conic_fov: True
+  obs_own_pos: True
   num_fov_actions: 12
   capability_config:
     n_units: 5
     team_gen:
-      dist_type: "all_teams"
+      dist_type: "weighted_teams"
       unit_types: 
         - "marine"
         - "marauder"
         - "medivac"
+      weights:
+        - 0.45
+        - 0.45
+        - 0.1
       exception_unit_types:
         - "medivac"
       observe: True
