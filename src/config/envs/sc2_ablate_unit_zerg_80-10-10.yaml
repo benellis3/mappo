@@ -23,7 +23,7 @@ env_args:
   reward_win: 200
   replay_dir: ""
   replay_prefix: ""
-  conic_fov: True
+  conic_fov: False
   num_fov_actions: 12
   obs_own_pos: True
   capability_config:
