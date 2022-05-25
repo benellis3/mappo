@@ -40,7 +40,6 @@ echo "ARGS:"  ${args[@]}
 echo "GPU LIST:" ${gpus[@]}
 echo "TIMES:" $times
 
-
 # run parallel
 count=0
 for map in "${maps[@]}"; do
