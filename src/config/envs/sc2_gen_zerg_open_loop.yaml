@@ -39,6 +39,8 @@ env_args:
         - 0.45
         - 0.1
         - 0.45
+      exception_unit_types:
+        - "baneling"
       observe: True
 
     start_positions:
