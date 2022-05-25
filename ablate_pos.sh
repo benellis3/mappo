@@ -47,7 +47,7 @@ for map in "${maps[@]}"; do
         for pos in "${start_pos[@]}"; do
             gpu=${gpus[$(($count % ${#gpus[@]}))]}  
             group="${config}-${tag}"
-            $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.start_position.dist_type="$pos" group="$group" use_wandb=True save_model=True "${args[@]}" &
+            $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.start_positions.dist_type="$pos" group="$group" use_wandb=True save_model=True "${args[@]}" &
 
             count=$(($count + 1))     
             if [ $(($count % $threads)) -eq 0 ]; then

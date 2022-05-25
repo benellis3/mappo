@@ -39,6 +39,6 @@ mv SMAC_Maps $MAP_DIR
 rm -rf SMAC_Maps.zip
 
 # for SMAC-v2 new map
-cp src/envs/starcraft2/maps/32x32_flat.SC2Map $MAP_DIR
+cp src/envs/starcraft2/maps/32x32_flat.SC2Map $MAP_DIR/SMAC_Maps/
 
 echo 'StarCraft II and SMAC are installed.'
