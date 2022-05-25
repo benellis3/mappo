@@ -4,7 +4,7 @@ env_args:
   continuing_episode: False
   difficulty: "7"
   game_version: null
-  map_name: "10gen_protoss"
+  map_name: "10gen_terran"
   move_amount: 2
   obs_all_health: True
   obs_instead_of_state: False
@@ -31,21 +31,23 @@ env_args:
     team_gen:
       dist_type: "weighted_teams"
       unit_types: 
-        - "stalker"
-        - "zealot"
-        - "colossus"
+        - "marine"
+        - "marauder"
+        - "medivac"
       weights:
-        - 0.45
-        - 0.45
-        - 0.1
+        - 0.80
+        - 0.10
+        - 0.10
+      exception_unit_types:
+        - "medivac"
       observe: True
+
     start_positions:
       dist_type: "surrounded_and_reflect"
       p: 0.5
       n_enemies: 5
       map_x: 32
       map_y: 32
-    
     # enemy_mask:
     #   dist_type: "mask"
     #   mask_probability: 0.5
