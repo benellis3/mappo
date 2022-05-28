@@ -35,6 +35,8 @@ env_args:
         - "baneling"
         - "hydralisk"
       observe: True
+      exception_unit_types:
+        - "baneling"
 
     start_positions:
       dist_type: "surrounded_and_reflect"

@@ -35,6 +35,8 @@ env_args:
         - "baneling"
         - "hydralisk"
       observe: True
+      exception_unit_types:
+        - "baneling"
 
   state_last_action: True
   state_timestep_number: False

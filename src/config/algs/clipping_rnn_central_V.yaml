@@ -14,7 +14,7 @@ batch_size: 8
 # update the target network every {} training steps
 target_update_interval: 200
 
-lr_actor: 0.001
+lr_actor: 0.0001
 lr_critic: 0.001
 tau: 0.995
 td_lambda: 0.99
