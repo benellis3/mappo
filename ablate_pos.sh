@@ -15,7 +15,7 @@ function onCtrlC () {
 
 config=$1  # qmix
 tag=$2
-start_pos=${3:-surrounded,reflect,surrounded_and_reflect} 
+start_pos=${3:-surrounded,reflect_position,surrounded_and_reflect} 
 maps=${8:-sc2_ablate_pos_protoss,sc2_ablate_pos_terran,sc2_ablate_pos_zerg}
 threads=${4:-27} # 2
 args=${5:-}    # ""
