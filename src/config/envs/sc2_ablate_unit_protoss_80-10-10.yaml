@@ -23,7 +23,7 @@ env_args:
   reward_win: 200
   replay_dir: ""
   replay_prefix: ""
-  conic_fov: False
+  conic_fov: True
   obs_own_pos: True
   num_fov_actions: 12
   capability_config:
@@ -39,6 +39,7 @@ env_args:
         - 0.10
         - 0.10
       observe: True
+
     start_positions:
       dist_type: "surrounded_and_reflect"
       p: 0.5
@@ -50,6 +51,7 @@ env_args:
     #   dist_type: "mask"
     #   mask_probability: 0.5
     #   n_enemies: 5
+
   state_last_action: True
   state_timestep_number: False
   step_mul: 8

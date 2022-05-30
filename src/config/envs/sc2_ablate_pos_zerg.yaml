@@ -23,7 +23,7 @@ env_args:
   reward_win: 200
   replay_dir: ""
   replay_prefix: ""
-  conic_fov: False
+  conic_fov: True
   num_fov_actions: 12
   obs_own_pos: True
   capability_config:
@@ -34,6 +34,10 @@ env_args:
         - "zergling"
         - "baneling"
         - "hydralisk"
+      weights:
+        - 0.45
+        - 0.45
+        - 0.1
       observe: True
       exception_unit_types:
         - "baneling"

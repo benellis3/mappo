@@ -34,6 +34,10 @@ env_args:
         - "zergling"
         - "baneling"
         - "hydralisk"
+      weights:
+        - 0.45
+        - 0.45
+        - 0.1
       observe: True
       exception_unit_types:
         - "baneling"
