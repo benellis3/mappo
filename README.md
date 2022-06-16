@@ -2,6 +2,7 @@
 
 Includes implementations of algorithms:
 - Independent PPO
+- Multi-agent PPO
 
 ## Installation instructions
 
