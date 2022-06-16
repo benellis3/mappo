@@ -2,6 +2,7 @@
 
 Includes implementations of algorithms:
 - Independent PPO
+- Multi-agent PPO
 
 ## Installation instructions
 
@@ -19,7 +20,8 @@ the [smacv2 repo](https://github.com/oxwhirl/smacv2).
 1. Make sure to either set `use_wandb=False` or to change the `project` and `entity` in `src/config/default.yaml`.
 2. Build the docker file as above.
 3. Install StarCraft II as above.
-4. Run the `./run_exp.sh` script.
+4. Set the `obs_starcraft` value in `src/config/envs/sc2.yaml` to `True` (closed-loop) or `False` (open-loop) as appropriate. 
+5. Run the `./run_exp.sh` script.
 
 
 ### Copyright and usage restrictions
