@@ -43,7 +43,7 @@ for lr in "${lrs[@]}"; do
             for((i=0;i<times;i++)); do
                 for unit in "${units[@]}"; do
                     group="${config}-${map}-${tag}"
-                    echo python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.start_positions.n_enemies=$unit group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=True save_model=True "${args[@]}"
+                    python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.start_positions.n_enemies=$unit group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=True save_model=True "${args[@]}"
 
                     count=$(($count + 1))
                     if [ $(($count % $threads)) -eq 0 ]; then
