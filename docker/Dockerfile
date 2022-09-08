@@ -17,7 +17,7 @@ RUN pip install pymongo
 
 ## -- SMAC
 ENV smac_ver 1
-RUN pip install git+https://github.com/benellis3/smac.git@smac-v2
+RUN pip install git+https://github.com/oxwhirl/smacv2.git@ranges
 ENV SC2PATH /home/minsun/pymarl/3rdparty/StarCraftII
 
 RUN git clone https://github.com/koulanurag/ma-gym.git /install/ma-gym && cd /install/ma-gym && pip install -e .

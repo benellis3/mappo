@@ -16,6 +16,8 @@ fi
 
 NV_GPU="$GPU" ${cmd} run \
     -e WANDB_API_KEY=$WANDB_API_KEY \
+    -e LANG=C.UTF-8 \
+    -e LC_ALL=C.UTF-8 \
     --name $name \
     --user $(id -u) \
     --memory 100g \
