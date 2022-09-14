@@ -28,6 +28,19 @@ class BasicMAC:
         else:
             self.is_obs_normalized = False
 
+    def update_rms(self, batch):
+        avail_actions = batch["avail_actions"][:, :].cuda()
+        if self.env_type == "matrix_game":
+            alive_mask = (th.sum(avail_actions, dim=-1) > 0.0).float()
+        elif self.env_type == "sc2" or self.env_type == "sc2wrapped":
+            alive_mask = (
+                (avail_actions[:, :, :, 0] < 1.0)
+                * (th.sum(avail_actions, dim=-1) > 0.0)
+            ).float()
+        else:
+            raise NotImplementedError
+        return self.update_rms(batch, alive_mask)
+
     def update_rms(self, batch, alive_mask):
         obs = batch["obs"][:, :].cuda() # ignore the last obs
         flat_obs = obs.clone().reshape(-1, obs.shape[-1])
