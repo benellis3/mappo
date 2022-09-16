@@ -15,7 +15,7 @@ class BasicMAC:
         self.agent_output_type = args.agent_output_type
         self.need_agent_logits = getattr(args, "need_agent_logits", False)
         self.detach_every = getattr(args, "detach_every", None)
-        self.replace_every = getattr(args, "replace_every", None) 
+        self.replace_every = getattr(args, "replace_every", None)
 
         self.action_selector = action_REGISTRY[args.action_selector](args)
 
@@ -27,19 +27,6 @@ class BasicMAC:
             self.is_obs_normalized = True
         else:
             self.is_obs_normalized = False
-
-    def update_rms(self, batch):
-        avail_actions = batch["avail_actions"][:, :].cuda()
-        if self.env_type == "matrix_game":
-            alive_mask = (th.sum(avail_actions, dim=-1) > 0.0).float()
-        elif self.env_type == "sc2" or self.env_type == "sc2wrapped":
-            alive_mask = (
-                (avail_actions[:, :, :, 0] < 1.0)
-                * (th.sum(avail_actions, dim=-1) > 0.0)
-            ).float()
-        else:
-            raise NotImplementedError
-        return self.update_rms(batch, alive_mask)
 
     def update_rms(self, batch, alive_mask):
         obs = batch["obs"][:, :].cuda() # ignore the last obs
@@ -97,9 +84,11 @@ class BasicMAC:
 
     def save_models(self, path):
         th.save(self.agent.state_dict(), "{}/agent.th".format(path))
+        self.obs_rms.save_model(path, "obs")
 
     def load_models(self, path):
         self.agent.load_state_dict(th.load("{}/agent.th".format(path), map_location=lambda storage, loc: storage))
+        self.obs_rms.load_model(path, "obs")
 
     def _build_agents(self, input_shape):
         self.agent = agent_REGISTRY[self.args.agent](input_shape, self.args)
@@ -141,7 +130,7 @@ class BasicMAC:
             # update obs directly in batch
             obs = (obs - obs_mean) / th.sqrt(obs_var + 1e-6 )
 
-        inputs.append(obs) 
+        inputs.append(obs)
 
         if self.args.obs_last_action:
             if t == 0:

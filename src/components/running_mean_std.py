@@ -23,6 +23,16 @@ class RunningMeanStd(object):
         self.mean.cuda()
         self.var.cuda()
 
+    def save_model(self, model_path, rms_id):
+        th.save(self.mean, f"{model_path}/{rms_id}_mean.pt")
+        th.save(self.var, f"{model_path}/{rms_id}_var.pt")
+        th.save(self.var, f"{model_path}/{rms_id}_count.pt")
+
+    def load_model(self, model_path, rms_id):
+        self.mean = th.load(f"{model_path}/{rms_id}_mean.pt")
+        self.var = th.load(f"{model_path}/{rms_id}_var.pt")
+        self.count = th.load(f"{model_path}/{rms_id}_count.pt")
+
 def update_mean_var_count_from_moments(mean, var, count, batch_mean, batch_var, batch_count):
     delta = batch_mean - mean
     tot_count = count + batch_count
