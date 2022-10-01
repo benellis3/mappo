@@ -288,8 +288,6 @@ class ParallelRunner:
                 )
             self.log_train_stats_t = self.t_env
 
-        if test_mode:
-            self.mac.update_rms(self.batch)
         return self.batch
 
     def _log(self, returns, stats, prefix):
