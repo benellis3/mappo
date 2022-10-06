@@ -15,9 +15,10 @@ function onCtrlC () {
 
 config=$1  # qmix
 tag=$2
-units=${3:-5}   # MMM2 left out
+units=${3:-5,10,20}   # MMM2 left out
 clipping_range=${9:-0.1}
 lr=${10:-0.001}
+offset=3
 maps=${8:-sc2_gen_protoss,sc2_gen_zerg,sc2_gen_terran}
 threads=${4:-27} # 2
 args=${5:-}    # ""
@@ -54,7 +55,8 @@ for lr in "${lrs[@]}"; do
                 for unit in "${units[@]}"; do
                     gpu=${gpus[$(($count % ${#gpus[@]}))]}  
                     group="${config}-${tag}"
-                    $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.start_positions.n_enemies=$unit group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=True save_model=True "${args[@]}" &
+                    enemies=$(($unit + $offset))
+                    $debug ./run_docker.sh $gpu python3 src/main.py --no-mongo --config="$config" --env-config="$map" with env_args.capability_config.n_units=$unit env_args.capability_config.n_enemies=$enemies group="$group" clip_range=$clipping_range lr_actor=$lr use_wandb=True save_model=True "${args[@]}" &
 
                     count=$(($count + 1))     
                     if [ $(($count % $threads)) -eq 0 ]; then
