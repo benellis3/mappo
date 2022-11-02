@@ -15,11 +15,11 @@ function onCtrlC () {
 
 config=$1  # qmix
 tag=$2
-units=${3:-5,10,20}   # MMM2 left out
+units=${3:-5}   # MMM2 left out
 clipping_range=${9:-0.1}
 lr=${10:-0.0001}
-offset=3
-maps=${8:-sc2_gen_protoss,sc2_gen_zerg,sc2_gen_terran}
+offset=0
+maps=${8:-sc2_gen_protoss,sc2_gen_zerg,sc2_gen_terran,sc2_gen_protoss_open_loop,sc2_gen_terran_open_loop,sc2_gen_zerg_open_loop}
 threads=${4:-27} # 2
 args=${5:-}    # ""
 gpus=${6:-0,1,2,3,4,5,6,7}    # 0,1,2
