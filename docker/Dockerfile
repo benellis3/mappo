@@ -21,7 +21,7 @@ RUN pip install pymongo
 
 ## -- SMAC
 ENV smac_ver 1
-RUN pip install "protobuf<3.21" git+https://github.com/oxwhirl/smacv2.git@ranges
+RUN pip install "protobuf<3.21" git+https://github.com/oxwhirl/smacv2.git
 ENV SC2PATH /home/minsun/pymarl/3rdparty/StarCraftII
 
 RUN git clone https://github.com/koulanurag/ma-gym.git /install/ma-gym && cd /install/ma-gym && pip install -e .
