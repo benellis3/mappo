@@ -33,10 +33,11 @@ if [ ! -d $MAP_DIR ]; then
 fi
 
 cd ..
-wget https://github.com/oxwhirl/smac/releases/download/v0.1-beta1/SMAC_Maps.zip
-unzip SMAC_Maps.zip
-mv SMAC_Maps $MAP_DIR
-rm -rf SMAC_Maps.zip
 
+rm -rf SMAC_Maps.zip
+wget https://github.com/oxwhirl/smacv2/releases/download/maps/SMAC_Maps.zip
+unzip SMAC_Maps.zip
+mkdir "$MAP_DIR/SMAC_Maps"
+mv *.SC2Map "$MAP_DIR/SMAC_Maps"
 echo 'StarCraft II and SMAC are installed.'
 

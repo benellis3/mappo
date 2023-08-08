@@ -8,13 +8,9 @@ name=${USER}_pymarl_GPU_${GPU}_${HASH}
 echo "Launching container named '${name}' on GPU '${GPU}'"
 # Launches a docker container using our image, and runs the provided command
 
-if hash nvidia-docker 2>/dev/null; then
-  cmd=nvidia-docker
-else
-  cmd=docker
-fi
+cmd=docker
 
-NV_GPU="$GPU" ${cmd} run \
+NV_GPU="$GPU" ${cmd} run --gpus device=$GPU \
     -e WANDB_API_KEY=$WANDB_API_KEY \
     -e LANG=C.UTF-8 \
     -e LC_ALL=C.UTF-8 \

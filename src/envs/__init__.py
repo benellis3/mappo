@@ -8,7 +8,7 @@ from .test import IntegrationTestEnv
 from .multiagentenv import MultiAgentEnv
 from .stag_hunt import StagHunt
 #from .starcraft2 import StarCraft2Env
-from smac.env import MultiAgentEnv, StarCraft2Env, StarCraftCapabilityEnvWrapper
+from smacv2.env import MultiAgentEnv, StarCraft2Env, StarCraftCapabilityEnvWrapper
 try:
     from smac.env import StarCraft2CustomEnv
 except Exception as e:

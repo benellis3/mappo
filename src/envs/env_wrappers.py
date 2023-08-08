@@ -3,7 +3,7 @@ import os
 os.environ.setdefault('PATH', '')
 from collections import deque
 
-from smac.env import MultiAgentEnv, StarCraft2Env
+from smacv2.env import MultiAgentEnv, StarCraft2Env
 
 # Reference: https://github.com/Denys88/rl_games/blob/master/common/wrappers.py
 #            baselines.common.atari_wrappers.LazyFrames
