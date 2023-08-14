@@ -24,7 +24,7 @@ args=${5:-}    # ""
 gpus=${6:-0,1,2,3,4,5,6,7}    # 0,1,2,3,4,5,6,7
 times=${7:-3}   # 5
 prob_obs_enemy=${9:-1.0}
-lr=0.0005
+lr=0.0001
 clipping_range=0.1
 dist=surrounded_and_reflect
 
